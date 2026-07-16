@@ -1,0 +1,16 @@
+{
+  "name": "@reference-vault/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@reference-vault/shared": "file:../../packages/shared",
+    "fastify": "^5.10.0"
+  }
+}

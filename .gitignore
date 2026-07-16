@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+*.log
+
+# A local development fixture; reference media and metadata are never committed.
+ReferenceLibrary/
+
+# Tooling and editor state.
+.vite/
+.eslintcache
