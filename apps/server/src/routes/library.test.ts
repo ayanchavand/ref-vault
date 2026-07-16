@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -169,6 +169,47 @@ test("rejects a video path that escapes the library root", async () => {
       error: "INVALID_VIDEO_PATH",
       message: "videoRelativePath must stay within the library root.",
     });
+  } finally {
+    await app.close();
+    await rm(library, { force: true, recursive: true });
+  }
+});
+
+test("atomically creates the metadata JSON beside a verified clip", async () => {
+  const library = await mkdtemp(join(tmpdir(), "reference-vault-"));
+  const videoDirectory = join(library, "video-a");
+  const clipsDirectory = join(videoDirectory, "clips");
+  await mkdir(clipsDirectory, { recursive: true });
+  await writeFile(join(videoDirectory, "main.mp4"), "");
+  await writeFile(join(clipsDirectory, "0.mp4"), "");
+  const app = await buildApp();
+  const metadata = {
+    tags: ["animation"],
+    notes: "Anticipation before the jump.",
+    futureField: { source: "study" },
+  };
+
+  try {
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/clips/metadata",
+      payload: {
+        rootPath: library,
+        videoRelativePath: "video-a",
+        clipMediaPath: "video-a/clips/0.mp4",
+        metadata,
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), {
+      metadataPath: "video-a/clips/0.json",
+      metadata,
+    });
+    assert.deepEqual(
+      JSON.parse(await readFile(join(clipsDirectory, "0.json"), "utf8")),
+      metadata,
+    );
   } finally {
     await app.close();
     await rm(library, { force: true, recursive: true });

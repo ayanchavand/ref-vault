@@ -55,6 +55,18 @@ export interface GetVideoDetailResponse {
   video: VideoDetail;
 }
 
+export interface PutClipMetadataRequest {
+  rootPath: string;
+  videoRelativePath: string;
+  clipMediaPath: string;
+  metadata: JsonObject;
+}
+
+export interface PutClipMetadataResponse {
+  metadataPath: string;
+  metadata: JsonObject;
+}
+
 export type LibraryRootValidationErrorCode =
   | "INVALID_LIBRARY_ROOT"
   | "LIBRARY_ROOT_NOT_FOUND"
@@ -63,7 +75,10 @@ export type LibraryRootValidationErrorCode =
   | "INVALID_VIDEO_PATH"
   | "VIDEO_NOT_FOUND"
   | "INVALID_METADATA_JSON"
-  | "METADATA_READ_FAILED";
+  | "METADATA_READ_FAILED"
+  | "INVALID_CLIP_PATH"
+  | "CLIP_NOT_FOUND"
+  | "METADATA_WRITE_FAILED";
 
 export interface ApiErrorResponse {
   error: LibraryRootValidationErrorCode;
