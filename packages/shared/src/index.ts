@@ -28,13 +28,45 @@ export interface ScanLibraryResponse {
   videos: ScannedVideo[];
 }
 
+export type JsonPrimitive = boolean | number | string | null;
+export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+export interface JsonObject {
+  [key: string]: JsonValue;
+}
+
+export interface GetVideoDetailRequest {
+  rootPath: string;
+  videoRelativePath: string;
+}
+
+export interface DetailedClip extends ScannedClip {
+  metadata?: JsonObject;
+}
+
+export interface VideoDetail {
+  relativePath: string;
+  mainVideoPath: string;
+  metadata?: JsonObject;
+  clips: DetailedClip[];
+}
+
+export interface GetVideoDetailResponse {
+  rootPath: string;
+  video: VideoDetail;
+}
+
 export type LibraryRootValidationErrorCode =
   | "INVALID_LIBRARY_ROOT"
   | "LIBRARY_ROOT_NOT_FOUND"
   | "LIBRARY_ROOT_NOT_ACCESSIBLE"
-  | "LIBRARY_SCAN_FAILED";
+  | "LIBRARY_SCAN_FAILED"
+  | "INVALID_VIDEO_PATH"
+  | "VIDEO_NOT_FOUND"
+  | "INVALID_METADATA_JSON"
+  | "METADATA_READ_FAILED";
 
 export interface ApiErrorResponse {
   error: LibraryRootValidationErrorCode;
   message: string;
+  path?: string;
 }
