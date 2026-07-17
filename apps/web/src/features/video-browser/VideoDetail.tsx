@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { VideoDetail as VideoDetailType, JsonObject } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover } from "./Uselazythumbnail";
 import { putClipMetadata, ApiError } from "../../lib/api";
+
 
 interface VideoDetailProps {
   rootPath: string;
@@ -14,6 +15,40 @@ function pad(index: number) {
   return String(index + 1).padStart(3, "0");
 }
 
+function getTagColorClass(tag: string): string {
+  const clean = tag.toLowerCase().trim();
+  
+  if (clean.includes("camera") || clean.includes("pan") || clean.includes("tilt") || clean.includes("zoom") || clean.includes("track") || clean.includes("dolly") || clean.includes("shot")) {
+    return "border-sky-500/20 bg-sky-500/5 text-sky-300";
+  }
+  if (clean.includes("light") || clean.includes("glow") || clean.includes("shadow") || clean.includes("neon") || clean.includes("contrast") || clean.includes("dark") || clean.includes("bright")) {
+    return "border-amber-500/20 bg-amber-500/5 text-amber-300";
+  }
+  if (clean.includes("cut") || clean.includes("transition") || clean.includes("edit") || clean.includes("whip") || clean.includes("fade") || clean.includes("dissolve")) {
+    return "border-emerald-500/20 bg-emerald-500/5 text-emerald-300";
+  }
+  if (clean.includes("color") || clean.includes("grade") || clean.includes("lut") || clean.includes("mood") || clean.includes("warm") || clean.includes("cool")) {
+    return "border-rose-500/20 bg-rose-500/5 text-rose-300";
+  }
+  if (clean.includes("vfx") || clean.includes("cgi") || clean.includes("smoke") || clean.includes("particle") || clean.includes("effect")) {
+    return "border-indigo-500/20 bg-indigo-500/5 text-indigo-300";
+  }
+
+  const presetStyles = [
+    "border-white/[0.08] bg-white/[0.03] text-white/70",
+    "border-purple-500/20 bg-purple-500/5 text-purple-300",
+    "border-teal-500/20 bg-teal-500/5 text-teal-300",
+    "border-orange-500/20 bg-orange-500/5 text-orange-300",
+    "border-pink-500/20 bg-pink-500/5 text-pink-300"
+  ];
+  
+  let hash = 0;
+  for (let i = 0; i < clean.length; i++) {
+    hash = clean.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % presetStyles.length;
+  return presetStyles[index]!;
+}
 
 function ShimmerFill() {
   return (
@@ -50,16 +85,21 @@ function MetadataTags({ metadata }: { metadata: NonNullable<VideoDetailType["cli
         Metadata · {entries.length}
       </p>
       <div className="flex flex-wrap gap-1.5">
-        {visible.map((tag, i) => (
-          <span
-            key={`${tag.key}-${i}`}
-            className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 font-mono text-[0.62rem] text-white/60"
-          >
-            <span className="font-semibold text-amber-300/70">{tag.key}</span>
-            <span className="text-white/20">·</span>
-            <span className="max-w-[10rem] truncate text-white/70">{tag.display}</span>
-          </span>
-        ))}
+        {visible.map((tag, i) => {
+          const isTag = tag.key === "tags";
+          const colorClass = isTag ? getTagColorClass(tag.display) : "border-white/[0.08] bg-white/[0.03] text-white/70";
+          return (
+            <span
+              key={`${tag.key}-${i}`}
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[0.62rem] ${colorClass}`}
+            >
+              <span className="font-semibold text-amber-300/70">{tag.key}</span>
+              <span className="text-white/20">·</span>
+              <span className="max-w-[10rem] truncate">{tag.display}</span>
+            </span>
+          );
+        })}
+
 
         {hiddenCount > 0 && (
           <button
@@ -225,6 +265,33 @@ function ClipMetadataEditor({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  const allLibraryTags = useMemo(() => {
+    const set = new Set<string>();
+    video.clips.forEach((c) => {
+      extractTags(c.metadata).forEach((tag) => set.add(tag));
+    });
+    return Array.from(set).sort();
+  }, [video.clips]);
+
+  const activeTags = useMemo(() => {
+    return tagsInput
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+  }, [tagsInput]);
+
+  const suggestedTags = useMemo(() => {
+    return allLibraryTags.filter((tag) => !activeTags.includes(tag));
+  }, [allLibraryTags, activeTags]);
+
+  function handleAddSuggestion(tag: string) {
+    if (!activeTags.includes(tag)) {
+      const newTags = [...activeTags, tag];
+      setTagsInput(newTags.join(", "));
+    }
+  }
+
+
   // Initialize form state from clip metadata
   useEffect(() => {
     const tags = extractTags(clip.metadata);
@@ -331,7 +398,6 @@ function ClipMetadataEditor({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-4">
-          {/* Tags Field */}
           <div className="space-y-1.5">
             <label htmlFor="clip-tags" className="block font-mono text-[0.65rem] uppercase tracking-wider text-white/50">
               Tags (comma separated)
@@ -345,7 +411,27 @@ function ClipMetadataEditor({
               disabled={isSaving}
               className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2 text-sm text-white/95 placeholder:text-white/25 focus:border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/50 disabled:opacity-50"
             />
+            {/* Tag suggestions display */}
+            {suggestedTags.length > 0 && (
+              <div className="mt-1.5 space-y-1">
+                <span className="block font-mono text-[0.55rem] uppercase tracking-wider text-white/20">Suggestions</span>
+                <div className="flex flex-wrap gap-1">
+                  {suggestedTags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => handleAddSuggestion(tag)}
+                      disabled={isSaving}
+                      className={`rounded-full border px-2 py-0.5 font-mono text-[0.58rem] transition focus:outline-none ${getTagColorClass(tag)} hover:opacity-85`}
+                    >
+                      + {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
+
 
           {/* Rating Field */}
           <div className="space-y-1.5">
@@ -438,9 +524,11 @@ export function VideoDetail({ rootPath, video, onBack, onUpdateVideoDetail }: Vi
 
   const [selectedMediaPath, setSelectedMediaPath] = useState(video.mainVideoPath);
 
-  useEffect(() => {
-    setSelectedMediaPath(video.mainVideoPath);
-  }, [video.mainVideoPath]);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isLooping, setIsLooping] = useState(false);
+  const [playRate, setPlayRate] = useState(1);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   const mediaUrl = useMemo(() => {
     return `/api/media?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
@@ -455,6 +543,71 @@ export function VideoDetail({ rootPath, video, onBack, onUpdateVideoDetail }: Vi
         )}`
       : undefined;
   }, [rootPath, video.thumbnailPath]);
+
+  useEffect(() => {
+    setSelectedMediaPath(video.mainVideoPath);
+    setPlayRate(1);
+  }, [video.mainVideoPath]);
+
+  function stepFrameForward() {
+    if (videoRef.current) {
+      videoRef.current.currentTime += 0.04;
+    }
+  }
+
+  function stepFrameBackward() {
+    if (videoRef.current) {
+      videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 0.04);
+    }
+  }
+
+  function changePlayRate(rate: number) {
+    setPlayRate(rate);
+    if (videoRef.current) {
+      videoRef.current.playbackRate = rate;
+    }
+  }
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = playRate;
+      videoRef.current.loop = isLooping;
+    }
+  }, [mediaUrl, playRate, isLooping]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const activeEl = document.activeElement;
+      const isTyping = activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
+      if (isTyping) return;
+
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        stepFrameBackward();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        stepFrameForward();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  function formatTimecode(secs: number) {
+    const hours = Math.floor(secs / 3600);
+    const minutes = Math.floor((secs % 3600) / 60);
+    const seconds = Math.floor(secs % 60);
+    const frames = Math.floor((secs % 1) * 24);
+    return [
+      String(hours).padStart(2, "0"),
+      String(minutes).padStart(2, "0"),
+      String(seconds).padStart(2, "0"),
+      String(frames).padStart(2, "0"),
+    ].join(":");
+  }
+
+
+
 
   const isMainPlaying = selectedMediaPath === video.mainVideoPath;
 
@@ -508,25 +661,102 @@ export function VideoDetail({ rootPath, video, onBack, onUpdateVideoDetail }: Vi
 
           {/* Viewfinder-framed player — signature element */}
           <div className="relative flex-1">
+            {/* Corner Viewfinder Braces */}
             <div className="pointer-events-none absolute -inset-1 z-10">
               <span className="absolute left-0 top-0 h-6 w-6 border-l-2 border-t-2 border-amber-400/50" />
               <span className="absolute right-0 top-0 h-6 w-6 border-r-2 border-t-2 border-amber-400/50" />
               <span className="absolute bottom-0 left-0 h-6 w-6 border-b-2 border-l-2 border-amber-400/50" />
               <span className="absolute bottom-0 right-0 h-6 w-6 border-b-2 border-r-2 border-amber-400/50" />
             </div>
+
+            {/* Viewfinder HUD overlays */}
+            <div className="absolute top-3.5 left-3.5 z-20 flex items-center gap-1.5 pointer-events-none font-mono text-[0.62rem] tracking-wider text-rose-500 uppercase bg-black/40 px-2 py-0.5 rounded backdrop-blur-[1px]">
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-600 animate-pulse" />
+              <span>REC</span>
+            </div>
+            <div className="absolute top-3.5 right-3.5 z-20 pointer-events-none font-mono text-[0.62rem] tracking-wider text-white/40 bg-black/40 px-2 py-0.5 rounded backdrop-blur-[1px]">
+              <span>1080p · 24fps</span>
+            </div>
+
+            <div className="absolute bottom-3.5 left-3.5 z-20 pointer-events-none font-mono text-[0.68rem] tracking-widest text-amber-300 font-semibold bg-black/60 px-2.5 py-0.5 rounded backdrop-blur-[1px] border border-amber-400/10">
+              <span>TC {formatTimecode(currentTime)}</span>
+            </div>
+            <div className="absolute bottom-3.5 right-3.5 z-20 pointer-events-none font-mono text-[0.68rem] tracking-widest text-white/40 bg-black/60 px-2.5 py-0.5 rounded backdrop-blur-[1px]">
+              <span>DUR {formatTimecode(duration)}</span>
+            </div>
+
             <div className="min-h-[55vh] overflow-hidden rounded-2xl border border-white/[0.06] bg-black">
               <video
+                ref={videoRef}
                 controls
                 className="h-full w-full bg-black"
                 style={{ minHeight: "55vh" }}
                 src={mediaUrl}
                 poster={posterUrl}
                 preload="metadata"
+                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
               >
                 Your browser does not support the video element.
               </video>
             </div>
           </div>
+
+          {/* Advanced Playback Control Panel */}
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/[0.04] bg-white/[0.01] p-3 text-sm">
+            {/* Frame step buttons */}
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={stepFrameBackward}
+                title="Step 1 Frame Back (Left Arrow)"
+                className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-white/80 hover:border-amber-400/40 hover:bg-white/[0.06] transition focus:outline-none"
+              >
+                ◀ Frame
+              </button>
+              <button
+                type="button"
+                onClick={stepFrameForward}
+                title="Step 1 Frame Forward (Right Arrow)"
+                className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-white/80 hover:border-amber-400/40 hover:bg-white/[0.06] transition focus:outline-none"
+              >
+                Frame ▶
+              </button>
+            </div>
+
+            {/* Playback speed rate selection */}
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-[0.6rem] uppercase tracking-widest text-white/30 mr-1">Speed</span>
+              {[0.25, 0.5, 1, 2].map((rate) => (
+                <button
+                  key={rate}
+                  type="button"
+                  onClick={() => changePlayRate(rate)}
+                  className={`rounded-lg px-2.5 py-1 font-mono text-xs transition focus:outline-none ${
+                    playRate === rate
+                      ? "bg-amber-400 font-semibold text-[#0A0B0D]"
+                      : "border border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
+                  }`}
+                >
+                  {rate}x
+                </button>
+              ))}
+            </div>
+
+            {/* Loop Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsLooping(!isLooping)}
+              className={`rounded-lg px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition focus:outline-none ${
+                isLooping
+                  ? "bg-amber-400/20 border border-amber-400/50 text-amber-300 font-semibold shadow-[0_0_8px_rgba(232,163,61,0.2)]"
+                  : "border border-white/[0.08] bg-white/[0.03] text-white/60 hover:text-white"
+              }`}
+            >
+              Loop: {isLooping ? "ON" : "OFF"}
+            </button>
+          </div>
+
 
           {!isMainPlaying && activeClip && (
             <div className="mt-4 border-t border-white/[0.06] pt-6">

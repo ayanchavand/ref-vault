@@ -43,12 +43,14 @@ function VideoThumbnailCard({
   isOpening,
   disabled,
   onSelect,
+  viewMode = "details",
 }: {
   rootPath: string;
   video: ScannedVideo;
   isOpening: boolean;
   disabled: boolean;
   onSelect(): void;
+  viewMode?: "details" | "moodboard";
 }) {
   const [isHovering, setIsHovering] = useState(false);
 
@@ -69,13 +71,15 @@ function VideoThumbnailCard({
   const { containerRef, poster } = useDynamicThumbnail({ mediaUrl, posterUrl, frameCount: 4, isHovering });
   const prefetchHandlers = usePrefetchOnHover(mediaUrl);
 
+  const isMoodboard = viewMode === "moodboard";
+
   return (
     <li
-      className={`group relative overflow-hidden rounded-2xl border transition-all duration-200 ${
+      className={`group relative overflow-hidden rounded-2xl border transition-all duration-300 ${
         isOpening
           ? "border-amber-400/50"
-          : "border-white/[0.06] hover:-translate-y-1 hover:border-amber-400/40 hover:bg-[#14171B] hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)]"
-      } bg-[#111316]`}
+          : "border-white/[0.06] hover:-translate-y-1 hover:border-amber-400/50 hover:shadow-[0_12px_36px_rgba(0,0,0,0.5)]"
+      } bg-[#111316]/50 backdrop-blur-md`}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
@@ -92,8 +96,8 @@ function VideoThumbnailCard({
             <img
               src={poster}
               alt=""
-              className={`h-full w-full object-cover transition-opacity duration-200 ${
-                isOpening ? "opacity-40" : "opacity-90 group-hover:opacity-100"
+              className={`h-full w-full object-cover transition-all duration-300 ${
+                isOpening ? "opacity-40" : "opacity-90 group-hover:opacity-100 group-hover:scale-105"
               }`}
             />
           ) : (
@@ -105,32 +109,44 @@ function VideoThumbnailCard({
             </div>
           )}
 
-          <span className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
-          <span className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 font-mono text-[0.6rem] uppercase tracking-widest text-amber-300/90 backdrop-blur-sm">
+          <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          <span className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-md bg-black/75 px-2 py-1 font-mono text-[0.6rem] uppercase tracking-widest text-amber-300/90 backdrop-blur-sm">
             <span className="h-1.5 w-1.5 rounded-full bg-amber-400/80" />
             {video.clips.length} clip{video.clips.length !== 1 ? "s" : ""}
           </span>
 
           {isOpening && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/50 backdrop-blur-[1px]">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/60 backdrop-blur-[2px]">
               <span className="h-6 w-6 animate-spin rounded-full border-2 border-amber-400/30 border-t-amber-400" />
               <span className="font-mono text-[0.6rem] uppercase tracking-widest text-amber-300">
                 Opening…
               </span>
             </div>
           )}
+
+          {isMoodboard && (
+            <div className="absolute inset-x-0 bottom-0 p-3.5 bg-gradient-to-t from-black via-black/75 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0">
+              <p className="truncate font-semibold text-white text-sm">{video.relativePath}</p>
+              <p className="mt-0.5 truncate font-mono text-[0.65rem] text-white/40">
+                {video.mainVideoPath.split("/").pop() ?? video.mainVideoPath}
+              </p>
+            </div>
+          )}
         </div>
 
-        <div className="w-full p-4">
-          <p className="truncate font-semibold text-white/90">{video.relativePath}</p>
-          <p className="mt-1.5 truncate font-mono text-xs text-white/35">
-            {video.mainVideoPath.split("/").pop() ?? video.mainVideoPath}
-          </p>
-        </div>
+        {!isMoodboard && (
+          <div className="w-full p-4 border-t border-white/[0.02]">
+            <p className="truncate font-semibold text-white/95">{video.relativePath}</p>
+            <p className="mt-1 truncate font-mono text-xs text-white/35">
+              {video.mainVideoPath.split("/").pop() ?? video.mainVideoPath}
+            </p>
+          </div>
+        )}
       </button>
     </li>
   );
 }
+
 
 export function VideoList({
   rootPath,
@@ -142,9 +158,11 @@ export function VideoList({
   openingVideoPath,
   error,
 }: VideoListProps) {
+  const [viewMode, setViewMode] = useState<"details" | "moodboard">("details");
   const isInitialScan = isLoading && videos.length === 0;
 
   return (
+
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 min-w-0">
@@ -156,7 +174,29 @@ export function VideoList({
             <p className="mt-1 truncate font-mono text-sm text-white/50">{rootPath}</p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5 mr-1 backdrop-blur-sm">
+            <button
+              onClick={() => setViewMode("details")}
+              className={`rounded-md px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition ${
+                viewMode === "details"
+                  ? "bg-amber-400 font-semibold text-[#0A0B0D]"
+                  : "text-white/60 hover:text-white"
+              }`}
+            >
+              List
+            </button>
+            <button
+              onClick={() => setViewMode("moodboard")}
+              className={`rounded-md px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition ${
+                viewMode === "moodboard"
+                  ? "bg-amber-400 font-semibold text-[#0A0B0D]"
+                  : "text-white/60 hover:text-white"
+              }`}
+            >
+              Board
+            </button>
+          </div>
           <button
             onClick={onBrowseTags}
             className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
@@ -170,6 +210,7 @@ export function VideoList({
             Change library
           </button>
         </div>
+
       </div>
 
       {error && (
@@ -209,18 +250,21 @@ export function VideoList({
             <p className="text-sm text-white/40">No videos were found in this library.</p>
           </div>
         ) : (
-          <ul className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className={`grid gap-5 sm:grid-cols-2 ${viewMode === "moodboard" ? "lg:grid-cols-3 xl:grid-cols-4" : "xl:grid-cols-3"}`}>
+
             {videos.map((video) => (
               <VideoThumbnailCard
                 key={video.relativePath}
                 rootPath={rootPath}
                 video={video}
+                viewMode={viewMode}
                 isOpening={openingVideoPath === video.relativePath}
                 disabled={openingVideoPath !== null}
                 onSelect={() => onSelectVideo(video)}
               />
             ))}
           </ul>
+
         )}
       </div>
     </div>

@@ -351,6 +351,7 @@ export function App() {
             <VideoDetail
               rootPath={activeRootPath!}
               video={videoDetail}
+              allVideos={scanResult?.videos || []}
               onBack={handleBackToLibrary}
               onUpdateVideoDetail={handleUpdateVideoDetail}
             />
