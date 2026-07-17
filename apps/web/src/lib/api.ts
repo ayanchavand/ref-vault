@@ -6,6 +6,8 @@ import type {
   ValidateLibraryRootResponse,
   PutClipMetadataRequest,
   PutClipMetadataResponse,
+  PutVideoMetadataRequest,
+  PutVideoMetadataResponse,
 } from "@reference-vault/shared";
 
 export class ApiError extends Error {
@@ -83,5 +85,23 @@ export async function putClipMetadata(
   }
 
   return payload as PutClipMetadataResponse;
+}
+
+export async function putVideoMetadata(
+  request: PutVideoMetadataRequest,
+): Promise<PutVideoMetadataResponse> {
+  const response = await fetch("/api/videos/metadata", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const payload: unknown = await response.json();
+
+  if (!response.ok) {
+    const error = payload as ApiErrorResponse;
+    throw new ApiError(error.message || "The video metadata could not be saved.");
+  }
+
+  return payload as PutVideoMetadataResponse;
 }
 

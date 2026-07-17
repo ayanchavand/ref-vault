@@ -70,6 +70,17 @@ export interface PutClipMetadataResponse {
   metadata: JsonObject;
 }
 
+export interface PutVideoMetadataRequest {
+  rootPath: string;
+  videoRelativePath: string;
+  metadata: JsonObject;
+}
+
+export interface PutVideoMetadataResponse {
+  metadataPath: string;
+  metadata: JsonObject;
+}
+
 export type LibraryRootValidationErrorCode =
   | "INVALID_LIBRARY_ROOT"
   | "LIBRARY_ROOT_NOT_FOUND"

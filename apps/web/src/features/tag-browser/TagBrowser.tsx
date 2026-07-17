@@ -97,8 +97,9 @@ function TagBrowserClipCard({
 }
 
 export function TagBrowser({ rootPath, videos, onBack, onSelectVideo }: TagBrowserProps) {
-  const [tagMap, setTagMap] = useState<Record<string, TaggedClip[]>>({});
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [videoDetails, setVideoDetails] = useState<VideoDetailType[]>([]);
+  const [selectedVideoTags, setSelectedVideoTags] = useState<string[]>([]);
+  const [selectedClipTags, setSelectedClipTags] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,8 +107,9 @@ export function TagBrowser({ rootPath, videos, onBack, onSelectVideo }: TagBrows
     let active = true;
     setIsLoading(true);
     setError(null);
-    setTagMap({});
-    setSelectedTag(null);
+    setVideoDetails([]);
+    setSelectedVideoTags([]);
+    setSelectedClipTags([]);
 
     if (videos.length === 0) {
       setIsLoading(false);
@@ -117,7 +119,10 @@ export function TagBrowser({ rootPath, videos, onBack, onSelectVideo }: TagBrows
     Promise.all(
       videos.map(async (video) => {
         try {
-          return { ok: true as const, video: await getVideoDetail({ rootPath, videoRelativePath: video.relativePath }) };
+          return {
+            ok: true as const,
+            video: await getVideoDetail({ rootPath, videoRelativePath: video.relativePath }),
+          };
         } catch (cause) {
           return { ok: false as const, error: cause, video };
         }
@@ -127,7 +132,7 @@ export function TagBrowser({ rootPath, videos, onBack, onSelectVideo }: TagBrows
         return;
       }
 
-      const nextTagMap: Record<string, TaggedClip[]> = {};
+      const details: VideoDetailType[] = [];
       const errors: string[] = [];
 
       for (const result of results) {
@@ -139,59 +144,10 @@ export function TagBrowser({ rootPath, videos, onBack, onSelectVideo }: TagBrows
           );
           continue;
         }
-
-        const videoDetail = result.video.video;
-        const videoTags = extractTags(videoDetail.metadata);
-        const clipTagsById = new Map<string, Set<string>>();
-
-        for (const clip of videoDetail.clips) {
-          clipTagsById.set(clip.mediaPath, new Set(extractTags(clip.metadata)));
-        }
-
-        for (const tag of videoTags) {
-          for (const clip of videoDetail.clips) {
-            const existing = clipTagsById.get(clip.mediaPath);
-            if (existing) {
-              existing.add(tag);
-            }
-          }
-        }
-
-        for (const clip of videoDetail.clips) {
-          const clipTags = Array.from(clipTagsById.get(clip.mediaPath) ?? []);
-
-          for (const tag of clipTags) {
-            if (!nextTagMap[tag]) {
-              nextTagMap[tag] = [];
-            }
-
-            const existingClip = nextTagMap[tag].find(
-              (entry) => entry.clip.mediaPath === clip.mediaPath,
-            );
-            if (existingClip) {
-              continue;
-            }
-
-            nextTagMap[tag].push({ clip, video: videoDetail, source: clip.metadata ? "clip" : "video" });
-          }
-        }
+        details.push(result.video.video);
       }
 
-      if (!active) {
-        return;
-      }
-
-      const sortedTagKeys = Object.keys(nextTagMap).sort((left, right) =>
-        left.localeCompare(right, undefined, { sensitivity: "base" }),
-      );
-      const normalizedMap: Record<string, TaggedClip[]> = {};
-      for (const tag of sortedTagKeys) {
-        normalizedMap[tag] = nextTagMap[tag] || [];
-      }
-
-
-      setTagMap(normalizedMap);
-      setSelectedTag((current) => current ?? sortedTagKeys[0] ?? null);
+      setVideoDetails(details);
       setError(errors.length > 0 ? Array.from(new Set(errors)).join(" ") : null);
       setIsLoading(false);
     });
@@ -201,15 +157,74 @@ export function TagBrowser({ rootPath, videos, onBack, onSelectVideo }: TagBrows
     };
   }, [rootPath, videos]);
 
-  const tagEntries = useMemo(
-    () =>
-      Object.entries(tagMap).map(([tag, clips]) => ({ tag, clips })).sort((left, right) =>
-        left.tag.localeCompare(right.tag, undefined, { sensitivity: "base" }),
+  const { videoTagsList, clipTagsList } = useMemo(() => {
+    const vTags = new Set<string>();
+    const cTags = new Set<string>();
+    for (const detail of videoDetails) {
+      extractTags(detail.metadata).forEach((t) => vTags.add(t));
+      for (const clip of detail.clips) {
+        extractTags(clip.metadata).forEach((t) => cTags.add(t));
+      }
+    }
+    return {
+      videoTagsList: Array.from(vTags).sort((left, right) =>
+        left.localeCompare(right, undefined, { sensitivity: "base" }),
       ),
-    [tagMap],
-  );
+      clipTagsList: Array.from(cTags).sort((left, right) =>
+        left.localeCompare(right, undefined, { sensitivity: "base" }),
+      ),
+    };
+  }, [videoDetails]);
 
-  const selectedClips = selectedTag ? tagMap[selectedTag] ?? [] : [];
+  const videoTagCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const detail of videoDetails) {
+      const vTags = extractTags(detail.metadata);
+      for (const tag of vTags) {
+        counts[tag] = (counts[tag] || 0) + detail.clips.length;
+      }
+    }
+    return counts;
+  }, [videoDetails]);
+
+  const clipTagCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const detail of videoDetails) {
+      for (const clip of detail.clips) {
+        const cTags = extractTags(clip.metadata);
+        for (const tag of cTags) {
+          counts[tag] = (counts[tag] || 0) + 1;
+        }
+      }
+    }
+    return counts;
+  }, [videoDetails]);
+
+  const matchedClips = useMemo(() => {
+    const list: {
+      clip: VideoDetailType["clips"][number];
+      video: VideoDetailType;
+      source: "clip" | "video";
+    }[] = [];
+
+    for (const detail of videoDetails) {
+      const vTags = extractTags(detail.metadata);
+      const matchesVideo = selectedVideoTags.every((t) => vTags.includes(t));
+      if (!matchesVideo) continue;
+
+      for (const clip of detail.clips) {
+        const cTags = extractTags(clip.metadata);
+        const matchesClip = selectedClipTags.every((t) => cTags.includes(t));
+        if (!matchesClip) continue;
+
+        const source = clip.metadata ? ("clip" as const) : ("video" as const);
+        list.push({ clip, video: detail, source });
+      }
+    }
+    return list;
+  }, [videoDetails, selectedVideoTags, selectedClipTags]);
+
+  const isFilterActive = selectedVideoTags.length > 0 || selectedClipTags.length > 0;
 
   return (
     <div className="flex min-h-[calc(100vh-7rem)] flex-col gap-5 bg-[#0A0B0D] text-white">
@@ -243,74 +258,139 @@ export function TagBrowser({ rootPath, videos, onBack, onSelectVideo }: TagBrows
               Clips
             </p>
             <p className="mt-1 text-sm text-white/50">
-              Select a tag to filter clips in your library.
+              Select multiple video tags and clip subtags to filter clips in your library.
             </p>
           </div>
           <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/50">
-            {selectedClips.length} matched
+            {matchedClips.length} matched
           </span>
         </div>
 
-        {/* Tags as selectable chips */}
-        {isLoading ? (
-          <div className="mb-4 flex flex-wrap gap-2">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-8 w-24 rounded-full bg-white/[0.03]" />
-            ))}
-          </div>
-        ) : tagEntries.length === 0 ? (
-          <div className="mb-4 rounded-xl border border-dashed border-white/[0.10] px-4 py-6 text-center text-sm text-white/40">
-            No tags were discovered in the current library. Ensure clip metadata is present in `clips.json` or `metadata.json`.
-          </div>
-        ) : (
-          <div className="mb-4 flex flex-wrap gap-2">
-            {tagEntries.map(({ tag, clips }) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => setSelectedTag(tag)}
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition duration-200 ${
-                  selectedTag === tag
-                    ? "border-amber-400/60 bg-amber-400/10 text-white"
-                    : "border-white/[0.06] bg-white/[0.03] text-white/80 hover:border-amber-400/30 hover:bg-white/[0.06]"
-                }`}
-              >
-                <span className="font-medium">{tag}</span>
-                <span className="rounded-full bg-white/[0.08] px-2 text-[0.65rem] text-white/60">
-                  {formatTagCount(clips.length)}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-
-          {selectedTag === null ? (
-            <div className="rounded-xl border border-dashed border-white/[0.10] px-4 py-10 text-center text-sm text-white/40">
-              Select a tag to view matching clips.
+        {/* Video Tags Section */}
+        <div className="mb-6 space-y-2">
+          <span className="block font-mono text-[0.6rem] uppercase tracking-wider text-white/30">Video Tags</span>
+          {isLoading ? (
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="h-8 w-24 rounded-full bg-white/[0.03]" />
+              ))}
             </div>
-          ) : selectedClips.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-white/[0.10] px-4 py-10 text-center text-sm text-white/40">
-              No clips were tagged with “{selectedTag}”.
-            </div>
+          ) : videoTagsList.length === 0 ? (
+            <p className="text-xs text-white/30">No video tags discovered in this library.</p>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {selectedClips.map((entry) => {
-                const scannedVideo = videos.find((v) => v.relativePath === entry.video.relativePath);
+            <div className="flex flex-wrap gap-2">
+              {videoTagsList.map((tag) => {
+                const isSelected = selectedVideoTags.includes(tag);
                 return (
-                  <TagBrowserClipCard
-                    key={`${entry.video.relativePath}:${entry.clip.mediaPath}`}
-                    rootPath={rootPath}
-                    entry={entry}
+                  <button
+                    key={tag}
+                    type="button"
                     onClick={() => {
-                      if (scannedVideo) {
-                        onSelectVideo(scannedVideo);
-                      }
+                      setSelectedVideoTags((prev) =>
+                        isSelected ? prev.filter((t) => t !== tag) : [...prev, tag],
+                      );
                     }}
-                  />
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition duration-200 ${
+                      isSelected
+                        ? "border-amber-400 bg-amber-400/20 text-white shadow-[0_0_8px_rgba(232,163,61,0.2)]"
+                        : "border-white/[0.06] bg-white/[0.03] text-white/80 hover:border-amber-400/30 hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    <span className="font-medium">{tag}</span>
+                    <span className="rounded-full bg-white/[0.08] px-2 text-[0.65rem] text-white/60">
+                      {formatTagCount(videoTagCounts[tag] || 0)}
+                    </span>
+                  </button>
                 );
               })}
             </div>
           )}
+        </div>
+
+        {/* Clip Tags Section */}
+        <div className="mb-6 space-y-2">
+          <span className="block font-mono text-[0.6rem] uppercase tracking-wider text-white/30">Clip Tags (Subtags)</span>
+          {isLoading ? (
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="h-8 w-24 rounded-full bg-white/[0.03]" />
+              ))}
+            </div>
+          ) : clipTagsList.length === 0 ? (
+            <p className="text-xs text-white/30">No clip tags discovered in this library.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {clipTagsList.map((tag) => {
+                const isSelected = selectedClipTags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => {
+                      setSelectedClipTags((prev) =>
+                        isSelected ? prev.filter((t) => t !== tag) : [...prev, tag],
+                      );
+                    }}
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition duration-200 ${
+                      isSelected
+                        ? "border-sky-400 bg-sky-400/20 text-white shadow-[0_0_8px_rgba(56,189,248,0.2)]"
+                        : "border-white/[0.06] bg-white/[0.03] text-white/80 hover:border-sky-400/30 hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    <span className="font-medium">{tag}</span>
+                    <span className="rounded-full bg-white/[0.08] px-2 text-[0.65rem] text-white/60">
+                      {formatTagCount(clipTagCounts[tag] || 0)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Clear Filters */}
+        {isFilterActive && (
+          <div className="mb-6 flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedVideoTags([]);
+                setSelectedClipTags([]);
+              }}
+              className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-white/60 transition hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/70"
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
+
+        {!isFilterActive ? (
+          <div className="rounded-xl border border-dashed border-white/[0.10] px-4 py-10 text-center text-sm text-white/40">
+            Select one or more tags above to filter matching clips.
+          </div>
+        ) : matchedClips.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-white/[0.10] px-4 py-10 text-center text-sm text-white/40">
+            No clips match the selected combination of filters.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {matchedClips.map((entry) => {
+              const scannedVideo = videos.find((v) => v.relativePath === entry.video.relativePath);
+              return (
+                <TagBrowserClipCard
+                  key={`${entry.video.relativePath}:${entry.clip.mediaPath}`}
+                  rootPath={rootPath}
+                  entry={entry}
+                  onClick={() => {
+                    if (scannedVideo) {
+                      onSelectVideo(scannedVideo);
+                    }
+                  }}
+                />
+              );
+            })}
+          </div>
+        )}
       </section>
     </div>
   );

@@ -239,3 +239,41 @@ test("atomically creates the metadata JSON beside a verified clip", async () => 
     await rm(library, { force: true, recursive: true });
   }
 });
+
+test("atomically creates the metadata.json beside a verified video", async () => {
+  const library = await mkdtemp(join(tmpdir(), "reference-vault-"));
+  const videoDirectory = join(library, "video-a");
+  await mkdir(videoDirectory, { recursive: true });
+  await writeFile(join(videoDirectory, "main.mp4"), "");
+  const app = await buildApp();
+  const metadata = {
+    tags: ["camera movement", "neon"],
+    notes: "Main video overview.",
+    rating: 5,
+  };
+
+  try {
+    const response = await app.inject({
+      method: "PUT",
+      url: "/api/videos/metadata",
+      payload: {
+        rootPath: library,
+        videoRelativePath: "video-a",
+        metadata,
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), {
+      metadataPath: "video-a/metadata.json",
+      metadata,
+    });
+    assert.deepEqual(
+      JSON.parse(await readFile(join(videoDirectory, "metadata.json"), "utf8")),
+      metadata,
+    );
+  } finally {
+    await app.close();
+    await rm(library, { force: true, recursive: true });
+  }
+});

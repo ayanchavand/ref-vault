@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { VideoDetail as VideoDetailType, JsonObject, ScannedVideo } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover } from "./Uselazythumbnail";
-import { putClipMetadata, getVideoDetail, ApiError } from "../../lib/api";
+import { putClipMetadata, putVideoMetadata, getVideoDetail, ApiError } from "../../lib/api";
 
 
 interface VideoDetailProps {
@@ -550,6 +550,320 @@ function ClipMetadataEditor({
   );
 }
 
+interface VideoMetadataEditorProps {
+  rootPath: string;
+  video: VideoDetailType;
+  globalTags: string[];
+  onSaveSuccess(updatedVideo: VideoDetailType): void;
+}
+
+function VideoMetadataEditor({
+  rootPath,
+  video,
+  globalTags,
+  onSaveSuccess,
+}: VideoMetadataEditorProps) {
+  const [tagsInput, setTagsInput] = useState("");
+  const [artistInput, setArtistInput] = useState("");
+  const [notesInput, setNotesInput] = useState("");
+  const [ratingInput, setRatingInput] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const allLibraryTags = useMemo(() => {
+    const set = new Set<string>();
+    video.clips.forEach((c) => {
+      extractTags(c.metadata).forEach((tag) => set.add(tag));
+    });
+    return Array.from(set).sort();
+  }, [video.clips]);
+
+  const activeTags = useMemo(() => {
+    return tagsInput
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+  }, [tagsInput]);
+
+  const suggestedTags = useMemo(() => {
+    return allLibraryTags.filter((tag) => !activeTags.includes(tag));
+  }, [allLibraryTags, activeTags]);
+
+  const suggestedGlobalTags = useMemo(() => {
+    return globalTags.filter(
+      (tag) => !allLibraryTags.includes(tag) && !activeTags.includes(tag)
+    );
+  }, [globalTags, allLibraryTags, activeTags]);
+
+  function handleAddSuggestion(tag: string) {
+    if (!activeTags.includes(tag)) {
+      const newTags = [...activeTags, tag];
+      setTagsInput(newTags.join(", "));
+    }
+  }
+
+  // Initialize form state from video metadata
+  useEffect(() => {
+    const tags = extractTags(video.metadata);
+    setTagsInput(tags.join(", "));
+    setNotesInput(String(video.metadata?.notes ?? ""));
+    setRatingInput(Number(video.metadata?.rating ?? 0));
+    setArtistInput(String(video.metadata?.artist ?? ""));
+    setSaveError(null);
+    setSaveSuccess(false);
+  }, [video]);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+
+    const tags = tagsInput
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+
+    const newMetadata: JsonObject = {
+      ...video.metadata,
+      tags,
+    };
+
+    if (notesInput) {
+      newMetadata.notes = notesInput;
+    } else {
+      delete newMetadata.notes;
+    }
+
+    if (ratingInput) {
+      newMetadata.rating = ratingInput;
+    } else {
+      delete newMetadata.rating;
+    }
+
+    if (artistInput) {
+      newMetadata.artist = artistInput;
+    } else {
+      delete newMetadata.artist;
+    }
+
+    try {
+      const response = await putVideoMetadata({
+        rootPath,
+        videoRelativePath: video.relativePath,
+        metadata: newMetadata,
+      });
+
+      const updatedVideo: VideoDetailType = {
+        ...video,
+        metadata: response.metadata,
+      };
+
+      onSaveSuccess(updatedVideo);
+      setSaveSuccess(true);
+    } catch (err) {
+      setSaveError(err instanceof ApiError ? err.message : "Failed to save metadata.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function handleReset() {
+    const tags = extractTags(video.metadata);
+    setTagsInput(tags.join(", "));
+    setNotesInput(String(video.metadata?.notes ?? ""));
+    setRatingInput(Number(video.metadata?.rating ?? 0));
+    setArtistInput(String(video.metadata?.artist ?? ""));
+    setSaveError(null);
+    setSaveSuccess(false);
+  }
+
+  const isModified = useMemo(() => {
+    const originalTags = extractTags(video.metadata).join(", ");
+    const originalNotes = String(video.metadata?.notes ?? "");
+    const originalRating = Number(video.metadata?.rating ?? 0);
+    const originalArtist = String(video.metadata?.artist ?? "");
+
+    return (
+      tagsInput !== originalTags ||
+      artistInput !== originalArtist ||
+      notesInput !== originalNotes ||
+      ratingInput !== originalRating
+    );
+  }, [video.metadata, tagsInput, artistInput, notesInput, ratingInput]);
+
+  return (
+    <form onSubmit={handleSave} className="space-y-4">
+      <div className="flex flex-col gap-1">
+        <h3 className="font-mono text-xs uppercase tracking-wider text-amber-300">
+          Video Metadata Editor
+        </h3>
+        <p className="text-xs text-white/40">
+          Edits are saved directly to metadata.json in the library.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label htmlFor="video-tags" className="block font-mono text-[0.65rem] uppercase tracking-wider text-white/50">
+              Tags (comma separated)
+            </label>
+            <input
+              id="video-tags"
+              type="text"
+              value={tagsInput}
+              onChange={(e) => setTagsInput(e.target.value)}
+              placeholder="e.g. camera movement, slow motion"
+              disabled={isSaving}
+              className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2 text-sm text-white/95 placeholder:text-white/25 focus:border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/50 disabled:opacity-50"
+            />
+            {/* Local Video Tag suggestions */}
+            {suggestedTags.length > 0 && (
+              <div className="mt-1.5 space-y-1">
+                <span className="block font-mono text-[0.55rem] uppercase tracking-wider text-white/20">Suggestions (This Video)</span>
+                <div className="flex flex-wrap gap-1 max-h-[4.5rem] overflow-y-auto pr-1">
+                  {suggestedTags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => handleAddSuggestion(tag)}
+                      disabled={isSaving}
+                      className={`rounded-full border px-2 py-0.5 font-mono text-[0.58rem] transition focus:outline-none ${getTagColorClass(tag)} hover:opacity-85`}
+                    >
+                      + {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Global Library Tag suggestions */}
+            {suggestedGlobalTags.length > 0 && (
+              <div className="mt-1.5 space-y-1">
+                <span className="block font-mono text-[0.55rem] uppercase tracking-wider text-white/20">Suggestions (Global Library)</span>
+                <div className="flex flex-wrap gap-1 max-h-[4.5rem] overflow-y-auto pr-1">
+                  {suggestedGlobalTags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => handleAddSuggestion(tag)}
+                      disabled={isSaving}
+                      className={`rounded-full border px-2 py-0.5 font-mono text-[0.58rem] transition focus:outline-none ${getTagColorClass(tag)} hover:opacity-85`}
+                    >
+                      + {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div>
+
+          {/* Artist Field */}
+          <div className="space-y-1.5">
+            <label htmlFor="video-artist" className="block font-mono text-[0.65rem] uppercase tracking-wider text-white/50">
+              Artist
+            </label>
+            <input
+              id="video-artist"
+              type="text"
+              value={artistInput}
+              onChange={(e) => setArtistInput(e.target.value)}
+              placeholder="e.g. Director, Studio, Animator"
+              disabled={isSaving}
+              className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2 text-sm text-white/95 placeholder:text-white/25 focus:border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/50 disabled:opacity-50"
+            />
+          </div>
+
+          {/* Rating Field */}
+          <div className="space-y-1.5">
+            <span className="block font-mono text-[0.65rem] uppercase tracking-wider text-white/50">
+              Rating
+            </span>
+            <div className="flex items-center gap-1.5">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => setRatingInput(star)}
+                  disabled={isSaving}
+                  className={`text-2xl transition duration-150 focus:outline-none ${
+                    star <= ratingInput
+                      ? "text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.5)]"
+                      : "text-white/20 hover:text-amber-400/50"
+                  }`}
+                >
+                  ★
+                </button>
+              ))}
+              {ratingInput > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setRatingInput(0)}
+                  disabled={isSaving}
+                  className="ml-2 font-mono text-[0.65rem] uppercase tracking-widest text-white/30 hover:text-white/60 focus:outline-none focus:underline"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Notes Field */}
+        <div className="space-y-1.5">
+          <label htmlFor="video-notes" className="block font-mono text-[0.65rem] uppercase tracking-wider text-white/50">
+            Notes
+          </label>
+          <textarea
+            id="video-notes"
+            value={notesInput}
+            onChange={(e) => setNotesInput(e.target.value)}
+            placeholder="Enter video-level notes or annotations..."
+            disabled={isSaving}
+            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2 text-sm text-white/95 placeholder:text-white/25 focus:border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/50 disabled:opacity-50 min-h-[5.75rem] resize-y"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={isSaving || !isModified}
+            className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isSaving ? "Saving..." : "Save Changes"}
+          </button>
+          <button
+            type="button"
+            onClick={handleReset}
+            disabled={isSaving || !isModified}
+            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Reset
+          </button>
+        </div>
+
+        {saveSuccess && (
+          <span className="flex items-center gap-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-emerald-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+            Changes saved successfully!
+          </span>
+        )}
+
+        {saveError && (
+          <span className="font-mono text-[0.65rem] uppercase tracking-wider text-rose-400">
+            Error: {saveError}
+          </span>
+        )}
+      </div>
+    </form>
+  );
+}
+
 export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoDetail }: VideoDetailProps) {
 
   const [selectedMediaPath, setSelectedMediaPath] = useState(video.mainVideoPath);
@@ -710,6 +1024,9 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
               <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-white sm:text-xl">
                 {selectedMediaPath.split("/").pop()}
               </h2>
+              {isMainPlaying && video.metadata && (
+                <MetadataTags metadata={video.metadata} />
+              )}
             </div>
             {!isMainPlaying && (
               <button
@@ -821,7 +1138,7 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
           </div>
 
 
-          {!isMainPlaying && activeClip && (
+          {!isMainPlaying && activeClip ? (
             <div className="mt-4 border-t border-white/[0.06] pt-6">
               <ClipMetadataEditor
                 rootPath={rootPath}
@@ -832,6 +1149,17 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
                 onSaveSuccess={onUpdateVideoDetail}
               />
             </div>
+          ) : (
+            isMainPlaying && (
+              <div className="mt-4 border-t border-white/[0.06] pt-6">
+                <VideoMetadataEditor
+                  rootPath={rootPath}
+                  video={video}
+                  globalTags={globalTags}
+                  onSaveSuccess={onUpdateVideoDetail}
+                />
+              </div>
+            )
           )}
         </section>
 

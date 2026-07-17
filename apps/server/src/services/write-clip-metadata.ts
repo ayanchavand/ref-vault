@@ -102,7 +102,7 @@ export async function writeClipMetadata(
   }
 }
 
-async function resolveVideoDirectory(
+export async function resolveVideoDirectory(
   libraryRootPath: string,
   videoRelativePath: string,
 ): Promise<{ ok: true; value: string } | { ok: false; error: ApiErrorResponse }> {
@@ -172,7 +172,7 @@ async function resolveClipPath(
   }
 }
 
-async function writeJsonAtomically(
+export async function writeJsonAtomically(
   metadataPath: string,
   metadata: JsonObject,
 ): Promise<void> {
@@ -239,6 +239,6 @@ function isContainedPath(parentPath: string, targetPath: string): boolean {
   );
 }
 
-function toLibraryRelativePath(libraryRootPath: string, targetPath: string): string {
+export function toLibraryRelativePath(libraryRootPath: string, targetPath: string): string {
   return relative(libraryRootPath, targetPath).split(sep).join("/");
 }

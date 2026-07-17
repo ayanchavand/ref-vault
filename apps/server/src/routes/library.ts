@@ -9,6 +9,8 @@ import type {
   GetVideoDetailResponse,
   PutClipMetadataRequest,
   PutClipMetadataResponse,
+  PutVideoMetadataRequest,
+  PutVideoMetadataResponse,
   ScanLibraryRequest,
   ScanLibraryResponse,
   ValidateLibraryRootRequest,
@@ -19,6 +21,7 @@ import { validateLibraryRoot } from "../services/validate-library-root.js";
 import { scanLibrary } from "../services/scan-library.js";
 import { readVideoDetail } from "../services/read-video-detail.js";
 import { writeClipMetadata } from "../services/write-clip-metadata.js";
+import { writeVideoMetadata } from "../services/write-video-metadata.js";
 
 export async function registerLibraryRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
@@ -325,6 +328,47 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
           result.error.error === "LIBRARY_ROOT_NOT_FOUND" ||
           result.error.error === "VIDEO_NOT_FOUND" ||
           result.error.error === "CLIP_NOT_FOUND"
+            ? 404
+            : result.error.error === "METADATA_WRITE_FAILED"
+              ? 500
+              : 400;
+        return reply.status(statusCode).send(result.error);
+      }
+
+      return result.value;
+    },
+  );
+
+  app.put<{
+    Body: PutVideoMetadataRequest;
+    Reply: PutVideoMetadataResponse | ApiErrorResponse;
+  }>(
+    "/api/videos/metadata",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["rootPath", "videoRelativePath", "metadata"],
+          additionalProperties: false,
+          properties: {
+            rootPath: { type: "string" },
+            videoRelativePath: { type: "string" },
+            metadata: { type: "object" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await writeVideoMetadata(
+        request.body.rootPath,
+        request.body.videoRelativePath,
+        request.body.metadata,
+      );
+
+      if (!result.ok) {
+        const statusCode =
+          result.error.error === "LIBRARY_ROOT_NOT_FOUND" ||
+          result.error.error === "VIDEO_NOT_FOUND"
             ? 404
             : result.error.error === "METADATA_WRITE_FAILED"
               ? 500
