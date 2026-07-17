@@ -20,6 +20,7 @@ export interface ScannedVideo {
   mainVideoPath: string;
   metadataPath?: string;
   thumbnailPath?: string;
+  clipsMetadataPath?: string;
   clips: ScannedClip[];
 }
 
@@ -47,6 +48,8 @@ export interface VideoDetail {
   relativePath: string;
   mainVideoPath: string;
   metadata?: JsonObject;
+  thumbnailPath?: string;
+  clipsMetadataPath?: string;
   clips: DetailedClip[];
 }
 
@@ -78,6 +81,7 @@ export type LibraryRootValidationErrorCode =
   | "METADATA_READ_FAILED"
   | "INVALID_CLIP_PATH"
   | "CLIP_NOT_FOUND"
+  | "MEDIA_NOT_FOUND"
   | "METADATA_WRITE_FAILED";
 
 export interface ApiErrorResponse {

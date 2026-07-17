@@ -68,12 +68,30 @@ export async function readVideoDetail(
     const clipsDirectory = entries.find(
       (entry) => entry.name === "clips" && entry.isDirectory(),
     );
-    const clips = clipsDirectory
-      ? await readClipsWithMetadata(
-          join(videoDirectory.value, clipsDirectory.name),
-          libraryRootPath,
-        )
-      : { ok: true as const, value: [] };
+
+    if (!clipsDirectory) {
+      return videoNotFound();
+    }
+
+    const clipsJsonPath = join(videoDirectory.value, "clips.json");
+    const clipsMetadataResult = await readOptionalClipsMetadata(
+      clipsJsonPath,
+      entries.some((entry) => entry.name === "clips.json" && entry.isFile()),
+      libraryRootPath,
+    );
+
+    if (!clipsMetadataResult.ok) {
+      return clipsMetadataResult;
+    }
+
+    const clips = await readClipsWithMetadata(
+      join(videoDirectory.value, clipsDirectory.name),
+      libraryRootPath,
+      clipsMetadataResult.value ?? {},
+      entries.some((entry) => entry.name === "clips.json" && entry.isFile())
+        ? toLibraryRelativePath(libraryRootPath, clipsJsonPath)
+        : undefined,
+    );
 
     if (!clips.ok) {
       return clips;
@@ -87,6 +105,20 @@ export async function readVideoDetail(
       ),
       clips: clips.value,
     };
+
+    if (entries.some((entry) => entry.name === "thumbnail.jpg" && entry.isFile())) {
+      video.thumbnailPath = toLibraryRelativePath(
+        libraryRootPath,
+        join(videoDirectory.value, "thumbnail.jpg"),
+      );
+    }
+
+    if (entries.some((entry) => entry.name === "clips.json" && entry.isFile())) {
+      video.clipsMetadataPath = toLibraryRelativePath(
+        libraryRootPath,
+        join(videoDirectory.value, "clips.json"),
+      );
+    }
 
     if (metadata.value) {
       video.metadata = metadata.value;
@@ -159,6 +191,8 @@ function videoNotFound(): { ok: false; error: ApiErrorResponse } {
 async function readClipsWithMetadata(
   clipsDirectoryPath: string,
   libraryRootPath: string,
+  clipsMetadata: JsonObject,
+  clipsMetadataPath?: string,
 ): Promise<
   | { ok: true; value: DetailedClip[] }
   | { ok: false; error: ApiErrorResponse }
@@ -168,18 +202,16 @@ async function readClipsWithMetadata(
 
   for (const clip of clips) {
     const detailedClip: DetailedClip = { ...clip };
+    const clipKey = clip.mediaPath.split("/").pop()!.replace(/\.mp4$/u, "");
 
-    if (clip.metadataPath) {
-      const metadata = await readMetadata(
-        resolve(libraryRootPath, clip.metadataPath),
-        clip.metadataPath,
-      );
+    if (Object.prototype.hasOwnProperty.call(clipsMetadata, clipKey)) {
+      const clipMeta = clipsMetadata[clipKey];
 
-      if (!metadata.ok) {
-        return metadata;
+      if (typeof clipMeta !== "object" || clipMeta === null || Array.isArray(clipMeta)) {
+        return invalidMetadata(clipsMetadataPath ?? "clips.json");
       }
 
-      detailedClip.metadata = metadata.value;
+      detailedClip.metadata = clipMeta as JsonObject;
     }
 
     detailedClips.push(detailedClip);
@@ -213,14 +245,6 @@ async function findClips(
     const clip: ScannedClip = {
       mediaPath: toLibraryRelativePath(libraryRootPath, entryPath),
     };
-    const metadataFileName = `${entry.name.slice(0, -4)}.json`;
-
-    if (fileNames.has(metadataFileName)) {
-      clip.metadataPath = toLibraryRelativePath(
-        libraryRootPath,
-        join(directoryPath, metadataFileName),
-      );
-    }
 
     clips.push(clip);
   }
@@ -229,6 +253,18 @@ async function findClips(
 }
 
 async function readOptionalMetadata(
+  filePath: string,
+  exists: boolean,
+  libraryRootPath: string,
+): Promise<{ ok: true; value?: JsonObject } | { ok: false; error: ApiErrorResponse }> {
+  if (!exists) {
+    return { ok: true };
+  }
+
+  return readMetadata(filePath, toLibraryRelativePath(libraryRootPath, filePath));
+}
+
+async function readOptionalClipsMetadata(
   filePath: string,
   exists: boolean,
   libraryRootPath: string,

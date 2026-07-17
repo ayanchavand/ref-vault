@@ -1,101 +1,184 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ScannedVideo } from "@reference-vault/shared";
+import type { VideoDetail as VideoDetailType } from "@reference-vault/shared";
+import { useLazyThumbnail, usePrefetchOnHover } from "./Uselazythumbnail";
 
 interface VideoDetailProps {
   rootPath: string;
-  video: ScannedVideo;
+  video: VideoDetailType;
   onBack(): void;
+}
+
+function pad(index: number) {
+  return String(index + 1).padStart(3, "0");
+}
+
+function ShimmerFill() {
+  return (
+    <div className="absolute inset-0 -translate-x-full animate-[rv-shimmer_1.6s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+  );
+}
+
+const TAG_PREVIEW_LIMIT = 4;
+
+function MetadataTags({ metadata }: { metadata: NonNullable<VideoDetailType["clips"][number]["metadata"]> }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const entries = useMemo(() => {
+    return Object.entries(metadata).flatMap(([key, value]) => {
+      const values = Array.isArray(value) ? value : [value];
+      return values.map((entry) => ({
+        key,
+        display:
+          typeof entry === "object" && entry !== null ? JSON.stringify(entry) : String(entry),
+      }));
+    });
+  }, [metadata]);
+
+  const visible = expanded ? entries : entries.slice(0, TAG_PREVIEW_LIMIT);
+  const hiddenCount = entries.length - visible.length;
+
+  if (entries.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-white/[0.06] bg-black/20 p-2.5">
+      <p className="mb-2 font-mono text-[0.58rem] uppercase tracking-[0.25em] text-white/25">
+        Metadata · {entries.length}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {visible.map((tag, i) => (
+          <span
+            key={`${tag.key}-${i}`}
+            className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 font-mono text-[0.62rem] text-white/60"
+          >
+            <span className="font-semibold text-amber-300/70">{tag.key}</span>
+            <span className="text-white/20">·</span>
+            <span className="max-w-[10rem] truncate text-white/70">{tag.display}</span>
+          </span>
+        ))}
+
+        {hiddenCount > 0 && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setExpanded(true);
+            }}
+            className="rounded-full border border-amber-400/30 bg-amber-400/[0.06] px-2 py-0.5 font-mono text-[0.62rem] font-semibold text-amber-300 transition hover:border-amber-400/60 hover:bg-amber-400/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
+          >
+            +{hiddenCount} more
+          </button>
+        )}
+
+        {expanded && entries.length > TAG_PREVIEW_LIMIT && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setExpanded(false);
+            }}
+            className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 font-mono text-[0.62rem] text-white/50 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
+          >
+            Show less
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function ClipCard({
   rootPath,
   clip,
+  index,
+  active,
   onSelect,
 }: {
   rootPath: string;
-  clip: ScannedVideo["clips"][number];
+  clip: VideoDetailType["clips"][number];
+  index: number;
+  active: boolean;
   onSelect(): void;
 }) {
-  const [poster, setPoster] = useState<string | undefined>(undefined);
-
   const mediaUrl = useMemo(() => {
     return `/api/media?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
       clip.mediaPath,
     )}`;
   }, [rootPath, clip.mediaPath]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const videoElement = document.createElement("video");
-    const canvas = document.createElement("canvas");
-
-    videoElement.src = mediaUrl;
-    videoElement.muted = true;
-    videoElement.preload = "metadata";
-    videoElement.crossOrigin = "anonymous";
-
-    const onLoadedData = () => {
-      if (cancelled) {
-        return;
-      }
-
-      canvas.width = 320;
-      canvas.height = 180;
-      const ctx = canvas.getContext("2d");
-
-      if (!ctx) {
-        return;
-      }
-
-      ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-      setPoster(canvas.toDataURL("image/jpeg", 0.75));
-    };
-
-    videoElement.addEventListener("loadeddata", onLoadedData);
-    videoElement.addEventListener("error", () => {
-      if (!cancelled) {
-        setPoster(undefined);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      videoElement.removeEventListener("loadeddata", onLoadedData);
-      videoElement.src = "";
-    };
-  }, [mediaUrl]);
+  const { containerRef, poster } = useLazyThumbnail({ mediaUrl });
+  const prefetchHandlers = usePrefetchOnHover(mediaUrl);
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
-      className="group flex w-full flex-col gap-3 rounded-3xl border border-slate-700 bg-slate-950/80 p-3 text-left transition hover:border-cyan-400/70 hover:bg-slate-900"
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+      aria-current={active}
+      {...prefetchHandlers}
+      className={`group relative flex w-full cursor-pointer gap-3 rounded-xl border p-2.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0B0D] ${
+        active
+          ? "border-amber-400/60 bg-[#17140D] shadow-[0_0_0_1px_rgba(232,163,61,0.15)]"
+          : "border-white/[0.06] bg-[#111316] hover:-translate-y-0.5 hover:border-amber-400/30 hover:bg-[#14171B]"
+      }`}
     >
-      <div className="overflow-hidden rounded-3xl bg-slate-950 aspect-video">
+      <span
+        className={`absolute left-0 top-0 h-full w-[3px] rounded-l-xl transition-colors ${
+          active ? "bg-amber-400" : "bg-transparent group-hover:bg-amber-400/30"
+        }`}
+        aria-hidden="true"
+      />
+
+      <div
+        ref={containerRef}
+        className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-lg bg-black/40 sm:w-36"
+      >
         {poster ? (
           <img
             src={poster}
-            alt={`Thumbnail for ${clip.mediaPath}`}
-            className="h-full w-full object-cover"
+            alt=""
+            className="h-full w-full object-cover opacity-90 transition-opacity duration-200 group-hover:opacity-100"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-slate-900 text-slate-500">
-            <span>Generating clip thumbnail…</span>
+          <div className="relative flex h-full w-full items-center justify-center bg-white/[0.04]">
+            <ShimmerFill />
+            <span className="font-mono text-[0.6rem] uppercase tracking-widest text-white/25">
+              indexing
+            </span>
           </div>
         )}
-      </div>
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-white">{clip.mediaPath.split("/").pop()}</p>
-          {clip.metadataPath && (
-            <p className="mt-1 truncate text-xs text-slate-500">Metadata: {clip.metadataPath}</p>
-          )}
-        </div>
-        <span className="rounded-full bg-cyan-500 px-3 py-1 text-xs font-semibold text-slate-950 transition group-hover:bg-cyan-400">
-          Play
+        <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[0.6rem] tabular-nums text-amber-300/90 backdrop-blur-sm">
+          {pad(index)}
         </span>
+        {active && (
+          <span className="absolute right-1 top-1 flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
+            <span className="font-mono text-[0.55rem] uppercase tracking-wider text-amber-300">
+              live
+            </span>
+          </span>
+        )}
       </div>
-    </button>
+
+      <div className="min-w-0 flex-1 py-0.5">
+        <p className="truncate font-mono text-[0.8rem] font-medium text-white/90">
+          {clip.mediaPath.split("/").pop()}
+        </p>
+        {clip.metadataPath && (
+          <p className="mt-0.5 truncate font-mono text-[0.65rem] text-white/30">
+            {clip.metadataPath}
+          </p>
+        )}
+        {clip.metadata && <MetadataTags metadata={clip.metadata} />}
+      </div>
+    </div>
   );
 }
 
@@ -120,48 +203,61 @@ export function VideoDetail({ rootPath, video, onBack }: VideoDetailProps) {
       : undefined;
   }, [rootPath, video.thumbnailPath]);
 
+  const isMainPlaying = selectedMediaPath === video.mainVideoPath;
+
   return (
-    <div className="flex min-h-[calc(100vh-7rem)] flex-col gap-6">
-      <div className="flex flex-col gap-4 rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-lg shadow-slate-950/20 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-cyan-300">Watch</p>
-          <p className="mt-1 break-all font-mono text-sm text-slate-400">
-            {video.relativePath}
-          </p>
+    <div className="flex min-h-[calc(100vh-7rem)] flex-col gap-5 bg-[#0A0B0D] text-white">
+      {/* Header */}
+      <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(232,163,61,0.7)]" />
+          <div className="min-w-0">
+            <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
+              Vault / Watch
+            </p>
+            <p className="mt-1 truncate font-mono text-sm text-white/50">{video.relativePath}</p>
+          </div>
         </div>
         <button
           onClick={onBack}
-          className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-600"
+          className="flex shrink-0 items-center gap-2 self-start rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
         >
-          Back to videos
+          <span aria-hidden="true">&larr;</span> All videos
         </button>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,2.3fr)_minmax(0,0.9fr)]">
-        <section className="space-y-6 rounded-3xl border border-slate-700 bg-slate-900/70 p-4 shadow-lg shadow-slate-950/20">
-          <div className="space-y-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-400">
-                  Now Playing
-                </p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-                  {video.relativePath}
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm text-slate-400">
-                  Watch the selected clip or the main video in the player below.
-                </p>
-              </div>
+      <div className="grid flex-1 gap-5 xl:grid-cols-[minmax(0,2.3fr)_minmax(0,0.9fr)]">
+        {/* Player */}
+        <section className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316] p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
+                {isMainPlaying ? "Now Playing · Main" : "Now Playing · Clip"}
+              </p>
+              <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-white sm:text-xl">
+                {selectedMediaPath.split("/").pop()}
+              </h2>
+            </div>
+            {!isMainPlaying && (
               <button
                 type="button"
                 onClick={() => setSelectedMediaPath(video.mainVideoPath)}
-                className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-cyan-400"
+                className="self-start rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#111316]"
               >
                 Play main video
               </button>
-            </div>
+            )}
+          </div>
 
-            <div className="overflow-hidden rounded-[2rem] border border-slate-800 bg-slate-950 shadow-inner min-h-[55vh]">
+          {/* Viewfinder-framed player — signature element */}
+          <div className="relative flex-1">
+            <div className="pointer-events-none absolute -inset-1 z-10">
+              <span className="absolute left-0 top-0 h-6 w-6 border-l-2 border-t-2 border-amber-400/50" />
+              <span className="absolute right-0 top-0 h-6 w-6 border-r-2 border-t-2 border-amber-400/50" />
+              <span className="absolute bottom-0 left-0 h-6 w-6 border-b-2 border-l-2 border-amber-400/50" />
+              <span className="absolute bottom-0 right-0 h-6 w-6 border-b-2 border-r-2 border-amber-400/50" />
+            </div>
+            <div className="min-h-[55vh] overflow-hidden rounded-2xl border border-white/[0.06] bg-black">
               <video
                 controls
                 className="h-full w-full bg-black"
@@ -176,30 +272,38 @@ export function VideoDetail({ rootPath, video, onBack }: VideoDetailProps) {
           </div>
         </section>
 
-        <aside className="space-y-6 rounded-3xl border border-slate-700 bg-slate-900/70 p-4 shadow-lg shadow-slate-950/20">
-          <div className="flex items-center justify-between gap-3">
+        {/* Clip rail */}
+        <aside className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316] p-4">
+          <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] pb-3">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.25em] text-cyan-400">
-                Clips
+              <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
+                Clip Index
               </p>
-              <p className="text-sm text-slate-400">Tap any clip to play it instantly.</p>
+              <p className="mt-1 text-sm text-white/40">Select a clip to play it instantly.</p>
             </div>
-            <span className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-400">
-              {video.clips.length}
+            <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 font-mono text-xs tabular-nums text-white/50">
+              {String(video.clips.length).padStart(2, "0")}
             </span>
           </div>
 
           {video.clips.length === 0 ? (
-            <p className="rounded-3xl border border-dashed border-slate-700 bg-slate-950/50 px-4 py-6 text-center text-sm text-slate-400">
-              No numbered clips were found for this video.
-            </p>
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 px-4 py-10 text-center">
+              <span className="font-mono text-[0.65rem] uppercase tracking-widest text-white/30">
+                No entries
+              </span>
+              <p className="text-sm text-white/40">
+                No numbered clips are indexed for this video yet.
+              </p>
+            </div>
           ) : (
-            <ul className="space-y-3">
+            <ul className="flex-1 space-y-2 overflow-y-auto pr-0.5">
               {video.clips.map((clip, index) => (
                 <li key={clip.mediaPath}>
                   <ClipCard
                     rootPath={rootPath}
                     clip={clip}
+                    index={index}
+                    active={selectedMediaPath === clip.mediaPath}
                     onSelect={() => setSelectedMediaPath(clip.mediaPath)}
                   />
                 </li>

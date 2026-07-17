@@ -2,7 +2,7 @@
 
 ## `PUT /api/clips/metadata`
 
-Replaces the JSON metadata for one verified clip. The server derives the destination JSON filename from the clip media path (`0.mp4` becomes `0.json`); callers cannot choose an arbitrary write target.
+Replaces the JSON metadata for one verified clip. The server stores all clip metadata in the video-level `clips.json` file; callers cannot choose an arbitrary write target.
 
 The file is written to a temporary sibling and renamed into place. Readers therefore see either the previous complete JSON document or the new complete JSON document, never a partial write.
 

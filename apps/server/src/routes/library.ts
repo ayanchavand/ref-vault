@@ -131,8 +131,8 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
           });
         }
 
-        const start = rangeMatch[1].length > 0 ? Number(rangeMatch[1]) : 0;
-        const end = rangeMatch[2].length > 0 ? Number(rangeMatch[2]) : fileStats.size - 1;
+        const start = (rangeMatch[1] ?? "").length > 0 ? Number(rangeMatch[1]) : 0;
+        const end = (rangeMatch[2] ?? "").length > 0 ? Number(rangeMatch[2]) : fileStats.size - 1;
 
         if (Number.isNaN(start) || Number.isNaN(end) || start > end || start >= fileStats.size) {
           reply
@@ -206,9 +206,10 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
   async function resolveMediaFile(
     libraryRootPath: string,
     mediaPath: string,
-  ):
+  ): Promise<
     | { ok: true; value: { filePath: string; fileStats: import("node:fs").Stats; contentType: string } }
-    | { ok: false; error: ApiErrorResponse } {
+    | { ok: false; error: ApiErrorResponse }
+  > {
     if (
       mediaPath.trim().length === 0 ||
       !isContainedPath(libraryRootPath, resolve(libraryRootPath, mediaPath))

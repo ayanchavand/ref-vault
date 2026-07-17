@@ -1,5 +1,7 @@
 import type {
   ApiErrorResponse,
+  GetVideoDetailRequest,
+  GetVideoDetailResponse,
   ScanLibraryResponse,
   ValidateLibraryRootResponse,
 } from "@reference-vault/shared";
@@ -43,4 +45,22 @@ export async function scanLibrary(rootPath: string): Promise<ScanLibraryResponse
   }
 
   return payload as ScanLibraryResponse;
+}
+
+export async function getVideoDetail(
+  request: GetVideoDetailRequest,
+): Promise<GetVideoDetailResponse> {
+  const response = await fetch("/api/videos/detail", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const payload: unknown = await response.json();
+
+  if (!response.ok) {
+    const error = payload as ApiErrorResponse;
+    throw new ApiError(error.message || "The video details could not be loaded.");
+  }
+
+  return payload as GetVideoDetailResponse;
 }

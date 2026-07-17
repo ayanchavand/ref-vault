@@ -37,6 +37,8 @@ Reads one video directory and its clip metadata directly from the selected libra
 
 `metadata` is optional when its file is absent. When present, it must be a valid JSON object; all fields, including unknown future fields, are returned unchanged.
 
+`clipsMetadataPath` is optional when `clips.json` is absent. When present, `clips.json` contains an object with per-clip keys matching each clip basename (`0`, `1`, etc.).
+
 ## Errors
 
 | Status | Code | Meaning |

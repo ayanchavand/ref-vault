@@ -9,8 +9,9 @@ Reads a reference library from the supplied root path. It validates the root for
 - A video is any directory containing a direct `main.mp4` file.
 - Video folders can appear anywhere under the selected root.
 - A video may have direct `metadata.json` and `thumbnail.jpg` files; their relative paths are reported when present.
+- Videos must have a `clips/` directory alongside `main.mp4`.
 - Clips are `.mp4` files anywhere under a video's `clips/` directory.
-- A clip has metadata when a sibling JSON file has the same basename: `0.mp4` pairs with `0.json`.
+- Clip metadata is stored in one aggregated `clips.json` file in the video directory. When present, its relative path is reported as `clipsMetadataPath`.
 
 ## Request
 

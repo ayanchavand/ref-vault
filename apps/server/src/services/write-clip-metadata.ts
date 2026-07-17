@@ -45,19 +45,48 @@ export async function writeClipMetadata(
     return clipPath;
   }
 
-  const metadataPath = join(
-    dirname(clipPath.value),
-    `${basename(clipPath.value, ".mp4")}.json`,
-  );
+  const clipsMetadataPath = join(videoDirectory.value, "clips.json");
+  let clipsMetadata: JsonObject = {};
 
   try {
-    await writeJsonAtomically(metadataPath, metadata);
+    const existingContents = await readFile(clipsMetadataPath, "utf8");
+    const parsed: unknown = JSON.parse(existingContents);
+
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      throw new Error("Invalid existing clips metadata");
+    }
+
+    clipsMetadata = parsed as JsonObject;
+  } catch (error: unknown) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: string }).code === "ENOENT"
+    ) {
+      clipsMetadata = {};
+    } else {
+      return {
+        ok: false,
+        error: {
+          error: "METADATA_WRITE_FAILED",
+          message: "Clip metadata could not be saved.",
+        },
+      };
+    }
+  }
+
+  const clipKey = basename(clipPath.value, ".mp4");
+  clipsMetadata[clipKey] = metadata;
+
+  try {
+    await writeJsonAtomically(clipsMetadataPath, clipsMetadata);
     return {
       ok: true,
       value: {
         metadataPath: toLibraryRelativePath(
           rootValidation.value.rootPath,
-          metadataPath,
+          clipsMetadataPath,
         ),
         metadata,
       },

@@ -60,9 +60,9 @@ test("recursively discovers video folders and clips without reading metadata", a
   await writeFile(join(shotDirectory, "metadata.json"), "not read by this endpoint");
   await writeFile(join(shotDirectory, "thumbnail.jpg"), "");
   await writeFile(join(shotDirectory, "clips", "0.mp4"), "");
-  await writeFile(join(shotDirectory, "clips", "0.json"), "not read by this endpoint");
   await writeFile(join(nestedClipsDirectory, "1.mp4"), "");
   await writeFile(join(simpleVideoDirectory, "main.mp4"), "");
+  await mkdir(join(simpleVideoDirectory, "clips"));
   const app = await buildApp();
 
   try {
@@ -84,7 +84,6 @@ test("recursively discovers video folders and clips without reading metadata", a
           clips: [
             {
               mediaPath: "sequences/opening-shot/clips/0.mp4",
-              metadataPath: "sequences/opening-shot/clips/0.json",
             },
             {
               mediaPath: "sequences/opening-shot/clips/alternates/1.mp4",
@@ -116,8 +115,10 @@ test("reads video and clip metadata without changing its future fields", async (
   );
   await writeFile(join(clipsDirectory, "0.mp4"), "");
   await writeFile(
-    join(clipsDirectory, "0.json"),
-    JSON.stringify({ notes: "Camera settles.", rating: 4 }),
+    join(videoDirectory, "clips.json"),
+    JSON.stringify({
+      "0": { notes: "Camera settles.", rating: 4 },
+    }, null, 2),
   );
   const app = await buildApp();
 
@@ -138,10 +139,10 @@ test("reads video and clip metadata without changing its future fields", async (
           tags: ["cinematography"],
           futureField: { enabled: true },
         },
+        clipsMetadataPath: "video-a/clips.json",
         clips: [
           {
             mediaPath: "video-a/clips/0.mp4",
-            metadataPath: "video-a/clips/0.json",
             metadata: { notes: "Camera settles.", rating: 4 },
           },
         ],
@@ -226,12 +227,12 @@ test("atomically creates the metadata JSON beside a verified clip", async () => 
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.json(), {
-      metadataPath: "video-a/clips/0.json",
+      metadataPath: "video-a/clips.json",
       metadata,
     });
     assert.deepEqual(
-      JSON.parse(await readFile(join(clipsDirectory, "0.json"), "utf8")),
-      metadata,
+      JSON.parse(await readFile(join(videoDirectory, "clips.json"), "utf8")),
+      { "0": metadata },
     );
   } finally {
     await app.close();

@@ -56,7 +56,10 @@ async function findVideos(
   const mainVideo = entries.find(
     (entry) => entry.name === "main.mp4" && entry.isFile(),
   );
-  const isVideoDirectory = mainVideo !== undefined;
+  const clipsDirectory = entries.find(
+    (entry) => entry.name === "clips" && entry.isDirectory(),
+  );
+  const isVideoDirectory = mainVideo !== undefined && clipsDirectory !== undefined;
 
   if (isVideoDirectory) {
     videos.push(await describeVideo(directoryPath, libraryRootPath, entries));
@@ -87,10 +90,15 @@ async function describeVideo(
   const video: ScannedVideo = {
     relativePath: relativePath(libraryRootPath, directoryPath),
     mainVideoPath: relativePath(libraryRootPath, join(directoryPath, "main.mp4")),
-    clips: clipsDirectory
-      ? await findClips(join(directoryPath, clipsDirectory.name), libraryRootPath)
-      : [],
+    clips: await findClips(join(directoryPath, clipsDirectory!.name), libraryRootPath),
   };
+
+  if (entries.some((entry) => entry.name === "clips.json" && entry.isFile())) {
+    video.clipsMetadataPath = relativePath(
+      libraryRootPath,
+      join(directoryPath, "clips.json"),
+    );
+  }
 
   if (entries.some((entry) => entry.name === "metadata.json" && entry.isFile())) {
     video.metadataPath = relativePath(
@@ -135,13 +143,6 @@ async function findClips(
     const clip: ScannedClip = {
       mediaPath: relativePath(libraryRootPath, entryPath),
     };
-
-    if (fileNames.has(metadataFileName)) {
-      clip.metadataPath = relativePath(
-        libraryRootPath,
-        join(directoryPath, metadataFileName),
-      );
-    }
 
     clips.push(clip);
   }
