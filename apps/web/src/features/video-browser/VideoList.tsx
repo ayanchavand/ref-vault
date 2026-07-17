@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { ScannedVideo } from "@reference-vault/shared";
-import { useLazyThumbnail, usePrefetchOnHover } from "./Uselazythumbnail";
+import { useLazyThumbnail, usePrefetchOnHover, useDynamicThumbnail } from "./Uselazythumbnail";
 
 interface VideoListProps {
   rootPath: string;
@@ -50,6 +50,8 @@ function VideoThumbnailCard({
   disabled: boolean;
   onSelect(): void;
 }) {
+  const [isHovering, setIsHovering] = useState(false);
+
   const mediaUrl = useMemo(() => {
     return `/api/media?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
       video.mainVideoPath,
@@ -64,7 +66,7 @@ function VideoThumbnailCard({
       : undefined;
   }, [rootPath, video.thumbnailPath]);
 
-  const { containerRef, poster } = useLazyThumbnail({ mediaUrl, posterUrl });
+  const { containerRef, poster } = useDynamicThumbnail({ mediaUrl, posterUrl, frameCount: 4, isHovering });
   const prefetchHandlers = usePrefetchOnHover(mediaUrl);
 
   return (
@@ -74,6 +76,8 @@ function VideoThumbnailCard({
           ? "border-amber-400/50"
           : "border-white/[0.06] hover:-translate-y-1 hover:border-amber-400/40 hover:bg-[#14171B] hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)]"
       } bg-[#111316]`}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
     >
       <button
         type="button"

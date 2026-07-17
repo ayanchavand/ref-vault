@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import type { VideoDetail as VideoDetailType } from "@reference-vault/shared";
+import type { VideoDetail as VideoDetailType, JsonObject } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover } from "./Uselazythumbnail";
+import { putClipMetadata, ApiError } from "../../lib/api";
 
 interface VideoDetailProps {
   rootPath: string;
   video: VideoDetailType;
   onBack(): void;
+  onUpdateVideoDetail(updatedVideo: VideoDetailType): void;
 }
 
 function pad(index: number) {
   return String(index + 1).padStart(3, "0");
 }
+
 
 function ShimmerFill() {
   return (
@@ -182,7 +185,257 @@ function ClipCard({
   );
 }
 
-export function VideoDetail({ rootPath, video, onBack }: VideoDetailProps) {
+function extractTags(metadata?: JsonObject): string[] {
+  if (!metadata) {
+    return [];
+  }
+
+  const tags = metadata.tags;
+
+  if (typeof tags === "string") {
+    return [tags];
+  }
+
+  if (!Array.isArray(tags)) {
+    return [];
+  }
+
+  return tags.filter((item): item is string => typeof item === "string");
+}
+
+interface ClipMetadataEditorProps {
+  rootPath: string;
+  videoRelativePath: string;
+  clip: VideoDetailType["clips"][number];
+  video: VideoDetailType;
+  onSaveSuccess(updatedVideo: VideoDetailType): void;
+}
+
+function ClipMetadataEditor({
+  rootPath,
+  videoRelativePath,
+  clip,
+  video,
+  onSaveSuccess,
+}: ClipMetadataEditorProps) {
+  const [tagsInput, setTagsInput] = useState("");
+  const [notesInput, setNotesInput] = useState("");
+  const [ratingInput, setRatingInput] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Initialize form state from clip metadata
+  useEffect(() => {
+    const tags = extractTags(clip.metadata);
+    setTagsInput(tags.join(", "));
+    setNotesInput(String(clip.metadata?.notes ?? ""));
+    setRatingInput(Number(clip.metadata?.rating ?? 0));
+    setSaveError(null);
+    setSaveSuccess(false);
+  }, [clip]);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+
+    const tags = tagsInput
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+
+    const newMetadata: JsonObject = {
+      ...clip.metadata,
+      tags,
+    };
+
+    if (notesInput) {
+      newMetadata.notes = notesInput;
+    } else {
+      delete newMetadata.notes;
+    }
+
+    if (ratingInput) {
+      newMetadata.rating = ratingInput;
+    } else {
+      delete newMetadata.rating;
+    }
+
+
+    try {
+      const response = await putClipMetadata({
+        rootPath,
+        videoRelativePath,
+        clipMediaPath: clip.mediaPath,
+        metadata: newMetadata,
+      });
+
+      const updatedClips = video.clips.map((c) => {
+        if (c.mediaPath === clip.mediaPath) {
+          return {
+            ...c,
+            metadata: response.metadata,
+          };
+        }
+        return c;
+      });
+
+      const updatedVideo: VideoDetailType = {
+        ...video,
+        clipsMetadataPath: video.clipsMetadataPath || response.metadataPath,
+        clips: updatedClips,
+      };
+
+      onSaveSuccess(updatedVideo);
+      setSaveSuccess(true);
+    } catch (err) {
+      setSaveError(err instanceof ApiError ? err.message : "Failed to save metadata.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function handleReset() {
+    const tags = extractTags(clip.metadata);
+    setTagsInput(tags.join(", "));
+    setNotesInput(String(clip.metadata?.notes ?? ""));
+    setRatingInput(Number(clip.metadata?.rating ?? 0));
+    setSaveError(null);
+    setSaveSuccess(false);
+  }
+
+  const isModified = useMemo(() => {
+    const originalTags = extractTags(clip.metadata).join(", ");
+    const originalNotes = String(clip.metadata?.notes ?? "");
+    const originalRating = Number(clip.metadata?.rating ?? 0);
+
+    return (
+      tagsInput !== originalTags ||
+      notesInput !== originalNotes ||
+      ratingInput !== originalRating
+    );
+  }, [clip.metadata, tagsInput, notesInput, ratingInput]);
+
+  return (
+    <form onSubmit={handleSave} className="space-y-4">
+      <div className="flex flex-col gap-1">
+        <h3 className="font-mono text-xs uppercase tracking-wider text-amber-300">
+          Clip Metadata Editor
+        </h3>
+        <p className="text-xs text-white/40">
+          Edits are saved directly to the video's library folder.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-4">
+          {/* Tags Field */}
+          <div className="space-y-1.5">
+            <label htmlFor="clip-tags" className="block font-mono text-[0.65rem] uppercase tracking-wider text-white/50">
+              Tags (comma separated)
+            </label>
+            <input
+              id="clip-tags"
+              type="text"
+              value={tagsInput}
+              onChange={(e) => setTagsInput(e.target.value)}
+              placeholder="e.g. camera movement, slow motion"
+              disabled={isSaving}
+              className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2 text-sm text-white/95 placeholder:text-white/25 focus:border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/50 disabled:opacity-50"
+            />
+          </div>
+
+          {/* Rating Field */}
+          <div className="space-y-1.5">
+            <span className="block font-mono text-[0.65rem] uppercase tracking-wider text-white/50">
+              Rating
+            </span>
+            <div className="flex items-center gap-1.5">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => setRatingInput(star)}
+                  disabled={isSaving}
+                  className={`text-2xl transition duration-150 focus:outline-none ${
+                    star <= ratingInput
+                      ? "text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.5)]"
+                      : "text-white/20 hover:text-amber-400/50"
+                  }`}
+                >
+                  ★
+                </button>
+              ))}
+              {ratingInput > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setRatingInput(0)}
+                  disabled={isSaving}
+                  className="ml-2 font-mono text-[0.65rem] uppercase tracking-widest text-white/30 hover:text-white/60 focus:outline-none focus:underline"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Notes Field */}
+        <div className="space-y-1.5">
+          <label htmlFor="clip-notes" className="block font-mono text-[0.65rem] uppercase tracking-wider text-white/50">
+            Notes
+          </label>
+          <textarea
+            id="clip-notes"
+            value={notesInput}
+            onChange={(e) => setNotesInput(e.target.value)}
+            placeholder="Enter camera notes or annotations..."
+            disabled={isSaving}
+            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2 text-sm text-white/95 placeholder:text-white/25 focus:border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/50 disabled:opacity-50 min-h-[5.75rem] resize-y"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={isSaving || !isModified}
+            className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isSaving ? "Saving..." : "Save Changes"}
+          </button>
+          <button
+            type="button"
+            onClick={handleReset}
+            disabled={isSaving || !isModified}
+            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Reset
+          </button>
+        </div>
+
+        {saveSuccess && (
+          <span className="flex items-center gap-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-emerald-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+            Changes saved successfully!
+          </span>
+        )}
+
+        {saveError && (
+          <span className="font-mono text-[0.65rem] uppercase tracking-wider text-rose-400">
+            Error: {saveError}
+          </span>
+        )}
+      </div>
+    </form>
+  );
+}
+
+export function VideoDetail({ rootPath, video, onBack, onUpdateVideoDetail }: VideoDetailProps) {
+
   const [selectedMediaPath, setSelectedMediaPath] = useState(video.mainVideoPath);
 
   useEffect(() => {
@@ -204,6 +457,10 @@ export function VideoDetail({ rootPath, video, onBack }: VideoDetailProps) {
   }, [rootPath, video.thumbnailPath]);
 
   const isMainPlaying = selectedMediaPath === video.mainVideoPath;
+
+  const activeClip = useMemo(() => {
+    return video.clips.find((clip) => clip.mediaPath === selectedMediaPath);
+  }, [video.clips, selectedMediaPath]);
 
   return (
     <div className="flex min-h-[calc(100vh-7rem)] flex-col gap-5 bg-[#0A0B0D] text-white">
@@ -270,7 +527,20 @@ export function VideoDetail({ rootPath, video, onBack }: VideoDetailProps) {
               </video>
             </div>
           </div>
+
+          {!isMainPlaying && activeClip && (
+            <div className="mt-4 border-t border-white/[0.06] pt-6">
+              <ClipMetadataEditor
+                rootPath={rootPath}
+                videoRelativePath={video.relativePath}
+                clip={activeClip}
+                video={video}
+                onSaveSuccess={onUpdateVideoDetail}
+              />
+            </div>
+          )}
         </section>
+
 
         {/* Clip rail */}
         <aside className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316] p-4">

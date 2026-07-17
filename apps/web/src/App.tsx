@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import type {
   ScanLibraryResponse,
@@ -13,6 +13,9 @@ import { VideoDetail } from "./features/video-browser/VideoDetail";
 import { scanLibrary, getVideoDetail, ApiError } from "./lib/api";
 
 const libraryRootStorageKey = "reference-vault.library-root";
+
+// How many videos to show per page in the browse view.
+const VIDEOS_PER_PAGE = 6;
 
 type AppView = "SELECT_LIBRARY" | "BROWSE_LIBRARY" | "BROWSE_TAGS" | "VIEW_VIDEO";
 
@@ -39,6 +42,50 @@ function GlobalMotionStyles() {
   );
 }
 
+interface VideoListPaginationProps {
+  currentPage: number;
+  totalPages: number;
+  onPrevPage: () => void;
+  onNextPage: () => void;
+}
+
+// Simple prev/next pager for the video grid. Styled to match the
+// amber/dark theme used everywhere else in the app.
+function VideoListPagination({
+  currentPage,
+  totalPages,
+  onPrevPage,
+  onNextPage,
+}: VideoListPaginationProps) {
+  if (totalPages <= 1) {
+    return null;
+  }
+
+  return (
+    <div className="mt-8 flex items-center justify-center gap-4">
+      <button
+        type="button"
+        onClick={onPrevPage}
+        disabled={currentPage === 1}
+        className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 font-mono text-[0.7rem] uppercase tracking-widest text-white/70 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-30"
+      >
+        Prev
+      </button>
+      <span className="font-mono text-[0.7rem] uppercase tracking-widest text-white/40">
+        Page {currentPage} of {totalPages}
+      </span>
+      <button
+        type="button"
+        onClick={onNextPage}
+        disabled={currentPage === totalPages}
+        className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 font-mono text-[0.7rem] uppercase tracking-widest text-white/70 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-30"
+      >
+        Next
+      </button>
+    </div>
+  );
+}
+
 export function App() {
   const [savedRootPath, setSavedRootPath] = useState(loadSavedLibraryRoot);
   const [currentView, setCurrentView] = useState<AppView>("SELECT_LIBRARY");
@@ -49,6 +96,37 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [openingVideoPath, setOpeningVideoPath] = useState<string | null>(null);
+  // Which page of the video grid is currently showing. Reset to 1 whenever
+  // a fresh scan happens; preserved when navigating to/from a video detail
+  // or the tag browser so the user doesn't lose their place.
+  const [videoPage, setVideoPage] = useState(1);
+
+  // Auto-load saved library on mount
+  useEffect(() => {
+    const saved = loadSavedLibraryRoot();
+    if (saved) {
+      setActiveRootPath(saved);
+      setError(null);
+      setIsLoading(true);
+
+      scanLibrary(saved)
+        .then((result) => {
+          setScanResult(result);
+          setVideoPage(1);
+          setCurrentView("BROWSE_LIBRARY");
+        })
+        .catch((cause) => {
+          const message =
+            cause instanceof ApiError
+              ? cause.message
+              : "The library could not be scanned.";
+          setError(message);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    }
+  }, []);
 
   async function handleValidatedRoot(rootPath: string): Promise<void> {
     window.localStorage.setItem(libraryRootStorageKey, rootPath);
@@ -60,6 +138,7 @@ export function App() {
     try {
       const result = await scanLibrary(rootPath);
       setScanResult(result);
+      setVideoPage(1);
       setCurrentView("BROWSE_LIBRARY");
     } catch (cause) {
       const message =
@@ -79,6 +158,7 @@ export function App() {
     setCurrentView("SELECT_LIBRARY");
     setScanResult(null);
     setSelectedVideo(null);
+    setVideoPage(1);
   }
 
   async function handleSelectVideo(video: ScannedVideo): Promise<void> {
@@ -122,11 +202,58 @@ export function App() {
     setCurrentView("BROWSE_LIBRARY");
   }
 
+  function handleUpdateVideoDetail(updatedVideo: VideoDetailType): void {
+    setVideoDetail(updatedVideo);
+
+    if (scanResult) {
+      const updatedVideos = scanResult.videos.map((v) => {
+        if (v.relativePath === updatedVideo.relativePath) {
+          return {
+            ...v,
+            clipsMetadataPath: updatedVideo.clipsMetadataPath || `${updatedVideo.relativePath}/clips.json`,
+            clips: updatedVideo.clips.map((c) => ({
+              mediaPath: c.mediaPath,
+              metadataPath: c.metadataPath,
+            })),
+          };
+        }
+        return v;
+      });
+      setScanResult({
+        ...scanResult,
+        videos: updatedVideos,
+      });
+    }
+  }
+
   function handleBackToRoot(): void {
     forgetSavedRoot();
   }
 
+  function handlePrevVideoPage(): void {
+    setVideoPage((page) => Math.max(1, page - 1));
+  }
+
+  function handleNextVideoPage(): void {
+    if (!scanResult) return;
+    const totalPages = Math.max(1, Math.ceil(scanResult.videos.length / VIDEOS_PER_PAGE));
+    setVideoPage((page) => Math.min(totalPages, page + 1));
+  }
+
   const isBusy = isLoading || openingVideoPath !== null;
+
+  const totalVideoPages = scanResult
+    ? Math.max(1, Math.ceil(scanResult.videos.length / VIDEOS_PER_PAGE))
+    : 1;
+  // Clamp in case the underlying list ever shrinks (e.g. a re-scan) while
+  // sitting on a page that no longer exists.
+  const clampedVideoPage = Math.min(videoPage, totalVideoPages);
+  const paginatedVideos = scanResult
+    ? scanResult.videos.slice(
+        (clampedVideoPage - 1) * VIDEOS_PER_PAGE,
+        clampedVideoPage * VIDEOS_PER_PAGE,
+      )
+    : [];
 
   return (
     <main className="m-0 min-h-screen bg-[#0A0B0D] text-white">
@@ -192,16 +319,24 @@ export function App() {
           )}
 
           {currentView === "BROWSE_LIBRARY" && scanResult && (
-            <VideoList
-              rootPath={activeRootPath!}
-              videos={scanResult.videos}
-              onSelectVideo={handleSelectVideo}
-              onBrowseTags={handleBrowseTags}
-              onChangeRoot={handleBackToRoot}
-              isLoading={isLoading}
-              openingVideoPath={openingVideoPath}
-              error={error}
-            />
+            <>
+              <VideoList
+                rootPath={activeRootPath!}
+                videos={paginatedVideos}
+                onSelectVideo={handleSelectVideo}
+                onBrowseTags={handleBrowseTags}
+                onChangeRoot={handleBackToRoot}
+                isLoading={isLoading}
+                openingVideoPath={openingVideoPath}
+                error={error}
+              />
+              <VideoListPagination
+                currentPage={clampedVideoPage}
+                totalPages={totalVideoPages}
+                onPrevPage={handlePrevVideoPage}
+                onNextPage={handleNextVideoPage}
+              />
+            </>
           )}
 
           {currentView === "BROWSE_TAGS" && scanResult && (
@@ -217,6 +352,7 @@ export function App() {
               rootPath={activeRootPath!}
               video={videoDetail}
               onBack={handleBackToLibrary}
+              onUpdateVideoDetail={handleUpdateVideoDetail}
             />
           )}
         </section>

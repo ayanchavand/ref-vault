@@ -181,8 +181,9 @@ export function TagBrowser({ rootPath, videos, onBack }: TagBrowserProps) {
       );
       const normalizedMap: Record<string, TaggedClip[]> = {};
       for (const tag of sortedTagKeys) {
-        normalizedMap[tag] = nextTagMap[tag];
+        normalizedMap[tag] = nextTagMap[tag] || [];
       }
+
 
       setTagMap(normalizedMap);
       setSelectedTag((current) => current ?? sortedTagKeys[0] ?? null);
