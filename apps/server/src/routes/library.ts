@@ -1,3 +1,6 @@
+import { createReadStream } from "node:fs";
+import { realpath, stat } from "node:fs/promises";
+import { extname, relative, resolve } from "node:path";
 import type { FastifyInstance } from "fastify";
 
 import type {
@@ -78,6 +81,89 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
     },
   );
 
+  app.get<{
+    Querystring: { rootPath: string; mediaPath: string };
+  }>(
+    "/api/media",
+    {
+      schema: {
+        querystring: {
+          type: "object",
+          required: ["rootPath", "mediaPath"],
+          additionalProperties: false,
+          properties: {
+            rootPath: { type: "string" },
+            mediaPath: { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const validation = await validateLibraryRoot(request.query.rootPath);
+
+      if (!validation.ok) {
+        const statusCode =
+          validation.error.error === "LIBRARY_ROOT_NOT_FOUND" ? 404 : 400;
+        return reply.status(statusCode).send(validation.error);
+      }
+
+      const mediaResult = await resolveMediaFile(
+        validation.value.rootPath,
+        request.query.mediaPath,
+      );
+
+      if (!mediaResult.ok) {
+        const statusCode =
+          mediaResult.error.error === "MEDIA_NOT_FOUND" ? 404 : 400;
+        return reply.status(statusCode).send(mediaResult.error);
+      }
+
+      const { filePath, fileStats, contentType } = mediaResult.value;
+      const rangeHeader = request.headers.range;
+
+      if (rangeHeader) {
+        const rangeMatch = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader);
+
+        if (!rangeMatch) {
+          return reply.status(416).send({
+            error: "INVALID_RANGE",
+            message: "The requested range is invalid.",
+          });
+        }
+
+        const start = rangeMatch[1].length > 0 ? Number(rangeMatch[1]) : 0;
+        const end = rangeMatch[2].length > 0 ? Number(rangeMatch[2]) : fileStats.size - 1;
+
+        if (Number.isNaN(start) || Number.isNaN(end) || start > end || start >= fileStats.size) {
+          reply
+            .status(416)
+            .header("Content-Range", `bytes */${fileStats.size}`)
+            .send();
+          return;
+        }
+
+        const chunkSize = end - start + 1;
+        const stream = createReadStream(filePath, { start, end });
+
+        return reply
+          .code(206)
+          .header("Content-Type", contentType)
+          .header("Accept-Ranges", "bytes")
+          .header("Content-Range", `bytes ${start}-${end}/${fileStats.size}`)
+          .header("Content-Length", String(chunkSize))
+          .send(stream);
+      }
+
+      const stream = createReadStream(filePath);
+      return reply
+        .code(200)
+        .header("Content-Type", contentType)
+        .header("Content-Length", String(fileStats.size))
+        .header("Accept-Ranges", "bytes")
+        .send(stream);
+    },
+  );
+
   app.post<{
     Body: GetVideoDetailRequest;
     Reply: GetVideoDetailResponse | ApiErrorResponse;
@@ -116,6 +202,94 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
       return result.value;
     },
   );
+
+  async function resolveMediaFile(
+    libraryRootPath: string,
+    mediaPath: string,
+  ):
+    | { ok: true; value: { filePath: string; fileStats: import("node:fs").Stats; contentType: string } }
+    | { ok: false; error: ApiErrorResponse } {
+    if (
+      mediaPath.trim().length === 0 ||
+      !isContainedPath(libraryRootPath, resolve(libraryRootPath, mediaPath))
+    ) {
+      return {
+        ok: false,
+        error: {
+          error: "MEDIA_NOT_FOUND",
+          message: "mediaPath must stay within the library root.",
+        },
+      };
+    }
+
+    const filePath = await realpath(resolve(libraryRootPath, mediaPath));
+
+    if (!isContainedPath(libraryRootPath, filePath)) {
+      return {
+        ok: false,
+        error: {
+          error: "MEDIA_NOT_FOUND",
+          message: "mediaPath must stay within the library root.",
+        },
+      };
+    }
+
+    if (!filePath.endsWith(".mp4") && !filePath.endsWith(".jpg") && !filePath.endsWith(".jpeg")) {
+      return {
+        ok: false,
+        error: {
+          error: "MEDIA_NOT_FOUND",
+          message: "Only .mp4 and image files can be served as media.",
+        },
+      };
+    }
+
+    try {
+      const fileStats = await stat(filePath);
+
+      if (!fileStats.isFile()) {
+        return {
+          ok: false,
+          error: {
+            error: "MEDIA_NOT_FOUND",
+            message: "The requested media file was not found.",
+          },
+        };
+      }
+
+      const contentType = getContentType(filePath);
+      return { ok: true, value: { filePath, fileStats, contentType } };
+    } catch {
+      return {
+        ok: false,
+        error: {
+          error: "MEDIA_NOT_FOUND",
+          message: "The requested media file was not found.",
+        },
+      };
+    }
+  }
+
+  function getContentType(filePath: string): string {
+    const extension = extname(filePath).toLowerCase();
+
+    switch (extension) {
+      case ".mp4":
+        return "video/mp4";
+      case ".jpg":
+      case ".jpeg":
+        return "image/jpeg";
+      default:
+        return "application/octet-stream";
+    }
+  }
+
+  function isContainedPath(libraryRootPath: string, targetPath: string): boolean {
+    const pathFromRoot = resolve(libraryRootPath, targetPath).startsWith(libraryRootPath)
+      ? relative(libraryRootPath, targetPath)
+      : "..";
+    return pathFromRoot === "" || (!pathFromRoot.startsWith(".."));
+  }
 
   app.put<{
     Body: PutClipMetadataRequest;

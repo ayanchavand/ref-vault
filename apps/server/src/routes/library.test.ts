@@ -153,6 +153,29 @@ test("reads video and clip metadata without changing its future fields", async (
   }
 });
 
+test("serves media files from the library", async () => {
+  const library = await mkdtemp(join(tmpdir(), "reference-vault-"));
+  const videoDirectory = join(library, "video-a");
+  await mkdir(videoDirectory, { recursive: true });
+  await writeFile(join(videoDirectory, "main.mp4"), "hello world");
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/media?rootPath=" + encodeURIComponent(library) +
+        "&mediaPath=" + encodeURIComponent("video-a/main.mp4"),
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.headers["content-type"], "video/mp4");
+    assert.equal(response.payload, "hello world");
+  } finally {
+    await app.close();
+    await rm(library, { force: true, recursive: true });
+  }
+});
+
 test("rejects a video path that escapes the library root", async () => {
   const library = await mkdtemp(join(tmpdir(), "reference-vault-"));
   const app = await buildApp();
