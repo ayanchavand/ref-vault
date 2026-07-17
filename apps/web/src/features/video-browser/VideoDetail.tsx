@@ -1357,7 +1357,7 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
   return (
     <div className="flex min-h-[calc(100vh-7rem)] flex-col gap-5 bg-[#0A0B0D] text-white">
       {/* Header */}
-      <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316] px-4 py-4 sm:px-5 sm:py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 min-w-0">
           <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(232,163,61,0.7)]" />
           <div className="min-w-0">
@@ -1369,7 +1369,7 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
         </div>
         <button
           onClick={onBack}
-          className="flex shrink-0 items-center gap-2 self-start rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
+          className="flex shrink-0 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
         >
           <span aria-hidden="true">&larr;</span> All videos
         </button>
@@ -1402,9 +1402,9 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
           </div>
 
           {/* Viewfinder-framed player — signature element */}
-          <div className="relative flex-1">
+          <div className="relative w-full aspect-video">
             {/* Corner Viewfinder Braces */}
-            <div className="pointer-events-none absolute -inset-1 z-10">
+            <div className="pointer-events-none absolute -inset-1 z-10 hidden md:block">
               <span className="absolute left-0 top-0 h-6 w-6 border-l-2 border-t-2 border-amber-400/50" />
               <span className="absolute right-0 top-0 h-6 w-6 border-r-2 border-t-2 border-amber-400/50" />
               <span className="absolute bottom-0 left-0 h-6 w-6 border-b-2 border-l-2 border-amber-400/50" />
@@ -1412,27 +1412,26 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
             </div>
 
             {/* Viewfinder HUD overlays */}
-            <div className="absolute top-3.5 left-3.5 z-20 flex items-center gap-1.5 pointer-events-none font-mono text-[0.62rem] tracking-wider text-rose-500 uppercase bg-black/40 px-2 py-0.5 rounded backdrop-blur-[1px]">
+            <div className="absolute top-3.5 left-3.5 z-20 hidden md:flex items-center gap-1.5 pointer-events-none font-mono text-[0.62rem] tracking-wider text-rose-500 uppercase bg-black/40 px-2 py-0.5 rounded backdrop-blur-[1px]">
               <span className="h-1.5 w-1.5 rounded-full bg-rose-600 animate-pulse" />
               <span>REC</span>
             </div>
-            <div className="absolute top-3.5 right-3.5 z-20 pointer-events-none font-mono text-[0.62rem] tracking-wider text-white/40 bg-black/40 px-2 py-0.5 rounded backdrop-blur-[1px]">
+            <div className="absolute top-3.5 right-3.5 z-20 pointer-events-none hidden md:block font-mono text-[0.62rem] tracking-wider text-white/40 bg-black/40 px-2 py-0.5 rounded backdrop-blur-[1px]">
               <span>1080p · 24fps</span>
             </div>
 
-            <div className="absolute bottom-3.5 left-3.5 z-20 pointer-events-none font-mono text-[0.68rem] tracking-widest text-amber-300 font-semibold bg-black/60 px-2.5 py-0.5 rounded backdrop-blur-[1px] border border-amber-400/10">
+            <div className="absolute bottom-3.5 left-3.5 z-20 pointer-events-none hidden md:block font-mono text-[0.68rem] tracking-widest text-amber-300 font-semibold bg-black/60 px-2.5 py-0.5 rounded backdrop-blur-[1px] border border-amber-400/10">
               <span>TC {formatTimecode(currentTime)}</span>
             </div>
-            <div className="absolute bottom-3.5 right-3.5 z-20 pointer-events-none font-mono text-[0.68rem] tracking-widest text-white/40 bg-black/60 px-2.5 py-0.5 rounded backdrop-blur-[1px]">
+            <div className="absolute bottom-3.5 right-3.5 z-20 pointer-events-none hidden md:block font-mono text-[0.68rem] tracking-widest text-white/40 bg-black/60 px-2.5 py-0.5 rounded backdrop-blur-[1px]">
               <span>DUR {formatTimecode(duration)}</span>
             </div>
 
-            <div className="min-h-[55vh] overflow-hidden rounded-2xl border border-white/[0.06] bg-black">
+            <div className="w-full h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-black aspect-video">
               <video
                 ref={videoRef}
                 controls
-                className="h-full w-full bg-black"
-                style={{ minHeight: "55vh" }}
+                className="h-full w-full bg-black aspect-video"
                 src={mediaUrl}
                 poster={posterUrl}
                 preload="metadata"
@@ -1445,14 +1444,14 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
           </div>
 
           {/* Advanced Playback Control Panel */}
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/[0.04] bg-white/[0.01] p-3 text-sm">
+          <div className="grid grid-cols-2 gap-3 p-2.5 text-xs sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:p-3 sm:text-sm rounded-xl border border-white/[0.04] bg-white/[0.01]">
             {/* Frame step buttons */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 col-span-2 justify-between sm:justify-start">
               <button
                 type="button"
                 onClick={stepFrameBackward}
                 title="Step 1 Frame Back (Left Arrow)"
-                className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-white/80 hover:border-amber-400/40 hover:bg-white/[0.06] transition focus:outline-none"
+                className="flex-1 sm:flex-initial text-center rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-white/80 hover:border-amber-400/40 hover:bg-white/[0.06] transition focus:outline-none"
               >
                 ◀ Frame
               </button>
@@ -1460,36 +1459,38 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
                 type="button"
                 onClick={stepFrameForward}
                 title="Step 1 Frame Forward (Right Arrow)"
-                className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-white/80 hover:border-amber-400/40 hover:bg-white/[0.06] transition focus:outline-none"
+                className="flex-1 sm:flex-initial text-center rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-white/80 hover:border-amber-400/40 hover:bg-white/[0.06] transition focus:outline-none"
               >
                 Frame ▶
               </button>
             </div>
 
             {/* Playback speed rate selection */}
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-[0.6rem] uppercase tracking-widest text-white/30 mr-1">Speed</span>
-              {[0.25, 0.5, 1, 2].map((rate) => (
-                <button
-                  key={rate}
-                  type="button"
-                  onClick={() => changePlayRate(rate)}
-                  className={`rounded-lg px-2.5 py-1 font-mono text-xs transition focus:outline-none ${
-                    playRate === rate
-                      ? "bg-amber-400 font-semibold text-[#0A0B0D]"
-                      : "border border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
-                  }`}
-                >
-                  {rate}x
-                </button>
-              ))}
+            <div className="flex items-center gap-1 justify-between sm:justify-start sm:gap-1.5">
+              <span className="font-mono text-[0.6rem] uppercase tracking-widest text-white/30 mr-1 hidden min-[370px]:inline">Speed</span>
+              <div className="flex items-center gap-1">
+                {[0.25, 0.5, 1, 2].map((rate) => (
+                  <button
+                    key={rate}
+                    type="button"
+                    onClick={() => changePlayRate(rate)}
+                    className={`rounded-lg px-2 py-1 sm:px-2.5 sm:py-1 font-mono text-[0.68rem] sm:text-xs transition focus:outline-none ${
+                      playRate === rate
+                        ? "bg-amber-400 font-semibold text-[#0A0B0D]"
+                        : "border border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    {rate}x
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Loop Toggle */}
             <button
               type="button"
               onClick={() => setIsLooping(!isLooping)}
-              className={`rounded-lg px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition focus:outline-none ${
+              className={`rounded-lg px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition focus:outline-none text-center ${
                 isLooping
                   ? "bg-amber-400/20 border border-amber-400/50 text-amber-300 font-semibold shadow-[0_0_8px_rgba(232,163,61,0.2)]"
                   : "border border-white/[0.08] bg-white/[0.03] text-white/60 hover:text-white"
@@ -1527,7 +1528,7 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
 
 
         {/* Clip rail */}
-        <aside className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316] p-4">
+        <aside className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316] p-4 max-h-[500px] xl:max-h-[80vh]">
           <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] pb-3">
             <div>
               <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">

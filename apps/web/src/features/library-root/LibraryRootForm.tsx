@@ -44,10 +44,10 @@ export function LibraryRootForm({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-700 bg-slate-900/70 p-6 shadow-2xl shadow-black/20">
+    <div className="rounded-2xl border border-white/[0.08] bg-[#111316]/50 backdrop-blur-md p-4 sm:p-6 shadow-2xl shadow-black/40">
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label htmlFor="library-root" className="text-sm font-medium text-slate-200">
+          <label htmlFor="library-root" className="text-sm font-medium text-white/80">
             Library folder path
           </label>
           <input
@@ -59,9 +59,9 @@ export function LibraryRootForm({
             placeholder="/Volumes/References/ReferenceLibrary"
             autoComplete="off"
             spellCheck="false"
-            className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-3 font-mono text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+            className="mt-2 w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 font-mono text-sm text-white outline-none transition focus:border-amber-400/50 focus:ring-2 focus:ring-amber-400/10"
           />
-          <p className="mt-2 text-xs leading-5 text-slate-500">
+          <p className="mt-2 text-xs leading-5 text-white/40">
             The path is saved only in this browser after validation.
           </p>
         </div>
@@ -75,16 +75,16 @@ export function LibraryRootForm({
         <button
           type="submit"
           disabled={isSubmitting || rootPath.trim().length === 0}
-          className="w-full rounded-lg bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-[#0A0B0D] transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {isSubmitting ? "Checking folder…" : "Open library"}
         </button>
       </form>
 
       {activeRootPath ? (
-        <div className="mt-5 border-t border-slate-800 pt-5">
+        <div className="mt-5 border-t border-white/[0.06] pt-5">
           <p className="text-sm font-medium text-emerald-300">Library ready</p>
-          <p className="mt-1 break-all font-mono text-xs leading-5 text-slate-400">
+          <p className="mt-1 break-all font-mono text-xs leading-5 text-white/60">
             {activeRootPath}
           </p>
         </div>
@@ -94,7 +94,7 @@ export function LibraryRootForm({
         <button
           type="button"
           onClick={onForgetSavedRoot}
-          className="mt-5 text-xs font-medium text-slate-500 transition hover:text-slate-300"
+          className="mt-5 text-xs font-medium text-white/40 transition hover:text-white/70"
         >
           Forget saved location
         </button>

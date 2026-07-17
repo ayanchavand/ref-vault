@@ -266,8 +266,8 @@ export function App() {
         </div>
       )}
 
-      <div className="flex min-h-screen w-full flex-col px-6 py-8 sm:px-10">
-        <header className="flex items-center justify-between border-b border-white/[0.06] pb-6">
+      <div className="flex min-h-screen w-full flex-col px-4 py-6 sm:px-10 sm:py-8">
+        <header className="flex items-center justify-between border-b border-white/[0.06] pb-4 sm:pb-6">
           <div className="flex items-center gap-3">
             <span
               className={`h-2 w-2 shrink-0 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(232,163,61,0.7)] ${
@@ -288,10 +288,10 @@ export function App() {
           </span>
         </header>
 
-        <section className="flex flex-1 flex-col py-12">
+        <section className="flex flex-col flex-1 py-6 sm:py-12">
           {currentView === "SELECT_LIBRARY" && (
             <div className="flex flex-1 items-center">
-              <div className="grid w-full gap-10 lg:grid-cols-[1fr_0.85fr] lg:items-center">
+              <div className="grid w-full gap-6 lg:gap-10 lg:grid-cols-[1fr_0.85fr] lg:items-center">
                 <div>
                   <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
                     01 · Open a library

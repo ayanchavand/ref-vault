@@ -228,7 +228,7 @@ export function TagBrowser({ rootPath, videos, onBack, onSelectVideo }: TagBrows
 
   return (
     <div className="flex min-h-[calc(100vh-7rem)] flex-col gap-5 bg-[#0A0B0D] text-white">
-      <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316] px-4 py-4 sm:px-5 sm:py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
             Vault / Tags
@@ -239,7 +239,7 @@ export function TagBrowser({ rootPath, videos, onBack, onSelectVideo }: TagBrows
         </div>
         <button
           onClick={onBack}
-          className="flex shrink-0 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
+          className="flex shrink-0 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
         >
           <span aria-hidden="true">&larr;</span> All videos
         </button>
@@ -290,7 +290,7 @@ export function TagBrowser({ rootPath, videos, onBack, onSelectVideo }: TagBrows
                         isSelected ? prev.filter((t) => t !== tag) : [...prev, tag],
                       );
                     }}
-                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition duration-200 ${
+                    className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm transition duration-200 ${
                       isSelected
                         ? "border-amber-400 bg-amber-400/20 text-white shadow-[0_0_8px_rgba(232,163,61,0.2)]"
                         : "border-white/[0.06] bg-white/[0.03] text-white/80 hover:border-amber-400/30 hover:bg-white/[0.06]"
@@ -331,7 +331,7 @@ export function TagBrowser({ rootPath, videos, onBack, onSelectVideo }: TagBrows
                         isSelected ? prev.filter((t) => t !== tag) : [...prev, tag],
                       );
                     }}
-                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition duration-200 ${
+                    className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm transition duration-200 ${
                       isSelected
                         ? "border-sky-400 bg-sky-400/20 text-white shadow-[0_0_8px_rgba(56,189,248,0.2)]"
                         : "border-white/[0.06] bg-white/[0.03] text-white/80 hover:border-sky-400/30 hover:bg-white/[0.06]"
@@ -373,7 +373,7 @@ export function TagBrowser({ rootPath, videos, onBack, onSelectVideo }: TagBrows
             No clips match the selected combination of filters.
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-1 min-[450px]:grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {matchedClips.map((entry) => {
               const scannedVideo = videos.find((v) => v.relativePath === entry.video.relativePath);
               return (
