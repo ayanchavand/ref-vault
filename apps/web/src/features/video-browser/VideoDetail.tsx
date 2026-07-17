@@ -894,6 +894,31 @@ function SegmentEditor({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  const allLibraryTags = useMemo(() => {
+    const set = new Set<string>();
+    video.clips.forEach((c) => {
+      extractTags(c.metadata).forEach((tag) => set.add(tag));
+    });
+    return Array.from(set).sort();
+  }, [video.clips]);
+
+  function suggestedTags(activeTags: string[]) {
+    return allLibraryTags.filter((tag) => !activeTags.includes(tag));
+  }
+
+  function suggestedGlobalTags(activeTags: string[]) {
+    return globalTags.filter(
+      (tag) => !allLibraryTags.includes(tag) && !activeTags.includes(tag)
+    );
+  }
+
+  function handleAddTag(index: number, tag: string) {
+    const currentTags = segments[index]?.tags || [];
+    if (!currentTags.includes(tag)) {
+      updateSegment(index, { tags: [...currentTags, tag] });
+    }
+  }
+
   useEffect(() => {
     setSegments([]);
   }, [video]);
@@ -1083,6 +1108,44 @@ function SegmentEditor({
                   }
                   className="w-full rounded bg-white/[0.03] border border-white/[0.08] px-2 py-1 text-xs text-white"
                 />
+
+                {/* Local Video Tag suggestions */}
+                {suggestedTags(seg.tags).length > 0 && (
+                  <div className="mt-1 space-y-1">
+                    <span className="block font-mono text-[0.5rem] uppercase tracking-wider text-white/20">Suggestions (This Video)</span>
+                    <div className="flex flex-wrap gap-1 max-h-[3.5rem] overflow-y-auto pr-1">
+                      {suggestedTags(seg.tags).map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => handleAddTag(index, tag)}
+                          className={`rounded-full border px-1.5 py-0.5 font-mono text-[0.52rem] transition focus:outline-none ${getTagColorClass(tag)} hover:opacity-85`}
+                        >
+                          + {tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Global Library Tag suggestions */}
+                {suggestedGlobalTags(seg.tags).length > 0 && (
+                  <div className="mt-1 space-y-1">
+                    <span className="block font-mono text-[0.5rem] uppercase tracking-wider text-white/20">Suggestions (Global Library)</span>
+                    <div className="flex flex-wrap gap-1 max-h-[3.5rem] overflow-y-auto pr-1">
+                      {suggestedGlobalTags(seg.tags).map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => handleAddTag(index, tag)}
+                          className={`rounded-full border px-1.5 py-0.5 font-mono text-[0.52rem] transition focus:outline-none ${getTagColorClass(tag)} hover:opacity-85`}
+                        >
+                          + {tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Notes */}
