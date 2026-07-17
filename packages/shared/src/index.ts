@@ -110,7 +110,9 @@ export type LibraryRootValidationErrorCode =
   | "INVALID_CLIP_PATH"
   | "CLIP_NOT_FOUND"
   | "MEDIA_NOT_FOUND"
-  | "METADATA_WRITE_FAILED";
+  | "METADATA_WRITE_FAILED"
+  | "INVALID_MEDIA_TYPE"
+  | "THUMBNAIL_GENERATION_FAILED";
 
 export interface ApiErrorResponse {
   error: LibraryRootValidationErrorCode;

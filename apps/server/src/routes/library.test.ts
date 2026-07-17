@@ -318,3 +318,81 @@ test("atomically creates the split_plan.json beside a verified video", async () 
     await rm(library, { force: true, recursive: true });
   }
 });
+
+test("serves image files with Cache-Control and ETag, and supports 304 conditional request", async () => {
+  const library = await mkdtemp(join(tmpdir(), "reference-vault-"));
+  const videoDirectory = join(library, "video-a");
+  await mkdir(videoDirectory, { recursive: true });
+  await writeFile(join(videoDirectory, "thumbnail.jpg"), "fake-image-content");
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/media?rootPath=" + encodeURIComponent(library) +
+        "&mediaPath=" + encodeURIComponent("video-a/thumbnail.jpg"),
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.headers["content-type"], "image/jpeg");
+    assert.equal(response.payload, "fake-image-content");
+    assert.ok(response.headers["cache-control"]);
+    assert.ok(response.headers["etag"]);
+
+    const etag = response.headers["etag"] as string;
+
+    const cacheResponse = await app.inject({
+      method: "GET",
+      url: "/api/media?rootPath=" + encodeURIComponent(library) +
+        "&mediaPath=" + encodeURIComponent("video-a/thumbnail.jpg"),
+      headers: {
+        "if-none-match": etag,
+      },
+    });
+
+    assert.equal(cacheResponse.statusCode, 304);
+    assert.equal(cacheResponse.payload, "");
+  } finally {
+    await app.close();
+    await rm(library, { force: true, recursive: true });
+  }
+});
+
+test("serves existing thumbnail via /api/media/thumbnail with Cache-Control and ETag", async () => {
+  const library = await mkdtemp(join(tmpdir(), "reference-vault-"));
+  const videoDirectory = join(library, "video-a");
+  await mkdir(videoDirectory, { recursive: true });
+  await writeFile(join(videoDirectory, "thumbnail.jpg"), "existing-thumbnail");
+  await writeFile(join(videoDirectory, "main.mp4"), "fake-video-content");
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/media/thumbnail?rootPath=${encodeURIComponent(library)}&mediaPath=video-a/main.mp4`,
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.headers["content-type"], "image/jpeg");
+    assert.equal(response.payload, "existing-thumbnail");
+    assert.ok(response.headers["cache-control"]);
+    assert.ok(response.headers["etag"]);
+
+    const etag = response.headers["etag"] as string;
+
+    const cacheResponse = await app.inject({
+      method: "GET",
+      url: `/api/media/thumbnail?rootPath=${encodeURIComponent(library)}&mediaPath=video-a/main.mp4`,
+      headers: {
+        "if-none-match": etag,
+      },
+    });
+
+    assert.equal(cacheResponse.statusCode, 304);
+    assert.equal(cacheResponse.payload, "");
+  } finally {
+    await app.close();
+    await rm(library, { force: true, recursive: true });
+  }
+});
+

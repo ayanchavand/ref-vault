@@ -1276,12 +1276,15 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
   }, [rootPath, selectedMediaPath]);
 
   const posterUrl = useMemo(() => {
-    return video.thumbnailPath
-      ? `/api/media?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
-          video.thumbnailPath,
-        )}`
-      : undefined;
-  }, [rootPath, video.thumbnailPath]);
+    if (video.thumbnailPath) {
+      return `/api/media?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
+        video.thumbnailPath,
+      )}`;
+    }
+    return `/api/media/thumbnail?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
+      video.mainVideoPath,
+    )}`;
+  }, [rootPath, video.thumbnailPath, video.mainVideoPath]);
 
   useEffect(() => {
     setSelectedMediaPath(video.mainVideoPath);

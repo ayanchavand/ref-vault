@@ -13,44 +13,70 @@ const SLOT_TIMEOUT_MS = 8000;
 let activeCount = 0;
 const waiters: Array<() => void> = [];
 
-function acquireSlot(): Promise<void> {
-  if (activeCount < MAX_CONCURRENT_THUMBNAILS) {
-    activeCount += 1;
-    return Promise.resolve();
+/**
+ * Helper to open and retrieve list of frames from the client-side Cache Storage.
+ */
+async function getFromClientCache(key: string): Promise<string[] | null> {
+  try {
+    const cache = await caches.open("thumbnail-extraction-cache");
+    const response = await cache.match(key);
+    if (response) {
+      const data = await response.json();
+      return data.frames || null;
+    }
+  } catch {
+    // Ignore cache errors (e.g. private browsing mode)
   }
-
-  return new Promise((resolve) => {
-    waiters.push(() => {
-      activeCount += 1;
-      resolve();
-    });
-  });
+  return null;
 }
 
-function releaseSlot(): void {
-  activeCount = Math.max(0, activeCount - 1);
-  const next = waiters.shift();
-  if (next) {
-    next();
+/**
+ * Helper to save extracted frames to the client-side Cache Storage.
+ */
+async function saveToClientCache(key: string, frames: string[]): Promise<void> {
+  try {
+    const cache = await caches.open("thumbnail-extraction-cache");
+    const response = new Response(JSON.stringify({ frames }), {
+      headers: { "Content-Type": "application/json" },
+    });
+    await cache.put(key, response);
+  } catch {
+    // Ignore cache errors
   }
 }
 
 /**
- * Same as acquireSlot(), but returns a release function that:
+ * Acquires a decoding slot with a customizable concurrency limit.
+ * Returns a release function that:
  *  - is idempotent (safe to call more than once, or never)
  *  - auto-fires after SLOT_TIMEOUT_MS so a stuck decode/seek/network
  *    stall can never hold a slot forever.
  */
-function acquireSlotWithTimeout(
+function acquireSlotWithLimit(
+  limit: number,
   timeoutMs: number = SLOT_TIMEOUT_MS,
 ): Promise<() => void> {
-  return acquireSlot().then(() => {
+  const promise =
+    activeCount < limit
+      ? ((activeCount += 1), Promise.resolve())
+      : new Promise<void>((resolve) => {
+          waiters.push(() => {
+            activeCount += 1;
+            resolve();
+          });
+        });
+
+  return promise.then(() => {
     let released = false;
     const release = () => {
       if (released) return;
       released = true;
       clearTimeout(timer);
-      releaseSlot();
+      activeCount = Math.max(0, activeCount - 1);
+      const next = waiters.shift();
+      if (next) {
+        next();
+      }
     };
     const timer = setTimeout(release, timeoutMs);
     return release;
@@ -77,6 +103,14 @@ export function useLazyThumbnail({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [poster, setPoster] = useState<string | undefined>(undefined);
+  const [isCached, setIsCached] = useState(false);
+
+  // Set initial poster if posterUrl is provided
+  useEffect(() => {
+    if (posterUrl) {
+      setPoster(posterUrl);
+    }
+  }, [posterUrl]);
 
   // Watch for the card entering (or nearing) the viewport, then stop watching.
   useEffect(() => {
@@ -99,13 +133,32 @@ export function useLazyThumbnail({
     return () => observer.disconnect();
   }, [posterUrl, rootMargin]);
 
+  // Try loading from client-side Cache Storage
   useEffect(() => {
-    if (posterUrl) {
-      setPoster(posterUrl);
+    if (posterUrl || !isVisible || isCached) {
       return;
     }
 
-    if (!isVisible) {
+    let active = true;
+    getFromClientCache(mediaUrl).then((cachedFrames) => {
+      if (active && cachedFrames && cachedFrames.length > 0) {
+        setPoster(cachedFrames[0]);
+        setIsCached(true);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [isVisible, mediaUrl, posterUrl, isCached]);
+
+  // Client-side extraction fallback
+  useEffect(() => {
+    if (posterUrl) {
+      return;
+    }
+
+    if (!isVisible || isCached) {
       return;
     }
 
@@ -113,7 +166,7 @@ export function useLazyThumbnail({
     const videoElement = document.createElement("video");
     const canvas = document.createElement("canvas");
 
-    acquireSlotWithTimeout().then((release) => {
+    acquireSlotWithLimit(MAX_CONCURRENT_THUMBNAILS).then((release) => {
       if (cancelled) {
         release();
         return;
@@ -140,11 +193,12 @@ export function useLazyThumbnail({
 
         try {
           ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-          setPoster(canvas.toDataURL("image/jpeg", 0.75));
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
+          setPoster(dataUrl);
+          setIsCached(true);
+          saveToClientCache(mediaUrl, [dataUrl]);
         } catch (e) {
-          // Cross-origin video without proper CORS headers taints the
-          // canvas; drawImage/toDataURL throw. Fall back to no poster
-          // instead of leaking the slot.
+          // Cross-origin video without proper CORS headers taints the canvas
           if (!cancelled) {
             setPoster(undefined);
           }
@@ -168,7 +222,7 @@ export function useLazyThumbnail({
       cancelled = true;
       videoElement.src = "";
     };
-  }, [mediaUrl, posterUrl, isVisible]);
+  }, [mediaUrl, posterUrl, isVisible, isCached]);
 
   return { containerRef, poster };
 }
@@ -181,6 +235,9 @@ interface UseDynamicThumbnailOptions extends UseLazyThumbnailOptions {
 /**
  * Hook that extracts and cycles through multiple frames from a video when hovering,
  * changing the displayed frame every 2-3 seconds for a dynamic effect.
+ *
+ * Optimized for mobile: skips dynamic cycling and limits concurrent extraction.
+ * Optimized for desktop: only extracts additional frames when the user actually hovers.
  */
 export function useDynamicThumbnail({
   mediaUrl,
@@ -192,15 +249,29 @@ export function useDynamicThumbnail({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [poster, setPoster] = useState<string | undefined>(undefined);
-  const frameUrlsRef = useRef<string[]>([]);
+  const [frames, setFrames] = useState<string[]>([]);
   const currentFrameIndexRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const firstFrameRef = useRef<string | undefined>(undefined);
+  const [isMobile, setIsMobile] = useState(false);
+  const [shouldExtract, setShouldExtract] = useState(false);
+
+  // Check if this is a touch device (no hover capability)
+  useEffect(() => {
+    setIsMobile(window.matchMedia("(hover: none)").matches);
+  }, []);
 
   // Watch for the card entering (or nearing) the viewport
   useEffect(() => {
     const node = containerRef.current;
-    if (!node || posterUrl) {
+    if (!node) {
+      return;
+    }
+
+    // If we have a server-side posterUrl and we are on mobile, we will never hover
+    // and never cycle. We can return the poster immediately and avoid observer setup.
+    if (posterUrl && isMobile) {
+      setPoster(posterUrl);
       return;
     }
 
@@ -216,16 +287,57 @@ export function useDynamicThumbnail({
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [posterUrl, rootMargin]);
+  }, [posterUrl, rootMargin, isMobile]);
 
-  // Extract frames on first load
+  // Set the default poster instantly if provided
   useEffect(() => {
     if (posterUrl) {
       setPoster(posterUrl);
+    }
+  }, [posterUrl]);
+
+  // Load from client-side Cache Storage if available
+  useEffect(() => {
+    if (!isVisible || frames.length > 0) {
       return;
     }
 
-    if (!isVisible || frameUrlsRef.current.length > 0) {
+    let active = true;
+    getFromClientCache(mediaUrl).then((cachedFrames) => {
+      if (active && cachedFrames && cachedFrames.length > 0) {
+        setFrames(cachedFrames);
+        const randomIndex =
+          cachedFrames.length > 1
+            ? 1 + Math.floor(Math.random() * (cachedFrames.length - 1))
+            : 0;
+        firstFrameRef.current = cachedFrames[randomIndex];
+        setPoster(cachedFrames[randomIndex]);
+        currentFrameIndexRef.current = randomIndex;
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [isVisible, mediaUrl, frames.length]);
+
+  // Determine when to extract frames client-side
+  useEffect(() => {
+    if (!isVisible || frames.length > 0) {
+      return;
+    }
+
+    // Trigger extraction if:
+    // 1. There is no posterUrl (needs static poster immediately).
+    // 2. Or, user is hovering (desktop only) and we need the frames to cycle.
+    if (!posterUrl || (isHovering && !isMobile)) {
+      setShouldExtract(true);
+    }
+  }, [isVisible, posterUrl, isHovering, isMobile, frames.length]);
+
+  // Client-side extraction effect
+  useEffect(() => {
+    if (!shouldExtract || frames.length > 0) {
       return;
     }
 
@@ -233,7 +345,10 @@ export function useDynamicThumbnail({
     const videoElement = document.createElement("video");
     const canvas = document.createElement("canvas");
 
-    acquireSlotWithTimeout().then((release) => {
+    // Reduce concurrent decodes on mobile to prevent blocking UI thread
+    const maxConcurrency = isMobile ? 3 : MAX_CONCURRENT_THUMBNAILS;
+
+    acquireSlotWithLimit(maxConcurrency).then((release) => {
       if (cancelled) {
         release();
         return;
@@ -249,12 +364,14 @@ export function useDynamicThumbnail({
           return;
         }
 
-        // Get video duration to sample frames evenly
         const duration = videoElement.duration;
         if (!duration || duration === Infinity) {
           release();
           return;
         }
+
+        // On mobile fallback, only extract 1 frame to save resources
+        const actualFrameCount = isMobile ? 1 : frameCount;
 
         canvas.width = 640;
         canvas.height = 360;
@@ -265,7 +382,7 @@ export function useDynamicThumbnail({
           return;
         }
 
-        const frames: string[] = [];
+        const extractedFrames: string[] = [];
         let framesExtracted = 0;
 
         const captureCurrentFrame = (): string => {
@@ -274,30 +391,28 @@ export function useDynamicThumbnail({
         };
 
         const finish = () => {
-          if (!cancelled && frames.length > 0) {
-            // Never default to frames[0]: it's captured at/near
-            // timestamp 0 and is frequently a black frame, fade-in, or
-            // title card, so it makes a poor representative thumbnail.
-            // Pick randomly from the remaining frames when there are
-            // any; only fall back to frames[0] if it's all we have.
+          if (!cancelled && extractedFrames.length > 0) {
             const randomIndex =
-              frames.length > 1
-                ? 1 + Math.floor(Math.random() * (frames.length - 1))
+              extractedFrames.length > 1
+                ? 1 + Math.floor(Math.random() * (extractedFrames.length - 1))
                 : 0;
-            frameUrlsRef.current = frames;
-            firstFrameRef.current = frames[randomIndex];
-            setPoster(frames[randomIndex]);
+            
+            setFrames(extractedFrames);
+            firstFrameRef.current = extractedFrames[randomIndex];
+            setPoster(extractedFrames[randomIndex]);
             currentFrameIndexRef.current = randomIndex;
+
+            // Cache generated frames
+            saveToClientCache(mediaUrl, extractedFrames);
           }
           release();
           videoElement.removeEventListener("seeked", onSeeked);
         };
 
-        // After capturing a frame, either seek for the next one or finish.
         const advance = () => {
           framesExtracted += 1;
-          if (framesExtracted < frameCount) {
-            videoElement.currentTime = (duration / frameCount) * framesExtracted;
+          if (framesExtracted < actualFrameCount) {
+            videoElement.currentTime = (duration / actualFrameCount) * framesExtracted;
           } else {
             finish();
           }
@@ -306,10 +421,9 @@ export function useDynamicThumbnail({
         const onSeeked = () => {
           if (cancelled) return;
           try {
-            frames.push(captureCurrentFrame());
+            extractedFrames.push(captureCurrentFrame());
             advance();
           } catch (e) {
-            // Ignore errors during frame extraction (e.g. CORS taint)
             release();
             videoElement.removeEventListener("seeked", onSeeked);
           }
@@ -318,19 +432,14 @@ export function useDynamicThumbnail({
         videoElement.addEventListener("seeked", onSeeked);
         videoElement.addEventListener("error", () => {
           if (!cancelled) {
-            setPoster(undefined);
+            setPoster(posterUrl);
           }
           release();
           videoElement.removeEventListener("seeked", onSeeked);
         });
 
-        // Capture the first frame directly from whatever timestamp the
-        // video already sits at after loadedmetadata (almost always 0),
-        // instead of assigning currentTime = 0. That assignment is a
-        // no-op in most browsers when currentTime is already 0, so
-        // "seeked" never fires and the slot leaks forever.
         try {
-          frames.push(captureCurrentFrame());
+          extractedFrames.push(captureCurrentFrame());
           advance();
         } catch (e) {
           release();
@@ -344,28 +453,28 @@ export function useDynamicThumbnail({
       cancelled = true;
       videoElement.src = "";
     };
-  }, [mediaUrl, posterUrl, isVisible, frameCount]);
+  }, [mediaUrl, shouldExtract, frameCount, isMobile, posterUrl, frames.length]);
 
   // Start/stop cycling based on hover state
   useEffect(() => {
-    if (!isHovering || frameUrlsRef.current.length === 0) {
+    if (!isHovering || frames.length === 0) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
-      // Show first frame when not hovering
       if (firstFrameRef.current) {
         setPoster(firstFrameRef.current);
+      } else if (posterUrl) {
+        setPoster(posterUrl);
       }
       return;
     }
 
-    // Start cycling through frames every 2-3 seconds
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(() => {
-      currentFrameIndexRef.current = (currentFrameIndexRef.current + 1) % frameUrlsRef.current.length;
-      setPoster(frameUrlsRef.current[currentFrameIndexRef.current]);
-    }, 2500); // 2.5 seconds
+      currentFrameIndexRef.current = (currentFrameIndexRef.current + 1) % frames.length;
+      setPoster(frames[currentFrameIndexRef.current]);
+    }, 2500);
 
     return () => {
       if (intervalRef.current) {
@@ -373,7 +482,7 @@ export function useDynamicThumbnail({
         intervalRef.current = null;
       }
     };
-  }, [isHovering]);
+  }, [isHovering, frames, posterUrl]);
 
   // Cleanup interval on unmount
   useEffect(() => {
@@ -394,8 +503,6 @@ const prefetchedUrls = new Set<string>();
  * Warms the browser's connection/cache for a media URL on hover or focus,
  * so playback starts faster if the user actually clicks. Uses
  * preload="metadata" rather than a full fetch, so it stays cheap.
- * Goes through the same slot + timeout gate as the thumbnail hooks so
- * a burst of hover events can't stack unlimited concurrent loads.
  */
 export function usePrefetchOnHover(mediaUrl: string) {
   function prefetch() {
@@ -404,7 +511,7 @@ export function usePrefetchOnHover(mediaUrl: string) {
     }
     prefetchedUrls.add(mediaUrl);
 
-    acquireSlotWithTimeout().then((release) => {
+    acquireSlotWithLimit(MAX_CONCURRENT_THUMBNAILS).then((release) => {
       const warmupVideo = document.createElement("video");
       warmupVideo.preload = "metadata";
       warmupVideo.muted = true;
@@ -414,8 +521,6 @@ export function usePrefetchOnHover(mediaUrl: string) {
       warmupVideo.addEventListener("error", cleanup, { once: true });
 
       warmupVideo.src = mediaUrl;
-      // Not attached to the DOM and not retained — the browser/OS media
-      // cache is the thing we're warming, not this element.
     });
   }
 

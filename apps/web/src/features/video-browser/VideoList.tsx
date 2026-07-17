@@ -66,12 +66,15 @@ function VideoThumbnailCard({
   }, [rootPath, video.mainVideoPath]);
 
   const posterUrl = useMemo(() => {
-    return video.thumbnailPath
-      ? `/api/media?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
-          video.thumbnailPath,
-        )}`
-      : undefined;
-  }, [rootPath, video.thumbnailPath]);
+    if (video.thumbnailPath) {
+      return `/api/media?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
+        video.thumbnailPath,
+      )}`;
+    }
+    return `/api/media/thumbnail?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
+      video.mainVideoPath,
+    )}`;
+  }, [rootPath, video.thumbnailPath, video.mainVideoPath]);
 
   const { containerRef, poster } = useDynamicThumbnail({ mediaUrl, posterUrl, frameCount: 4, isHovering: isHovering && !isTouchDevice });
   const prefetchHandlers = usePrefetchOnHover(mediaUrl);

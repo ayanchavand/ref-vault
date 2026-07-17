@@ -25,6 +25,7 @@ import { readVideoDetail } from "../services/read-video-detail.js";
 import { writeClipMetadata } from "../services/write-clip-metadata.js";
 import { writeVideoMetadata } from "../services/write-video-metadata.js";
 import { writeSplitPlan } from "../services/write-split-plan.js";
+import { generateThumbnail } from "../services/generate-thumbnail.js";
 
 export async function registerLibraryRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
@@ -125,6 +126,18 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
       }
 
       const { filePath, fileStats, contentType } = mediaResult.value;
+
+      if (contentType.startsWith("image/")) {
+        const etag = `W/"${fileStats.size}-${fileStats.mtime.getTime()}"`;
+        reply
+          .header("Cache-Control", "public, max-age=604800, must-revalidate")
+          .header("ETag", etag);
+
+        if (request.headers["if-none-match"] === etag) {
+          return reply.code(304).send();
+        }
+      }
+
       const rangeHeader = request.headers.range;
 
       if (rangeHeader) {
@@ -167,6 +180,57 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
         .header("Content-Length", String(fileStats.size))
         .header("Accept-Ranges", "bytes")
         .send(stream);
+    },
+  );
+
+  app.get<{
+    Querystring: { rootPath: string; mediaPath: string };
+  }>(
+    "/api/media/thumbnail",
+    {
+      schema: {
+        querystring: {
+          type: "object",
+          required: ["rootPath", "mediaPath"],
+          additionalProperties: false,
+          properties: {
+            rootPath: { type: "string" },
+            mediaPath: { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await generateThumbnail(
+        request.query.rootPath,
+        request.query.mediaPath,
+      );
+
+      if (!result.ok) {
+        const statusCode =
+          result.error.error === "LIBRARY_ROOT_NOT_FOUND" ||
+          result.error.error === "VIDEO_NOT_FOUND" ||
+          result.error.error === "MEDIA_NOT_FOUND"
+            ? 404
+            : 400;
+        return reply.status(statusCode).send(result.error);
+      }
+
+      const { filePath, fileStats } = result.value;
+      const etag = `W/"${fileStats.size}-${fileStats.mtime.getTime()}"`;
+
+      reply
+        .header("Content-Type", "image/jpeg")
+        .header("Content-Length", String(fileStats.size))
+        .header("Cache-Control", "public, max-age=604800, must-revalidate")
+        .header("ETag", etag);
+
+      if (request.headers["if-none-match"] === etag) {
+        return reply.code(304).send();
+      }
+
+      const stream = createReadStream(filePath);
+      return reply.code(200).send(stream);
     },
   );
 

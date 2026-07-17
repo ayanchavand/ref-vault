@@ -55,7 +55,10 @@ function TagBrowserClipCard({
   const mediaUrl = `/api/media?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
     entry.clip.mediaPath,
   )}`;
-  const { containerRef, poster } = useLazyThumbnail({ mediaUrl });
+  const posterUrl = `/api/media/thumbnail?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
+    entry.clip.mediaPath,
+  )}`;
+  const { containerRef, poster } = useLazyThumbnail({ mediaUrl, posterUrl });
   const prefetchHandlers = usePrefetchOnHover(mediaUrl);
 
   return (
