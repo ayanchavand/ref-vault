@@ -85,7 +85,6 @@ export function useLazyThumbnail({
     }
 
     let cancelled = false;
-    let releaseOnCleanup: (() => void) | null = null;
     const videoElement = document.createElement("video");
     const canvas = document.createElement("canvas");
 
@@ -94,8 +93,6 @@ export function useLazyThumbnail({
         releaseSlot();
         return;
       }
-
-      releaseOnCleanup = releaseSlot;
 
       videoElement.src = mediaUrl;
       videoElement.muted = true;
@@ -112,27 +109,29 @@ export function useLazyThumbnail({
         const ctx = canvas.getContext("2d");
 
         if (!ctx) {
+          releaseSlot();
           return;
         }
 
         ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
         setPoster(canvas.toDataURL("image/jpeg", 0.75));
+        releaseSlot();
       };
 
-      videoElement.addEventListener("loadeddata", onLoadedData);
-      videoElement.addEventListener("error", () => {
+      const onError = () => {
         if (!cancelled) {
           setPoster(undefined);
         }
-      });
+        releaseSlot();
+      };
+
+      videoElement.addEventListener("loadeddata", onLoadedData);
+      videoElement.addEventListener("error", onError);
     });
 
     return () => {
       cancelled = true;
       videoElement.src = "";
-      if (releaseOnCleanup) {
-        releaseOnCleanup();
-      }
     };
   }, [mediaUrl, posterUrl, isVisible]);
 

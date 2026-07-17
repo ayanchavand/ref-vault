@@ -57,10 +57,10 @@ function TagBrowserClipCard({
 
   return (
     <div
-      className="grid gap-3 rounded-2xl border border-white/[0.06] bg-[#111316] p-4 sm:grid-cols-[0.95fr_1.2fr]"
+      className="flex flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111316]"
       {...prefetchHandlers}
     >
-      <div className="relative overflow-hidden rounded-2xl bg-black/40" ref={containerRef}>
+      <div className="relative aspect-video overflow-hidden bg-black/40" ref={containerRef}>
         {poster ? (
           <img
             src={poster}
@@ -68,22 +68,22 @@ function TagBrowserClipCard({
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-32 items-center justify-center bg-white/[0.03] text-sm text-white/30">
-            Loading thumbnail…
+          <div className="flex h-full items-center justify-center bg-white/[0.03] text-sm text-white/30">
+            Loading…
           </div>
         )}
       </div>
-      <div className="flex flex-col justify-between gap-3">
-        <div>
-          <p className="font-semibold text-white">{entry.clip.mediaPath.split("/").pop()}</p>
-          <p className="mt-1 text-sm text-white/50">{entry.video.relativePath}</p>
+      <div className="flex flex-col gap-2 p-3">
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-white text-sm">{entry.clip.mediaPath.split("/").pop()}</p>
+          <p className="truncate text-xs text-white/50">{entry.video.relativePath}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-sm text-white/60">
-          <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-1">
-            {entry.source === "clip" ? "clip metadata" : "video metadata"}
+        <div className="flex flex-wrap gap-1">
+          <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[0.6rem] text-white/60">
+            {entry.source === "clip" ? "clip" : "video"}
           </span>
-          <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-1">
-            {entry.clip.metadata ? Object.keys(entry.clip.metadata).length : 0} metadata fields
+          <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[0.6rem] text-white/60">
+            {entry.clip.metadata ? Object.keys(entry.clip.metadata).length : 0} fields
           </span>
         </div>
       </div>
@@ -230,71 +230,53 @@ export function TagBrowser({ rootPath, videos, onBack }: TagBrowserProps) {
         </p>
       )}
 
-      <div className="grid flex-1 gap-5 xl:grid-cols-[0.95fr_1.25fr]">
-        <section className="rounded-2xl border border-white/[0.06] bg-[#111316] p-5">
-          <div className="flex items-center justify-between gap-3 pb-4">
-            <div>
-              <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
-                Tags
-              </p>
-              <p className="mt-1 text-sm text-white/50">
-                Pick a tag to see every matching clip in your library.
-              </p>
-            </div>
-            <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/50">
-              {String(tagEntries.length).padStart(2, "0")} unique
-            </span>
+      <section className="rounded-2xl border border-white/[0.06] bg-[#111316] p-5">
+        <div className="flex items-center justify-between gap-3 pb-4">
+          <div>
+            <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
+              Clips
+            </p>
+            <p className="mt-1 text-sm text-white/50">
+              Select a tag to filter clips in your library.
+            </p>
           </div>
+          <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/50">
+            {selectedClips.length} matched
+          </span>
+        </div>
 
-          {isLoading ? (
-            <div className="grid gap-3">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="h-12 rounded-2xl bg-white/[0.03]" />
-              ))}
-            </div>
-          ) : tagEntries.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-white/[0.10] px-4 py-10 text-center text-sm text-white/40">
-              No tags were discovered in the current library. Ensure clip metadata is present in `clips.json` or `metadata.json`.
-            </div>
-          ) : (
-            <div className="grid gap-3">
-              {tagEntries.map(({ tag, clips }) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => setSelectedTag(tag)}
-                  className={`w-full rounded-2xl border px-4 py-3 text-left transition duration-200 ${
-                    selectedTag === tag
-                      ? "border-amber-400/60 bg-amber-400/10 text-white"
-                      : "border-white/[0.06] bg-[#111316] text-white/80 hover:border-amber-400/30 hover:bg-[#14171B]"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="font-semibold text-white">{tag}</span>
-                    <span className="rounded-full bg-white/[0.03] px-2 py-1 text-[0.7rem] text-white/60">
-                      {formatTagCount(clips.length)}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="rounded-2xl border border-white/[0.06] bg-[#111316] p-5">
-          <div className="flex items-center justify-between gap-3 pb-4">
-            <div>
-              <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
-                Clips
-              </p>
-              <p className="mt-1 text-sm text-white/50">
-                Showing clips matched to the selected tag.
-              </p>
-            </div>
-            <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/50">
-              {selectedClips.length} matched
-            </span>
+        {/* Tags as selectable chips */}
+        {isLoading ? (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="h-8 w-24 rounded-full bg-white/[0.03]" />
+            ))}
           </div>
+        ) : tagEntries.length === 0 ? (
+          <div className="mb-4 rounded-xl border border-dashed border-white/[0.10] px-4 py-6 text-center text-sm text-white/40">
+            No tags were discovered in the current library. Ensure clip metadata is present in `clips.json` or `metadata.json`.
+          </div>
+        ) : (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {tagEntries.map(({ tag, clips }) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setSelectedTag(tag)}
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition duration-200 ${
+                  selectedTag === tag
+                    ? "border-amber-400/60 bg-amber-400/10 text-white"
+                    : "border-white/[0.06] bg-white/[0.03] text-white/80 hover:border-amber-400/30 hover:bg-white/[0.06]"
+                }`}
+              >
+                <span className="font-medium">{tag}</span>
+                <span className="rounded-full bg-white/[0.08] px-2 text-[0.65rem] text-white/60">
+                  {formatTagCount(clips.length)}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
 
           {selectedTag === null ? (
             <div className="rounded-xl border border-dashed border-white/[0.10] px-4 py-10 text-center text-sm text-white/40">
@@ -305,7 +287,7 @@ export function TagBrowser({ rootPath, videos, onBack }: TagBrowserProps) {
               No clips were tagged with “{selectedTag}”.
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {selectedClips.map((entry) => (
                 <TagBrowserClipCard
                   key={`${entry.video.relativePath}:${entry.clip.mediaPath}`}
@@ -315,8 +297,7 @@ export function TagBrowser({ rootPath, videos, onBack }: TagBrowserProps) {
               ))}
             </div>
           )}
-        </section>
-      </div>
+      </section>
     </div>
   );
 }
