@@ -277,3 +277,44 @@ test("atomically creates the metadata.json beside a verified video", async () =>
     await rm(library, { force: true, recursive: true });
   }
 });
+
+test("atomically creates the split_plan.json beside a verified video", async () => {
+  const library = await mkdtemp(join(tmpdir(), "reference-vault-"));
+  const videoDirectory = join(library, "video-a");
+  await mkdir(videoDirectory, { recursive: true });
+  await writeFile(join(videoDirectory, "main.mp4"), "");
+  const app = await buildApp();
+  const segments = [
+    { start: 0, end: 10, tags: ["first"] },
+    { start: 10, end: 20, tags: ["second"] },
+  ];
+
+  try {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/videos/split-plan",
+      payload: {
+        rootPath: library,
+        videoRelativePath: "video-a",
+        segments,
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), {
+      splitPlanPath: "video-a/split_plan.json",
+      success: true,
+    });
+    assert.deepEqual(
+      JSON.parse(await readFile(join(videoDirectory, "split_plan.json"), "utf8")),
+      {
+        videoRelativePath: "video-a",
+        mainVideoPath: "video-a/main.mp4",
+        segments,
+      },
+    );
+  } finally {
+    await app.close();
+    await rm(library, { force: true, recursive: true });
+  }
+});

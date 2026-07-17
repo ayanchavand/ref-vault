@@ -81,6 +81,23 @@ export interface PutVideoMetadataResponse {
   metadata: JsonObject;
 }
 
+export interface SaveSplitPlanRequest {
+  rootPath: string;
+  videoRelativePath: string;
+  segments: {
+    start: number;
+    end: number;
+    tags: string[];
+    notes?: string;
+    rating?: number;
+  }[];
+}
+
+export interface SaveSplitPlanResponse {
+  splitPlanPath: string;
+  success: boolean;
+}
+
 export type LibraryRootValidationErrorCode =
   | "INVALID_LIBRARY_ROOT"
   | "LIBRARY_ROOT_NOT_FOUND"

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { VideoDetail as VideoDetailType, JsonObject, ScannedVideo } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover } from "./Uselazythumbnail";
-import { putClipMetadata, putVideoMetadata, getVideoDetail, ApiError } from "../../lib/api";
+import { putClipMetadata, putVideoMetadata, saveSplitPlan, getVideoDetail, ApiError } from "../../lib/api";
 
 
 interface VideoDetailProps {
@@ -864,9 +864,308 @@ function VideoMetadataEditor({
   );
 }
 
+interface SegmentPlan {
+  start: number;
+  end: number;
+  tags: string[];
+  notes?: string;
+  rating?: number;
+}
+
+interface SegmentEditorProps {
+  rootPath: string;
+  video: VideoDetailType;
+  globalTags: string[];
+  currentTime: number;
+  onSaveSuccess(): void;
+  onCancel(): void;
+}
+
+function SegmentEditor({
+  rootPath,
+  video,
+  globalTags,
+  currentTime,
+  onSaveSuccess,
+  onCancel,
+}: SegmentEditorProps) {
+  const [segments, setSegments] = useState<SegmentPlan[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    setSegments([]);
+  }, [video]);
+
+  function addSegment() {
+    setSegments((prev) => [
+      ...prev,
+      {
+        start: Math.round(currentTime * 100) / 100,
+        end: Math.round((currentTime + 5) * 100) / 100,
+        tags: [],
+        notes: "",
+        rating: 0,
+      },
+    ]);
+  }
+
+  function removeSegment(index: number) {
+    setSegments((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updateSegment(index: number, updated: Partial<SegmentPlan>) {
+    setSegments((prev) =>
+      prev.map((seg, i) => (i === index ? { ...seg, ...updated } : seg))
+    );
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+
+    try {
+      await saveSplitPlan({
+        rootPath,
+        videoRelativePath: video.relativePath,
+        segments,
+      });
+      setSaveSuccess(true);
+      onSaveSuccess();
+    } catch (err) {
+      setSaveError(err instanceof ApiError ? err.message : "Failed to save split plan.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function formatTimecode(secs: number) {
+    const minutes = Math.floor(secs / 60);
+    const seconds = Math.floor(secs % 60);
+    const ms = Math.floor((secs % 1) * 10);
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${ms}`;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+        <div>
+          <h3 className="font-mono text-xs uppercase tracking-wider text-amber-300">
+            Clip Segment Editor
+          </h3>
+          <p className="text-xs text-white/40">
+            Define segments to chop later using the python script.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={addSegment}
+          className="rounded-lg bg-amber-400 px-3 py-1.5 text-xs font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus:outline-none"
+        >
+          + Add Marker
+        </button>
+      </div>
+
+      {segments.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 px-4 py-8 text-center">
+          <span className="font-mono text-[0.65rem] uppercase tracking-widest text-white/30">
+            No markers
+          </span>
+          <p className="text-xs text-white/40">
+            Click "+ Add Marker" to mark a clip segment.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+          {segments.map((seg, index) => (
+            <div
+              key={index}
+              className="relative space-y-3 rounded-xl border border-white/[0.06] bg-black/20 p-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[0.65rem] uppercase tracking-wider text-white/40">
+                  Marker #{index + 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeSegment(index)}
+                  className="font-mono text-[0.6rem] uppercase tracking-wider text-rose-400 hover:text-rose-300 focus:outline-none"
+                >
+                  Delete
+                </button>
+              </div>
+
+              {/* Time inputs */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="block font-mono text-[0.55rem] uppercase tracking-wider text-white/40">
+                    Start (seconds)
+                  </label>
+                  <div className="flex gap-1">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={seg.start}
+                      onChange={(e) =>
+                        updateSegment(index, { start: parseFloat(e.target.value) || 0 })
+                      }
+                      className="w-full rounded bg-white/[0.03] border border-white/[0.08] px-2 py-1 text-xs text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateSegment(index, { start: Math.round(currentTime * 100) / 100 })
+                      }
+                      title="Set to current time"
+                      className="rounded bg-white/[0.08] border border-white/[0.08] px-1.5 text-xs text-amber-300 hover:bg-white/[0.12]"
+                    >
+                      ⏱
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block font-mono text-[0.55rem] uppercase tracking-wider text-white/40">
+                    End (seconds)
+                  </label>
+                  <div className="flex gap-1">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={seg.end}
+                      onChange={(e) =>
+                        updateSegment(index, { end: parseFloat(e.target.value) || 0 })
+                      }
+                      className="w-full rounded bg-white/[0.03] border border-white/[0.08] px-2 py-1 text-xs text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateSegment(index, { end: Math.round(currentTime * 100) / 100 })
+                      }
+                      title="Set to current time"
+                      className="rounded bg-white/[0.08] border border-white/[0.08] px-1.5 text-xs text-amber-300 hover:bg-white/[0.12]"
+                    >
+                      ⏱
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Timecode Previews */}
+              <div className="flex justify-between font-mono text-[0.55rem] text-white/20">
+                <span>TC: {formatTimecode(seg.start)}</span>
+                <span>TC: {formatTimecode(seg.end)}</span>
+              </div>
+
+              {/* Tags */}
+              <div className="space-y-1">
+                <label className="block font-mono text-[0.55rem] uppercase tracking-wider text-white/40">
+                  Tags (comma separated)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. action, close up"
+                  value={seg.tags.join(", ")}
+                  onChange={(e) =>
+                    updateSegment(
+                      index,
+                      {
+                        tags: e.target.value
+                          .split(",")
+                          .map((t) => t.trim())
+                          .filter((t) => t.length > 0),
+                      }
+                    )
+                  }
+                  className="w-full rounded bg-white/[0.03] border border-white/[0.08] px-2 py-1 text-xs text-white"
+                />
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-1">
+                <label className="block font-mono text-[0.55rem] uppercase tracking-wider text-white/40">
+                  Notes
+                </label>
+                <input
+                  type="text"
+                  placeholder="Add clip notes..."
+                  value={seg.notes || ""}
+                  onChange={(e) => updateSegment(index, { notes: e.target.value })}
+                  className="w-full rounded bg-white/[0.03] border border-white/[0.08] px-2 py-1 text-xs text-white"
+                />
+              </div>
+
+              {/* Rating */}
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-[0.55rem] uppercase tracking-wider text-white/40">
+                  Rating:
+                </span>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => updateSegment(index, { rating: star })}
+                    className={`text-base transition duration-150 focus:outline-none ${
+                      star <= (seg.rating || 0)
+                        ? "text-amber-400"
+                        : "text-white/20 hover:text-amber-400/50"
+                    }`}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Buttons */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving || segments.length === 0}
+            className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isSaving ? "Saving..." : "Confirm & Save Split Plan"}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isSaving}
+            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Cancel
+          </button>
+        </div>
+
+        {saveSuccess && (
+          <span className="flex items-center gap-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-emerald-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+            Plan saved successfully!
+          </span>
+        )}
+
+        {saveError && (
+          <span className="font-mono text-[0.65rem] uppercase tracking-wider text-rose-400">
+            Error: {saveError}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoDetail }: VideoDetailProps) {
 
   const [selectedMediaPath, setSelectedMediaPath] = useState(video.mainVideoPath);
+  const [isEditingSegments, setIsEditingSegments] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isLooping, setIsLooping] = useState(false);
@@ -1169,16 +1468,48 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
           <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] pb-3">
             <div>
               <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
-                Clip Index
+                {isEditingSegments ? "Segment Log" : "Clip Index"}
               </p>
-              <p className="mt-1 text-sm text-white/40">Select a clip to play it instantly.</p>
+              <p className="mt-1 text-sm text-white/40">
+                {isEditingSegments ? "Mark start/end segments." : "Select a clip to play it instantly."}
+              </p>
             </div>
-            <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 font-mono text-xs tabular-nums text-white/50">
-              {String(video.clips.length).padStart(2, "0")}
-            </span>
+            {!isEditingSegments ? (
+              <button
+                type="button"
+                onClick={() => setIsEditingSegments(true)}
+                className="rounded border border-amber-400/30 bg-amber-400/[0.06] px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-wider text-amber-300 hover:bg-amber-400/10 focus:outline-none"
+              >
+                Create Clips
+              </button>
+            ) : (
+              <span className="rounded bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-wider text-amber-300">
+                Editing
+              </span>
+            )}
           </div>
 
-          {video.clips.length === 0 ? (
+          {isEditingSegments ? (
+            <SegmentEditor
+              rootPath={rootPath}
+              video={video}
+              globalTags={globalTags}
+              currentTime={currentTime}
+              onSaveSuccess={async () => {
+                try {
+                  const result = await getVideoDetail({
+                    rootPath,
+                    videoRelativePath: video.relativePath,
+                  });
+                  onUpdateVideoDetail(result.video);
+                  setIsEditingSegments(false);
+                } catch {
+                  setIsEditingSegments(false);
+                }
+              }}
+              onCancel={() => setIsEditingSegments(false)}
+            />
+          ) : video.clips.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 px-4 py-10 text-center">
               <span className="font-mono text-[0.65rem] uppercase tracking-widest text-white/30">
                 No entries

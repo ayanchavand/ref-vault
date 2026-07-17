@@ -8,6 +8,8 @@ import type {
   PutClipMetadataResponse,
   PutVideoMetadataRequest,
   PutVideoMetadataResponse,
+  SaveSplitPlanRequest,
+  SaveSplitPlanResponse,
 } from "@reference-vault/shared";
 
 export class ApiError extends Error {
@@ -103,5 +105,23 @@ export async function putVideoMetadata(
   }
 
   return payload as PutVideoMetadataResponse;
+}
+
+export async function saveSplitPlan(
+  request: SaveSplitPlanRequest,
+): Promise<SaveSplitPlanResponse> {
+  const response = await fetch("/api/videos/split-plan", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const payload: unknown = await response.json();
+
+  if (!response.ok) {
+    const error = payload as ApiErrorResponse;
+    throw new ApiError(error.message || "The split plan could not be saved.");
+  }
+
+  return payload as SaveSplitPlanResponse;
 }
 

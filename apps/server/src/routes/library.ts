@@ -11,6 +11,8 @@ import type {
   PutClipMetadataResponse,
   PutVideoMetadataRequest,
   PutVideoMetadataResponse,
+  SaveSplitPlanRequest,
+  SaveSplitPlanResponse,
   ScanLibraryRequest,
   ScanLibraryResponse,
   ValidateLibraryRootRequest,
@@ -22,6 +24,7 @@ import { scanLibrary } from "../services/scan-library.js";
 import { readVideoDetail } from "../services/read-video-detail.js";
 import { writeClipMetadata } from "../services/write-clip-metadata.js";
 import { writeVideoMetadata } from "../services/write-video-metadata.js";
+import { writeSplitPlan } from "../services/write-split-plan.js";
 
 export async function registerLibraryRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
@@ -377,6 +380,63 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
       }
 
       return result.value;
+    },
+  );
+
+  app.post<{
+    Body: SaveSplitPlanRequest;
+    Reply: SaveSplitPlanResponse | ApiErrorResponse;
+  }>(
+    "/api/videos/split-plan",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["rootPath", "videoRelativePath", "segments"],
+          additionalProperties: false,
+          properties: {
+            rootPath: { type: "string" },
+            videoRelativePath: { type: "string" },
+            segments: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["start", "end", "tags"],
+                properties: {
+                  start: { type: "number" },
+                  end: { type: "number" },
+                  tags: {
+                    type: "array",
+                    items: { type: "string" },
+                  },
+                  notes: { type: "string" },
+                  rating: { type: "number" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await writeSplitPlan(
+        request.body.rootPath,
+        request.body.videoRelativePath,
+        request.body.segments,
+      );
+
+      if (!result.ok) {
+        const statusCode =
+          result.error.error === "LIBRARY_ROOT_NOT_FOUND" ||
+          result.error.error === "VIDEO_NOT_FOUND"
+            ? 404
+            : result.error.error === "METADATA_WRITE_FAILED"
+              ? 500
+              : 400;
+        return reply.status(statusCode).send(result.error);
+      }
+
+      return reply.status(200).send(result.value);
     },
   );
 }
