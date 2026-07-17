@@ -12,6 +12,7 @@ interface TagBrowserProps {
   rootPath: string;
   videos: ScannedVideo[];
   onBack(): void;
+  onSelectVideo(video: ScannedVideo): void;
 }
 
 interface TaggedClip {
@@ -45,9 +46,11 @@ function formatTagCount(count: number): string {
 function TagBrowserClipCard({
   rootPath,
   entry,
+  onClick,
 }: {
   rootPath: string;
   entry: TaggedClip;
+  onClick(): void;
 }) {
   const mediaUrl = `/api/media?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
     entry.clip.mediaPath,
@@ -56,16 +59,18 @@ function TagBrowserClipCard({
   const prefetchHandlers = usePrefetchOnHover(mediaUrl);
 
   return (
-    <div
-      className="flex flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111316]"
+    <button
+      type="button"
+      onClick={onClick}
       {...prefetchHandlers}
+      className="group flex flex-col text-left overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111316] hover:-translate-y-1 hover:border-amber-400/50 hover:shadow-[0_12px_36px_rgba(0,0,0,0.5)] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0B0D] w-full"
     >
-      <div className="relative aspect-video overflow-hidden bg-black/40" ref={containerRef}>
+      <div className="relative aspect-video w-full overflow-hidden bg-black/40" ref={containerRef}>
         {poster ? (
           <img
             src={poster}
             alt="Clip thumbnail"
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-white/[0.03] text-sm text-white/30">
@@ -73,7 +78,7 @@ function TagBrowserClipCard({
           </div>
         )}
       </div>
-      <div className="flex flex-col gap-2 p-3">
+      <div className="flex flex-col gap-2 p-3 w-full">
         <div className="min-w-0">
           <p className="truncate font-semibold text-white text-sm">{entry.clip.mediaPath.split("/").pop()}</p>
           <p className="truncate text-xs text-white/50">{entry.video.relativePath}</p>
@@ -87,11 +92,11 @@ function TagBrowserClipCard({
           </span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
-export function TagBrowser({ rootPath, videos, onBack }: TagBrowserProps) {
+export function TagBrowser({ rootPath, videos, onBack, onSelectVideo }: TagBrowserProps) {
   const [tagMap, setTagMap] = useState<Record<string, TaggedClip[]>>({});
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -289,13 +294,21 @@ export function TagBrowser({ rootPath, videos, onBack }: TagBrowserProps) {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {selectedClips.map((entry) => (
-                <TagBrowserClipCard
-                  key={`${entry.video.relativePath}:${entry.clip.mediaPath}`}
-                  rootPath={rootPath}
-                  entry={entry}
-                />
-              ))}
+              {selectedClips.map((entry) => {
+                const scannedVideo = videos.find((v) => v.relativePath === entry.video.relativePath);
+                return (
+                  <TagBrowserClipCard
+                    key={`${entry.video.relativePath}:${entry.clip.mediaPath}`}
+                    rootPath={rootPath}
+                    entry={entry}
+                    onClick={() => {
+                      if (scannedVideo) {
+                        onSelectVideo(scannedVideo);
+                      }
+                    }}
+                  />
+                );
+              })}
             </div>
           )}
       </section>

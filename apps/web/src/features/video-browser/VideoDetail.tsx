@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { VideoDetail as VideoDetailType, JsonObject } from "@reference-vault/shared";
+import type { VideoDetail as VideoDetailType, JsonObject, ScannedVideo } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover } from "./Uselazythumbnail";
-import { putClipMetadata, ApiError } from "../../lib/api";
+import { putClipMetadata, getVideoDetail, ApiError } from "../../lib/api";
 
 
 interface VideoDetailProps {
   rootPath: string;
   video: VideoDetailType;
+  allVideos: ScannedVideo[];
   onBack(): void;
   onUpdateVideoDetail(updatedVideo: VideoDetailType): void;
 }
+
 
 function pad(index: number) {
   return String(index + 1).padStart(3, "0");
@@ -80,53 +82,51 @@ function MetadataTags({ metadata }: { metadata: NonNullable<VideoDetailType["cli
   }
 
   return (
-    <div className="mt-3 rounded-lg border border-white/[0.06] bg-black/20 p-2.5">
-      <p className="mb-2 font-mono text-[0.58rem] uppercase tracking-[0.25em] text-white/25">
-        Metadata · {entries.length}
-      </p>
-      <div className="flex flex-wrap gap-1.5">
-        {visible.map((tag, i) => {
-          const isTag = tag.key === "tags";
-          const colorClass = isTag ? getTagColorClass(tag.display) : "border-white/[0.08] bg-white/[0.03] text-white/70";
-          return (
-            <span
-              key={`${tag.key}-${i}`}
-              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[0.62rem] ${colorClass}`}
-            >
-              <span className="font-semibold text-amber-300/70">{tag.key}</span>
-              <span className="text-white/20">·</span>
-              <span className="max-w-[10rem] truncate">{tag.display}</span>
-            </span>
-          );
-        })}
-
-
-        {hiddenCount > 0 && (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              setExpanded(true);
-            }}
-            className="rounded-full border border-amber-400/30 bg-amber-400/[0.06] px-2 py-0.5 font-mono text-[0.62rem] font-semibold text-amber-300 transition hover:border-amber-400/60 hover:bg-amber-400/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {visible.map((tag, i) => {
+        const isTag = tag.key === "tags";
+        const colorClass = isTag ? getTagColorClass(tag.display) : "border-white/[0.08] bg-white/[0.03] text-white/70";
+        return (
+          <span
+            key={`${tag.key}-${i}`}
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[0.62rem] ${colorClass}`}
           >
-            +{hiddenCount} more
-          </button>
-        )}
+            {!isTag && (
+              <>
+                <span className="font-semibold text-amber-300/70">{tag.key}</span>
+                <span className="text-white/20">·</span>
+              </>
+            )}
+            <span className="max-w-[10rem] truncate">{tag.display}</span>
+          </span>
+        );
+      })}
 
-        {expanded && entries.length > TAG_PREVIEW_LIMIT && (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              setExpanded(false);
-            }}
-            className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 font-mono text-[0.62rem] text-white/50 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
-          >
-            Show less
-          </button>
-        )}
-      </div>
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpanded(true);
+          }}
+          className="rounded-full border border-amber-400/30 bg-amber-400/[0.06] px-2 py-0.5 font-mono text-[0.62rem] font-semibold text-amber-300 transition hover:border-amber-400/60 hover:bg-amber-400/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
+        >
+          +{hiddenCount} more
+        </button>
+      )}
+
+      {expanded && entries.length > TAG_PREVIEW_LIMIT && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpanded(false);
+          }}
+          className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 font-mono text-[0.62rem] text-white/50 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
+        >
+          Show less
+        </button>
+      )}
     </div>
   );
 }
@@ -248,6 +248,7 @@ interface ClipMetadataEditorProps {
   videoRelativePath: string;
   clip: VideoDetailType["clips"][number];
   video: VideoDetailType;
+  globalTags: string[];
   onSaveSuccess(updatedVideo: VideoDetailType): void;
 }
 
@@ -256,6 +257,7 @@ function ClipMetadataEditor({
   videoRelativePath,
   clip,
   video,
+  globalTags,
   onSaveSuccess,
 }: ClipMetadataEditorProps) {
   const [tagsInput, setTagsInput] = useState("");
@@ -283,6 +285,13 @@ function ClipMetadataEditor({
   const suggestedTags = useMemo(() => {
     return allLibraryTags.filter((tag) => !activeTags.includes(tag));
   }, [allLibraryTags, activeTags]);
+
+  const suggestedGlobalTags = useMemo(() => {
+    return globalTags.filter(
+      (tag) => !allLibraryTags.includes(tag) && !activeTags.includes(tag)
+    );
+  }, [globalTags, allLibraryTags, activeTags]);
+
 
   function handleAddSuggestion(tag: string) {
     if (!activeTags.includes(tag)) {
@@ -411,11 +420,11 @@ function ClipMetadataEditor({
               disabled={isSaving}
               className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2 text-sm text-white/95 placeholder:text-white/25 focus:border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/50 disabled:opacity-50"
             />
-            {/* Tag suggestions display */}
+            {/* Local Video Tag suggestions */}
             {suggestedTags.length > 0 && (
               <div className="mt-1.5 space-y-1">
-                <span className="block font-mono text-[0.55rem] uppercase tracking-wider text-white/20">Suggestions</span>
-                <div className="flex flex-wrap gap-1">
+                <span className="block font-mono text-[0.55rem] uppercase tracking-wider text-white/20">Suggestions (This Video)</span>
+                <div className="flex flex-wrap gap-1 max-h-[4.5rem] overflow-y-auto pr-1">
                   {suggestedTags.map((tag) => (
                     <button
                       key={tag}
@@ -430,6 +439,27 @@ function ClipMetadataEditor({
                 </div>
               </div>
             )}
+
+            {/* Global Library Tag suggestions */}
+            {suggestedGlobalTags.length > 0 && (
+              <div className="mt-1.5 space-y-1">
+                <span className="block font-mono text-[0.55rem] uppercase tracking-wider text-white/20">Suggestions (Global Library)</span>
+                <div className="flex flex-wrap gap-1 max-h-[4.5rem] overflow-y-auto pr-1">
+                  {suggestedGlobalTags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => handleAddSuggestion(tag)}
+                      disabled={isSaving}
+                      className={`rounded-full border px-2 py-0.5 font-mono text-[0.58rem] transition focus:outline-none ${getTagColorClass(tag)} hover:opacity-85`}
+                    >
+                      + {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
           </div>
 
 
@@ -520,7 +550,7 @@ function ClipMetadataEditor({
   );
 }
 
-export function VideoDetail({ rootPath, video, onBack, onUpdateVideoDetail }: VideoDetailProps) {
+export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoDetail }: VideoDetailProps) {
 
   const [selectedMediaPath, setSelectedMediaPath] = useState(video.mainVideoPath);
 
@@ -529,6 +559,39 @@ export function VideoDetail({ rootPath, video, onBack, onUpdateVideoDetail }: Vi
   const [playRate, setPlayRate] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+
+  const [globalTags, setGlobalTags] = useState<string[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    if (!allVideos || allVideos.length === 0) return;
+    
+    Promise.all(
+      allVideos.map(async (v) => {
+        try {
+          return await getVideoDetail({ rootPath, videoRelativePath: v.relativePath });
+        } catch {
+          return null;
+        }
+      })
+    ).then((results) => {
+      if (!active) return;
+      const set = new Set<string>();
+      results.forEach((res) => {
+        if (!res) return;
+        extractTags(res.video.metadata).forEach((t) => set.add(t));
+        res.video.clips.forEach((c) => {
+          extractTags(c.metadata).forEach((t) => set.add(t));
+        });
+      });
+      setGlobalTags(Array.from(set).sort());
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [rootPath, allVideos]);
+
 
   const mediaUrl = useMemo(() => {
     return `/api/media?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
@@ -765,6 +828,7 @@ export function VideoDetail({ rootPath, video, onBack, onUpdateVideoDetail }: Vi
                 videoRelativePath={video.relativePath}
                 clip={activeClip}
                 video={video}
+                globalTags={globalTags}
                 onSaveSuccess={onUpdateVideoDetail}
               />
             </div>

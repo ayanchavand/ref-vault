@@ -344,6 +344,7 @@ export function App() {
               rootPath={activeRootPath!}
               videos={scanResult.videos}
               onBack={handleBackToLibrary}
+              onSelectVideo={handleSelectVideo}
             />
           )}
 
