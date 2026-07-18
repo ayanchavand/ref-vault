@@ -107,8 +107,8 @@ export async function captureFrame(
     }
   }
 
-  // Ensure Generated folder exists under mediaRoot
-  const generatedDir = join(mediaRoot, "Generated");
+  // Ensure images/generated folder exists under mediaRoot
+  const generatedDir = join(mediaRoot, "images", "generated");
   try {
     await mkdir(generatedDir, { recursive: true });
   } catch (err) {
@@ -116,7 +116,7 @@ export async function captureFrame(
       ok: false,
       error: {
         error: "FRAME_CAPTURE_FAILED",
-        message: `Failed to create Generated folder: ${(err as Error).message}`,
+        message: `Failed to create images/generated folder: ${(err as Error).message}`,
       },
     };
   }

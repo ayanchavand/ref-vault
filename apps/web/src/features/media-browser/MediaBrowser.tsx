@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { ScannedMediaItem } from "@reference-vault/shared";
 import { scanMedia, ApiError } from "../../lib/api";
 
@@ -961,11 +961,25 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
   const [pendingDir, setPendingDir] = useState<"up" | "down" | null>(null);
   const [showLocations, setShowLocations] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<"all" | "image" | "gif" | "video">("all");
 
   // drag state
   const dragRef = useRef<{ startY: number; dragging: boolean } | null>(null);
   const [dragDelta, setDragDelta] = useState(0);
   const stageRef = useRef<HTMLDivElement>(null);
+
+  const filteredItems = useMemo(() => {
+    if (mediaTypeFilter === "all") return items;
+    return items.filter((item) => item.type === mediaTypeFilter);
+  }, [items, mediaTypeFilter]);
+
+  // Reset index when filter changes
+  useEffect(() => {
+    setIndex(0);
+    setExitDir(null);
+    setPendingDir(null);
+    setDragDelta(0);
+  }, [mediaTypeFilter]);
 
   const loadMedia = useCallback(async (rootPath: string) => {
     setIsLoading(true);
@@ -1013,7 +1027,7 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
   useEffect(() => {
     let lastWheelTime = 0;
     function onWheel(e: WheelEvent) {
-      if (exitDir !== null || items.length === 0) return;
+      if (exitDir !== null || filteredItems.length === 0) return;
       const now = Date.now();
       if (now - lastWheelTime < 600) return;
       if (Math.abs(e.deltaY) > 20) {
@@ -1032,10 +1046,10 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
     return () => {
       if (container) container.removeEventListener("wheel", onWheel);
     };
-  }, [items, exitDir]);
+  }, [filteredItems, exitDir]);
 
   function advance(dir: "up" | "down") {
-    if (exitDir !== null || items.length === 0) return;
+    if (exitDir !== null || filteredItems.length === 0) return;
     setPendingDir(dir);
     setExitDir(dir);
     setDragDelta(0);
@@ -1045,12 +1059,15 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
     setExitDir(null);
     if (pendingDir !== null) {
       setIndex((i) =>
-        pendingDir === "up" ? (i + 1) % items.length : (i - 1 + items.length) % items.length,
+        pendingDir === "up"
+          ? (i + 1) % filteredItems.length
+          : (i - 1 + filteredItems.length) % filteredItems.length,
       );
       setPendingDir(null);
     }
   }
 
+  // drag state handlers
   function onPointerDown(e: React.PointerEvent) {
     dragRef.current = { startY: e.clientY, dragging: true };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -1085,13 +1102,14 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
     setShowLocations(false);
   }
 
-  const currentItem = items[index];
-  const nextItem = items[(index + 1) % items.length];
+  const currentItem = filteredItems[index];
+  const nextItem = filteredItems.length > 0 ? filteredItems[(index + 1) % filteredItems.length] : undefined;
   const hasSavedRoot = !!mediaRoot && !error;
 
   // Decide what the stage shows
   const showSkeleton = isLoading;
   const showPicker = !isLoading && (!hasSavedRoot || items.length === 0) && !error;
+  const showEmptyFilter = !isLoading && !error && hasSavedRoot && items.length > 0 && filteredItems.length === 0;
   const showCard = !isLoading && !error && !!currentItem;
 
   return (
@@ -1180,6 +1198,7 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
           borderBottom: "1px solid rgba(255,255,255,0.06)",
           flexShrink: 0,
           position: "relative",
+          gap: 12,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -1196,9 +1215,9 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
             >
               Media Browser
             </p>
-            {items.length > 0 && !isLoading && (
+            {filteredItems.length > 0 && !isLoading && (
               <p style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, margin: "2px 0 0" }}>
-                {index + 1} / {items.length}
+                {index + 1} / {filteredItems.length}
               </p>
             )}
             {isLoading && (
@@ -1208,6 +1227,53 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
             )}
           </div>
         </div>
+
+        {/* Middle: Filter Tabs */}
+        {hasSavedRoot && items.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              background: "rgba(255, 255, 255, 0.02)",
+              border: "1px solid rgba(255, 255, 255, 0.05)",
+              borderRadius: 12,
+              padding: 3,
+            }}
+          >
+            {(["all", "image", "gif", "video"] as const).map((type) => {
+              const isActive = mediaTypeFilter === type;
+              const label =
+                type === "all"
+                  ? "All"
+                  : type === "image"
+                    ? "Images"
+                    : type === "gif"
+                      ? "GIFs"
+                      : "Videos";
+              return (
+                <button
+                  key={type}
+                  onClick={() => setMediaTypeFilter(type)}
+                  style={{
+                    background: isActive ? "rgba(240, 192, 96, 0.15)" : "transparent",
+                    border: isActive ? "1px solid rgba(240, 192, 96, 0.3)" : "1px solid transparent",
+                    borderRadius: 9,
+                    color: isActive ? "#f0c060" : "rgba(255, 255, 255, 0.5)",
+                    padding: "4px 12px",
+                    cursor: "pointer",
+                    fontSize: 11,
+                    fontWeight: isActive ? 600 : 400,
+                    fontFamily: "sans-serif",
+                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Right side: folder pill */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1288,6 +1354,22 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
               className="mt-2 rounded-lg bg-amber-400 px-5 py-2.5 text-xs font-semibold text-[#0A0B0D] hover:bg-amber-300 transition active:scale-[0.98]"
             >
               Go to Settings
+            </button>
+          </div>
+        )}
+
+        {showEmptyFilter && (
+          <div className="flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto gap-3" style={{ animation: "mb-fadein 0.3s ease" }}>
+            <span className="text-3xl">🔍</span>
+            <h3 className="text-lg font-semibold text-white">No {mediaTypeFilter === "image" ? "images" : mediaTypeFilter === "gif" ? "GIFs" : "videos"} found</h3>
+            <p className="text-xs text-white/40 leading-relaxed">
+              We couldn't find any {mediaTypeFilter === "image" ? "image files (.jpg, .png, etc.)" : mediaTypeFilter === "gif" ? "animated GIFs (.gif)" : "video files (.mp4, etc.)"} in this folder.
+            </p>
+            <button
+              onClick={() => setMediaTypeFilter("all")}
+              className="mt-1 rounded-lg bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.12] text-white/80 px-4 py-2 text-xs font-semibold transition active:scale-[0.98]"
+            >
+              Show All Media
             </button>
           </div>
         )}
@@ -1376,7 +1458,7 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
       </div>
 
       {/* Bottom controls tip */}
-      {!isLoading && !error && items.length > 0 && (
+      {!isLoading && !error && filteredItems.length > 0 && (
         <div
           style={{
             flexShrink: 0,
