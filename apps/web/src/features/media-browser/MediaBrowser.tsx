@@ -171,6 +171,51 @@ function MediaCard({
   const isGif = item.type === "gif";
   const [loaded, setLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(false);
+  const [mediaAspectRatio, setMediaAspectRatio] = useState<number | null>(null);
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth <= 640 : false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [cardSize, setCardSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    function handleResize() {
+      setIsMobile(window.innerWidth <= 640);
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!cardRef.current) return;
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setCardSize({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        });
+      }
+    });
+    resizeObserver.observe(cardRef.current);
+    return () => resizeObserver.disconnect();
+  }, [loaded]);
+
+  const mediaStyle: React.CSSProperties = (isMobile && isLandscape)
+    ? {
+        position: "absolute",
+        width: `${cardSize.height}px`,
+        height: `${cardSize.width}px`,
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%) rotate(90deg)",
+        objectFit: "contain",
+      }
+    : {
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        objectFit: isLandscape ? "contain" : "cover",
+      };
 
   const exitStyle: React.CSSProperties =
     exitDirection === "up"
@@ -246,9 +291,13 @@ function MediaCard({
       )}
 
       <div
+        ref={cardRef}
         className="tiktok-card"
         style={{
           opacity: loaded ? 1 : 0,
+          maxWidth: (!isMobile && isLandscape) ? "100%" : undefined,
+          height: "calc(100% - 32px)",
+          aspectRatio: (!isMobile && isLandscape && mediaAspectRatio) ? `${mediaAspectRatio}` : undefined,
         }}
       >
         {isVideo ? (
@@ -259,30 +308,38 @@ function MediaCard({
             loop
             muted={isMuted}
             playsInline
-            onLoadedData={() => setLoaded(true)}
-            onError={() => { setLoaded(false); setImgError(true); }}
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
+            onLoadedMetadata={(e) => {
+              const video = e.currentTarget;
+              if (video.videoWidth && video.videoHeight) {
+                setIsLandscape(video.videoWidth > video.videoHeight);
+                setMediaAspectRatio(video.videoWidth / video.videoHeight);
+              }
             }}
+            onLoadedData={() => setLoaded(true)}
+            onError={() => {
+              setLoaded(false);
+              setImgError(true);
+            }}
+            style={mediaStyle}
           />
         ) : (
           <img
             key={url}
             src={url}
             alt={item.relativePath.split("/").pop() ?? "media"}
-            onLoad={() => setLoaded(true)}
-            onError={() => { setLoaded(false); setImgError(true); }}
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              if (img.naturalWidth && img.naturalHeight) {
+                setIsLandscape(img.naturalWidth > img.naturalHeight);
+                setMediaAspectRatio(img.naturalWidth / img.naturalHeight);
+              }
+              setLoaded(true);
             }}
+            onError={() => {
+              setLoaded(false);
+              setImgError(true);
+            }}
+            style={mediaStyle}
             loading="eager"
             decoding="async"
           />

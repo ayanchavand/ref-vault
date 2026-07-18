@@ -1,5 +1,5 @@
 import { createReadStream, createWriteStream } from "node:fs";
-import { realpath, stat } from "node:fs/promises";
+import { realpath, stat, mkdir } from "node:fs/promises";
 import { extname, relative, resolve, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import type { FastifyInstance } from "fastify";
@@ -795,7 +795,32 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
         });
       }
 
-      const targetFilePath = join(rootValidation.value.rootPath, fileName);
+      const ext = extname(fileName).toLowerCase();
+      let subFolder = "";
+      if (ext === ".gif") {
+        subFolder = "gifs";
+      } else if ([".mp4", ".webm", ".mov"].includes(ext)) {
+        subFolder = "videos";
+      } else if ([".jpg", ".jpeg", ".png", ".webp", ".avif"].includes(ext)) {
+        subFolder = "images";
+      } else {
+        return reply.status(400).send({
+          error: "INVALID_MEDIA_TYPE",
+          message: "Unsupported media file extension.",
+        });
+      }
+
+      const targetDir = join(rootValidation.value.rootPath, subFolder);
+      try {
+        await mkdir(targetDir, { recursive: true });
+      } catch (err) {
+        return reply.status(500).send({
+          error: "MEDIA_WRITE_FAILED",
+          message: `Failed to create folder ${subFolder}: ${(err as Error).message}`,
+        });
+      }
+
+      const targetFilePath = join(targetDir, fileName);
       const writeStream = createWriteStream(targetFilePath);
 
       try {
