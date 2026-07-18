@@ -1,6 +1,7 @@
-import { createReadStream } from "node:fs";
+import { createReadStream, createWriteStream } from "node:fs";
 import { realpath, stat } from "node:fs/promises";
-import { extname, relative, resolve } from "node:path";
+import { extname, relative, resolve, join } from "node:path";
+import { pipeline } from "node:stream/promises";
 import type { FastifyInstance } from "fastify";
 
 import type {
@@ -19,6 +20,8 @@ import type {
   ValidateLibraryRootResponse,
   DeleteClipRequest,
   DeleteClipResponse,
+  CreateVideoPlaceholderRequest,
+  CreateVideoPlaceholderResponse,
 } from "@reference-vault/shared";
 
 import { validateLibraryRoot } from "../services/validate-library-root.js";
@@ -29,6 +32,8 @@ import { writeClipMetadata, deleteClip } from "../services/write-clip-metadata.j
 import { writeVideoMetadata } from "../services/write-video-metadata.js";
 import { writeSplitPlan } from "../services/write-split-plan.js";
 import { generateThumbnail } from "../services/generate-thumbnail.js";
+import { createVideoPlaceholder, resolveUploadDirectory } from "../services/import-video.js";
+
 
 export async function registerLibraryRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
@@ -196,7 +201,7 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
 
       if (rangeHeader) {
         const ifRange = request.headers["if-range"];
-        if (ifRange) {
+        if (ifRange && typeof ifRange === "string") {
           if (ifRange.startsWith("W/") || ifRange.startsWith('"')) {
             if (ifRange !== etag) {
               rangeRequested = false;
@@ -659,6 +664,98 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
       }
 
       return reply.status(200).send(result.value);
+    },
+  );
+
+  app.addContentTypeParser(
+    "application/octet-stream",
+    (request, payload, done) => {
+      done(null, payload);
+    },
+  );
+
+  app.post<{
+    Body: CreateVideoPlaceholderRequest;
+    Reply: CreateVideoPlaceholderResponse | ApiErrorResponse;
+  }>(
+    "/api/videos/create-placeholder",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["rootPath", "title"],
+          properties: {
+            rootPath: { type: "string" },
+            title: { type: "string" },
+            artist: { type: "string" },
+            tags: { type: "array", items: { type: "string" } },
+            notes: { type: "string" },
+            rating: { type: "number" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await createVideoPlaceholder(request.body);
+
+      if (!result.ok) {
+        const statusCode =
+          result.error.error === "LIBRARY_ROOT_NOT_FOUND" ? 404 : 400;
+        return reply.status(statusCode).send(result.error);
+      }
+
+      return result.value;
+    },
+  );
+
+  app.post<{
+    Querystring: { rootPath: string; videoRelativePath: string };
+  }>(
+    "/api/videos/upload",
+    {
+      schema: {
+        querystring: {
+          type: "object",
+          required: ["rootPath", "videoRelativePath"],
+          properties: {
+            rootPath: { type: "string" },
+            videoRelativePath: { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { rootPath, videoRelativePath } = request.query;
+
+      const rootValidation = await validateLibraryRoot(rootPath);
+      if (!rootValidation.ok) {
+        return reply.status(404).send(rootValidation.error);
+      }
+
+      const dirResult = await resolveUploadDirectory(
+        rootValidation.value.rootPath,
+        videoRelativePath,
+      );
+
+      if (!dirResult.ok) {
+        const statusCode =
+          dirResult.error.error === "VIDEO_NOT_FOUND" ? 404 : 400;
+        return reply.status(statusCode).send(dirResult.error);
+      }
+
+      const targetFilePath = join(dirResult.value, "main.mp4");
+      const writeStream = createWriteStream(targetFilePath);
+
+      try {
+        const bodyStream = request.body as any;
+        await pipeline(bodyStream, writeStream);
+        return { success: true };
+      } catch (err) {
+        return reply.status(500).send({
+          error: "METADATA_WRITE_FAILED",
+          message: `Failed to stream file to disk: ${(err as Error).message}`,
+        });
+      }
     },
   );
 }

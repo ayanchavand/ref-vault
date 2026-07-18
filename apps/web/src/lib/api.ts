@@ -13,6 +13,8 @@ import type {
   SaveSplitPlanResponse,
   DeleteClipRequest,
   DeleteClipResponse,
+  CreateVideoPlaceholderRequest,
+  CreateVideoPlaceholderResponse,
 } from "@reference-vault/shared";
 
 export class ApiError extends Error {
@@ -161,3 +163,74 @@ export async function deleteClip(
 
   return payload as DeleteClipResponse;
 }
+
+export async function createVideoPlaceholder(
+  request: CreateVideoPlaceholderRequest,
+): Promise<CreateVideoPlaceholderResponse> {
+  const response = await fetch("/api/videos/create-placeholder", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const payload: unknown = await response.json();
+
+  if (!response.ok) {
+    const error = payload as ApiErrorResponse;
+    throw new ApiError(error.message || "The video directory could not be created.");
+  }
+
+  return payload as CreateVideoPlaceholderResponse;
+}
+
+export function uploadVideo(
+  rootPath: string,
+  videoRelativePath: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<{ success: boolean }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const url = `/api/videos/upload?rootPath=${encodeURIComponent(
+      rootPath,
+    )}&videoRelativePath=${encodeURIComponent(videoRelativePath)}`;
+
+    xhr.open("POST", url, true);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+
+    if (onProgress && xhr.upload) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          onProgress(percent);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const response = JSON.parse(xhr.responseText);
+          resolve(response);
+        } catch {
+          resolve({ success: true });
+        }
+      } else {
+        let errorMessage = "The video file could not be uploaded.";
+        try {
+          const error = JSON.parse(xhr.responseText) as ApiErrorResponse;
+          errorMessage = error.message || errorMessage;
+        } catch {
+          // Keep default
+        }
+        reject(new ApiError(errorMessage));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new ApiError("A network error occurred during the upload."));
+    };
+
+    xhr.send(file);
+  });
+}
+

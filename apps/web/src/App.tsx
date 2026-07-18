@@ -11,6 +11,7 @@ import { TagBrowser } from "./features/tag-browser/TagBrowser";
 import { VideoList } from "./features/video-browser/VideoList";
 import { VideoDetail } from "./features/video-browser/VideoDetail";
 import { MediaBrowser } from "./features/media-browser/MediaBrowser";
+import { VideoImport } from "./features/video-import/VideoImport";
 import { scanLibrary, getVideoDetail, ApiError } from "./lib/api";
 import { useHashRouter, navigate } from "./lib/router";
 
@@ -350,6 +351,7 @@ export function App() {
                 videos={paginatedVideos}
                 onSelectVideo={handleSelectVideo}
                 onBrowseTags={handleBrowseTags}
+                onImportVideo={() => navigate({ view: "IMPORT_VIDEO" })}
                 onChangeRoot={handleBackToRoot}
                 isLoading={isLoading}
                 openingVideoPath={openingVideoPath}
@@ -362,6 +364,29 @@ export function App() {
                 onNextPage={handleNextVideoPage}
               />
             </>
+          )}
+
+          {activeRoute.view === "IMPORT_VIDEO" && (
+            <VideoImport
+              rootPath={activeRootPath!}
+              onImportSuccess={async () => {
+                setIsLoading(true);
+                try {
+                  const result = await scanLibrary(activeRootPath!);
+                  setScanResult(result);
+                  setVideoPage(1);
+                  navigate({ view: "BROWSE_LIBRARY" });
+                } catch (cause) {
+                  setError(cause instanceof ApiError ? cause.message : "Failed to scan library.");
+                  navigate({ view: "BROWSE_LIBRARY" });
+                } finally {
+                  setIsLoading(false);
+                }
+              }}
+              onBack={() => {
+                navigate({ view: "BROWSE_LIBRARY" });
+              }}
+            />
           )}
 
           {activeRoute.view === "BROWSE_TAGS" && scanResult && (

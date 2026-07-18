@@ -5,7 +5,8 @@ export type Route =
   | { view: "BROWSE_LIBRARY" }
   | { view: "BROWSE_TAGS" }
   | { view: "BROWSE_MEDIA" }
-  | { view: "VIEW_VIDEO"; path: string };
+  | { view: "VIEW_VIDEO"; path: string }
+  | { view: "IMPORT_VIDEO" };
 
 function parseHash(hash: string): Route {
   // Strip leading '#'
@@ -21,6 +22,10 @@ function parseHash(hash: string): Route {
 
   if (path === "/media") {
     return { view: "BROWSE_MEDIA" };
+  }
+
+  if (path === "/import") {
+    return { view: "IMPORT_VIDEO" };
   }
 
   if (path.startsWith("/video")) {
@@ -43,6 +48,8 @@ export function navigate(route: Route) {
     hash = "#/tags";
   } else if (route.view === "BROWSE_MEDIA") {
     hash = "#/media";
+  } else if (route.view === "IMPORT_VIDEO") {
+    hash = "#/import";
   } else if (route.view === "VIEW_VIDEO") {
     hash = `#/video?path=${encodeURIComponent(route.path)}`;
   }

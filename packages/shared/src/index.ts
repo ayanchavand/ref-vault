@@ -155,3 +155,16 @@ export interface DeleteClipResponse {
   success: boolean;
 }
 
+export interface CreateVideoPlaceholderRequest {
+  rootPath: string;
+  title: string;
+  artist?: string;
+  tags?: string[];
+  notes?: string;
+  rating?: number;
+}
+
+export interface CreateVideoPlaceholderResponse {
+  success: boolean;
+  videoRelativePath: string;
+}
