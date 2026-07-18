@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { VideoDetail as VideoDetailType, JsonObject, ScannedVideo } from "@reference-vault/shared";
+import type { VideoDetail as VideoDetailType, JsonObject, ScannedVideo, LibraryConfig, LibraryConfigField } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover } from "./Uselazythumbnail";
 import { putClipMetadata, putVideoMetadata, saveSplitPlan, getVideoDetail, deleteClip, deleteVideo, ApiError, captureFrame } from "../../lib/api";
 import { Save, RotateCcw, Trash2, Repeat, Gauge, Scissors, PlayCircle, Film, Plus, Camera, Star, User, FileText, ChevronDown, ChevronUp, Edit } from "lucide-react";
@@ -11,6 +11,7 @@ interface VideoDetailProps {
   allVideos: ScannedVideo[];
   onUpdateVideoDetail(updatedVideo: VideoDetailType): void;
   onDeleteVideo(): void;
+  libraryConfig?: LibraryConfig;
 }
 
 
@@ -61,7 +62,12 @@ function ShimmerFill() {
 
 const TAG_PREVIEW_LIMIT = 4;
 
-function MetadataTags({ metadata }: { metadata: NonNullable<VideoDetailType["clips"][number]["metadata"]> }) {
+interface MetadataTagsProps {
+  metadata: NonNullable<VideoDetailType["clips"][number]["metadata"]>;
+  libraryConfig?: LibraryConfig;
+}
+
+function MetadataTags({ metadata, libraryConfig }: MetadataTagsProps) {
   const [expanded, setExpanded] = useState(false);
 
   const tags = useMemo(() => {
@@ -74,7 +80,13 @@ function MetadataTags({ metadata }: { metadata: NonNullable<VideoDetailType["cli
 
   const rating = typeof metadata.rating === "number" ? metadata.rating : undefined;
 
-  if (tags.length === 0 && !rating) {
+  const configuredClipFields = useMemo(() => {
+    return libraryConfig?.fields.filter((f: LibraryConfigField) => f.type === "clip") ?? [];
+  }, [libraryConfig]);
+
+  const hasConfiguredValues = configuredClipFields.some((field: LibraryConfigField) => metadata[field.name]);
+
+  if (tags.length === 0 && !rating && !hasConfiguredValues) {
     return null;
   }
 
@@ -98,6 +110,24 @@ function MetadataTags({ metadata }: { metadata: NonNullable<VideoDetailType["cli
             <span className="max-w-[10rem] truncate">{tag}</span>
           </span>
         );
+      })}
+
+      {configuredClipFields.map((field: LibraryConfigField) => {
+        const val = metadata[field.name];
+        if (!val) return null;
+        const vals = Array.isArray(val) ? val : [val];
+        return vals.map((v, idx) => {
+          const text = `${field.name}: ${v}`;
+          const colorClass = getTagColorClass(field.name);
+          return (
+            <span
+              key={`${field.name}-${v}-${idx}`}
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[0.62rem] ${colorClass}`}
+            >
+              <span className="max-w-[10rem] truncate">{text}</span>
+            </span>
+          );
+        });
       })}
 
       {hiddenCount > 0 && (
@@ -131,9 +161,10 @@ function MetadataTags({ metadata }: { metadata: NonNullable<VideoDetailType["cli
 
 interface VideoDetailsDisplayProps {
   metadata?: JsonObject;
+  libraryConfig?: LibraryConfig;
 }
 
-function VideoDetailsDisplay({ metadata }: VideoDetailsDisplayProps) {
+function VideoDetailsDisplay({ metadata, libraryConfig }: VideoDetailsDisplayProps) {
   if (!metadata) return null;
 
   const tags = useMemo(() => {
@@ -148,12 +179,17 @@ function VideoDetailsDisplay({ metadata }: VideoDetailsDisplayProps) {
   const artist = typeof metadata.artist === "string" ? metadata.artist : undefined;
   const notes = typeof metadata.notes === "string" ? metadata.notes : undefined;
 
-  // Other custom metadata fields (excluding tags, rating, artist, notes)
+  const configuredVideoFields = useMemo(() => {
+    return libraryConfig?.fields.filter((f: LibraryConfigField) => f.type === "video") ?? [];
+  }, [libraryConfig]);
+
+  // Other custom metadata fields (excluding tags, rating, artist, notes, and configured fields)
   const customFields = useMemo(() => {
+    const configuredNames = configuredVideoFields.map((f: LibraryConfigField) => f.name);
     return Object.entries(metadata).filter(
-      ([key]) => !["tags", "rating", "artist", "notes"].includes(key)
+      ([key]) => !["tags", "rating", "artist", "notes", ...configuredNames].includes(key)
     );
-  }, [metadata]);
+  }, [metadata, configuredVideoFields]);
 
   return (
     <div className="mt-3 space-y-3">
@@ -193,6 +229,28 @@ function VideoDetailsDisplay({ metadata }: VideoDetailsDisplayProps) {
             <span className="block font-mono text-[0.55rem] uppercase tracking-wider text-blue-400/70">Notes</span>
             <p className="font-sans leading-relaxed text-white/90 whitespace-pre-wrap">{notes}</p>
           </div>
+        </div>
+      )}
+
+      {/* Configured Structured Fields Display */}
+      {configuredVideoFields.some((field: LibraryConfigField) => metadata[field.name]) && (
+        <div className="flex flex-wrap gap-1.5">
+          {configuredVideoFields.map((field: LibraryConfigField) => {
+            const val = metadata[field.name];
+            if (!val) return null;
+            const displayValue = Array.isArray(val) ? val.join(", ") : String(val);
+            const colorClass = getTagColorClass(field.name);
+            return (
+              <span
+                key={field.name}
+                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-mono text-[0.62rem] ${colorClass}`}
+              >
+                <span className="font-semibold text-amber-300/90">{field.name}</span>
+                <span className="text-white/20">·</span>
+                <span className="max-w-[10rem] truncate">{displayValue}</span>
+              </span>
+            );
+          })}
         </div>
       )}
 
@@ -241,12 +299,14 @@ function ClipCard({
   index,
   active,
   onSelect,
+  libraryConfig,
 }: {
   rootPath: string;
   clip: VideoDetailType["clips"][number];
   index: number;
   active: boolean;
   onSelect(): void;
+  libraryConfig?: LibraryConfig;
 }) {
   const mediaUrl = useMemo(() => {
     return `/api/media?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
@@ -318,7 +378,7 @@ function ClipCard({
         <p className="truncate font-mono text-xs font-semibold text-white/90">
           Clip {pad(index)}
         </p>
-        {clip.metadata && <MetadataTags metadata={clip.metadata} />}
+        {clip.metadata && <MetadataTags metadata={clip.metadata} libraryConfig={libraryConfig} />}
       </div>
     </div>
   );
@@ -350,6 +410,7 @@ interface ClipMetadataEditorProps {
   globalTags: string[];
   onSaveSuccess(updatedVideo: VideoDetailType): void;
   onDeleteSuccess(updatedVideo: VideoDetailType): void;
+  libraryConfig?: LibraryConfig;
 }
 
 function ClipMetadataEditor({
@@ -360,13 +421,19 @@ function ClipMetadataEditor({
   globalTags,
   onSaveSuccess,
   onDeleteSuccess,
+  libraryConfig,
 }: ClipMetadataEditorProps) {
   const [tagsInput, setTagsInput] = useState("");
   const [notesInput, setNotesInput] = useState("");
   const [ratingInput, setRatingInput] = useState(0);
+  const [structuredFields, setStructuredFields] = useState<Record<string, string | string[]>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const configuredClipFields = useMemo(() => {
+    return libraryConfig?.fields.filter((f: LibraryConfigField) => f.type === "clip") ?? [];
+  }, [libraryConfig]);
 
   const allLibraryTags = useMemo(() => {
     const set = new Set<string>();
@@ -408,9 +475,27 @@ function ClipMetadataEditor({
     setTagsInput(tags.join(", "));
     setNotesInput(String(clip.metadata?.notes ?? ""));
     setRatingInput(Number(clip.metadata?.rating ?? 0));
+
+    const initialFields: Record<string, string | string[]> = {};
+    configuredClipFields.forEach((field: LibraryConfigField) => {
+      const val = clip.metadata?.[field.name];
+      if (val !== undefined) {
+        if (field.isMulti) {
+          initialFields[field.name] = Array.isArray(val)
+            ? (val as string[])
+            : [String(val)];
+        } else {
+          initialFields[field.name] = String(val);
+        }
+      } else {
+        initialFields[field.name] = field.isMulti ? [] : "";
+      }
+    });
+    setStructuredFields(initialFields);
+
     setSaveError(null);
     setSaveSuccess(false);
-  }, [clip]);
+  }, [clip, libraryConfig]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -440,6 +525,24 @@ function ClipMetadataEditor({
       delete newMetadata.rating;
     }
 
+    configuredClipFields.forEach((field: LibraryConfigField) => {
+      const val = structuredFields[field.name];
+      if (field.isMulti) {
+        const arr = Array.isArray(val) ? val : [];
+        if (arr.length > 0) {
+          newMetadata[field.name] = arr;
+        } else {
+          delete newMetadata[field.name];
+        }
+      } else {
+        const str = typeof val === "string" ? val : "";
+        if (str) {
+          newMetadata[field.name] = str;
+        } else {
+          delete newMetadata[field.name];
+        }
+      }
+    });
 
     try {
       const response = await putClipMetadata({
@@ -479,6 +582,24 @@ function ClipMetadataEditor({
     setTagsInput(tags.join(", "));
     setNotesInput(String(clip.metadata?.notes ?? ""));
     setRatingInput(Number(clip.metadata?.rating ?? 0));
+
+    const initialFields: Record<string, string | string[]> = {};
+    configuredClipFields.forEach((field: LibraryConfigField) => {
+      const val = clip.metadata?.[field.name];
+      if (val !== undefined) {
+        if (field.isMulti) {
+          initialFields[field.name] = Array.isArray(val)
+            ? (val as string[])
+            : [String(val)];
+        } else {
+          initialFields[field.name] = String(val);
+        }
+      } else {
+        initialFields[field.name] = field.isMulti ? [] : "";
+      }
+    });
+    setStructuredFields(initialFields);
+
     setSaveError(null);
     setSaveSuccess(false);
   }
@@ -513,12 +634,33 @@ function ClipMetadataEditor({
     const originalNotes = String(clip.metadata?.notes ?? "");
     const originalRating = Number(clip.metadata?.rating ?? 0);
 
-    return (
-      tagsInput !== originalTags ||
-      notesInput !== originalNotes ||
-      ratingInput !== originalRating
-    );
-  }, [clip.metadata, tagsInput, notesInput, ratingInput]);
+    const tagsChanged = tagsInput !== originalTags;
+    const notesChanged = notesInput !== originalNotes;
+    const ratingChanged = ratingInput !== originalRating;
+
+    let structuredChanged = false;
+    for (const field of configuredClipFields) {
+      const orig = clip.metadata?.[field.name];
+      const curr = structuredFields[field.name];
+      if (field.isMulti) {
+        const origArr = (Array.isArray(orig) ? orig : (orig ? [String(orig)] : [])) as string[];
+        const currArr = Array.isArray(curr) ? curr : [];
+        if (origArr.length !== currArr.length || !origArr.every(v => currArr.includes(v))) {
+          structuredChanged = true;
+          break;
+        }
+      } else {
+        const origStr = orig ? String(orig) : "";
+        const currStr = typeof curr === "string" ? curr : "";
+        if (origStr !== currStr) {
+          structuredChanged = true;
+          break;
+        }
+      }
+    }
+
+    return tagsChanged || notesChanged || ratingChanged || structuredChanged;
+  }, [clip.metadata, tagsInput, notesInput, ratingInput, structuredFields, configuredClipFields]);
 
   return (
     <form onSubmit={handleSave} className="space-y-4">
@@ -587,6 +729,53 @@ function ClipMetadataEditor({
             )}
 
           </div>
+
+          {/* Configured Structured Fields */}
+          {configuredClipFields.map((field) => (
+            <div key={field.name} className="space-y-1.5 animate-[rv-slide-down_0.2s_ease-out]">
+              <label className="block font-mono text-[0.65rem] uppercase tracking-wider text-white/50">
+                {field.name}
+              </label>
+              {field.isMulti ? (
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {field.values.map((val) => {
+                    const isSelected = (structuredFields[field.name] as string[] ?? []).includes(val);
+                    return (
+                      <button
+                        key={val}
+                        type="button"
+                        disabled={isSaving}
+                        onClick={() => {
+                          const current = (structuredFields[field.name] as string[] ?? []);
+                          const next = isSelected ? current.filter((c) => c !== val) : [...current, val];
+                          setStructuredFields({ ...structuredFields, [field.name]: next });
+                        }}
+                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
+                          isSelected
+                            ? "border-purple-400/50 bg-purple-400/10 text-purple-300 font-semibold"
+                            : "border-white/[0.08] bg-white/[0.02] text-white/60 hover:bg-white/[0.04]"
+                        }`}
+                      >
+                        {val}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <select
+                  value={structuredFields[field.name] as string ?? ""}
+                  disabled={isSaving}
+                  onChange={(e) => setStructuredFields({ ...structuredFields, [field.name]: e.target.value })}
+                  className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2 text-sm text-white focus:border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/50 bg-[#111316]"
+                >
+                  <option value="" className="text-white/40">Select {field.name}...</option>
+                  {field.values.map((val) => (
+                    <option key={val} value={val} className="text-white bg-[#111316]">{val}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          ))}
 
 
           {/* Rating Field */}
@@ -696,6 +885,7 @@ interface VideoMetadataEditorProps {
   globalTags: string[];
   onSaveSuccess(updatedVideo: VideoDetailType): void;
   onDeleteSuccess(): void;
+  libraryConfig?: LibraryConfig;
 }
 
 function VideoMetadataEditor({
@@ -704,15 +894,21 @@ function VideoMetadataEditor({
   globalTags,
   onSaveSuccess,
   onDeleteSuccess,
+  libraryConfig,
 }: VideoMetadataEditorProps) {
   const [tagsInput, setTagsInput] = useState("");
   const [artistInput, setArtistInput] = useState("");
   const [notesInput, setNotesInput] = useState("");
   const [ratingInput, setRatingInput] = useState(0);
+  const [structuredFields, setStructuredFields] = useState<Record<string, string | string[]>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+
+  const configuredVideoFields = useMemo(() => {
+    return libraryConfig?.fields.filter((f: LibraryConfigField) => f.type === "video") ?? [];
+  }, [libraryConfig]);
 
   async function handleDeleteVideo() {
     setIsSaving(true);
@@ -770,9 +966,27 @@ function VideoMetadataEditor({
     setNotesInput(String(video.metadata?.notes ?? ""));
     setRatingInput(Number(video.metadata?.rating ?? 0));
     setArtistInput(String(video.metadata?.artist ?? ""));
+
+    const initialFields: Record<string, string | string[]> = {};
+    configuredVideoFields.forEach((field: LibraryConfigField) => {
+      const val = video.metadata?.[field.name];
+      if (val !== undefined) {
+        if (field.isMulti) {
+          initialFields[field.name] = Array.isArray(val)
+            ? (val as string[])
+            : [String(val)];
+        } else {
+          initialFields[field.name] = String(val);
+        }
+      } else {
+        initialFields[field.name] = field.isMulti ? [] : "";
+      }
+    });
+    setStructuredFields(initialFields);
+
     setSaveError(null);
     setSaveSuccess(false);
-  }, [video]);
+  }, [video, libraryConfig]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -808,6 +1022,25 @@ function VideoMetadataEditor({
       delete newMetadata.artist;
     }
 
+    configuredVideoFields.forEach((field: LibraryConfigField) => {
+      const val = structuredFields[field.name];
+      if (field.isMulti) {
+        const arr = Array.isArray(val) ? val : [];
+        if (arr.length > 0) {
+          newMetadata[field.name] = arr;
+        } else {
+          delete newMetadata[field.name];
+        }
+      } else {
+        const str = typeof val === "string" ? val : "";
+        if (str) {
+          newMetadata[field.name] = str;
+        } else {
+          delete newMetadata[field.name];
+        }
+      }
+    });
+
     try {
       const response = await putVideoMetadata({
         rootPath,
@@ -835,6 +1068,24 @@ function VideoMetadataEditor({
     setNotesInput(String(video.metadata?.notes ?? ""));
     setRatingInput(Number(video.metadata?.rating ?? 0));
     setArtistInput(String(video.metadata?.artist ?? ""));
+
+    const initialFields: Record<string, string | string[]> = {};
+    configuredVideoFields.forEach((field: LibraryConfigField) => {
+      const val = video.metadata?.[field.name];
+      if (val !== undefined) {
+        if (field.isMulti) {
+          initialFields[field.name] = Array.isArray(val)
+            ? (val as string[])
+            : [String(val)];
+        } else {
+          initialFields[field.name] = String(val);
+        }
+      } else {
+        initialFields[field.name] = field.isMulti ? [] : "";
+      }
+    });
+    setStructuredFields(initialFields);
+
     setSaveError(null);
     setSaveSuccess(false);
   }
@@ -845,13 +1096,34 @@ function VideoMetadataEditor({
     const originalRating = Number(video.metadata?.rating ?? 0);
     const originalArtist = String(video.metadata?.artist ?? "");
 
-    return (
-      tagsInput !== originalTags ||
-      artistInput !== originalArtist ||
-      notesInput !== originalNotes ||
-      ratingInput !== originalRating
-    );
-  }, [video.metadata, tagsInput, artistInput, notesInput, ratingInput]);
+    const tagsChanged = tagsInput !== originalTags;
+    const notesChanged = notesInput !== originalNotes;
+    const ratingChanged = ratingInput !== originalRating;
+    const artistChanged = artistInput !== originalArtist;
+
+    let structuredChanged = false;
+    for (const field of configuredVideoFields) {
+      const orig = video.metadata?.[field.name];
+      const curr = structuredFields[field.name];
+      if (field.isMulti) {
+        const origArr = (Array.isArray(orig) ? orig : (orig ? [String(orig)] : [])) as string[];
+        const currArr = Array.isArray(curr) ? curr : [];
+        if (origArr.length !== currArr.length || !origArr.every(v => currArr.includes(v))) {
+          structuredChanged = true;
+          break;
+        }
+      } else {
+        const origStr = orig ? String(orig) : "";
+        const currStr = typeof curr === "string" ? curr : "";
+        if (origStr !== currStr) {
+          structuredChanged = true;
+          break;
+        }
+      }
+    }
+
+    return tagsChanged || artistChanged || notesChanged || ratingChanged || structuredChanged;
+  }, [video.metadata, tagsInput, artistInput, notesInput, ratingInput, structuredFields, configuredVideoFields]);
 
   return (
     <form onSubmit={handleSave} className="space-y-4">
@@ -920,6 +1192,53 @@ function VideoMetadataEditor({
             )}
 
           </div>
+
+          {/* Configured Structured Fields */}
+          {configuredVideoFields.map((field) => (
+            <div key={field.name} className="space-y-1.5 animate-[rv-slide-down_0.2s_ease-out]">
+              <label className="block font-mono text-[0.65rem] uppercase tracking-wider text-white/50">
+                {field.name}
+              </label>
+              {field.isMulti ? (
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {field.values.map((val) => {
+                    const isSelected = (structuredFields[field.name] as string[] ?? []).includes(val);
+                    return (
+                      <button
+                        key={val}
+                        type="button"
+                        disabled={isSaving}
+                        onClick={() => {
+                          const current = (structuredFields[field.name] as string[] ?? []);
+                          const next = isSelected ? current.filter((c) => c !== val) : [...current, val];
+                          setStructuredFields({ ...structuredFields, [field.name]: next });
+                        }}
+                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
+                          isSelected
+                            ? "border-purple-400/50 bg-purple-400/10 text-purple-300 font-semibold"
+                            : "border-white/[0.08] bg-white/[0.02] text-white/60 hover:bg-white/[0.04]"
+                        }`}
+                      >
+                        {val}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <select
+                  value={structuredFields[field.name] as string ?? ""}
+                  disabled={isSaving}
+                  onChange={(e) => setStructuredFields({ ...structuredFields, [field.name]: e.target.value })}
+                  className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2 text-sm text-white focus:border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/50 bg-[#111316]"
+                >
+                  <option value="" className="text-white/40">Select {field.name}...</option>
+                  {field.values.map((val) => (
+                    <option key={val} value={val} className="text-white bg-[#111316]">{val}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          ))}
 
           {/* Artist Field */}
           <div className="space-y-1.5">
@@ -1495,7 +1814,14 @@ function SegmentEditor({
   );
 }
 
-export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, onDeleteVideo }: VideoDetailProps) {
+export function VideoDetail({
+  rootPath,
+  video,
+  allVideos,
+  onUpdateVideoDetail,
+  onDeleteVideo,
+  libraryConfig,
+}: VideoDetailProps) {
 
   const [selectedMediaPath, setSelectedMediaPath] = useState(video.mainVideoPath);
   const [isEditingSegments, setIsEditingSegments] = useState(false);
@@ -1712,10 +2038,10 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
                   : `Clip ${pad(video.clips.findIndex((c) => c.mediaPath === selectedMediaPath))}`}
               </h2>
               {isMainPlaying && video.metadata ? (
-                <VideoDetailsDisplay metadata={video.metadata} />
+                <VideoDetailsDisplay metadata={video.metadata} libraryConfig={libraryConfig} />
               ) : (
                 !isMainPlaying && activeClip?.metadata && (
-                  <VideoDetailsDisplay metadata={activeClip.metadata} />
+                  <VideoDetailsDisplay metadata={activeClip.metadata} libraryConfig={libraryConfig} />
                 )
               )}
             </div>
@@ -1894,6 +2220,7 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
                       onUpdateVideoDetail(updatedVideo);
                       setSelectedMediaPath(updatedVideo.mainVideoPath);
                     }}
+                    libraryConfig={libraryConfig}
                   />
                 ) : (
                   isMainPlaying && (
@@ -1903,6 +2230,7 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
                       globalTags={globalTags}
                       onSaveSuccess={onUpdateVideoDetail}
                       onDeleteSuccess={onDeleteVideo}
+                      libraryConfig={libraryConfig}
                     />
                   )
                 )}
@@ -1979,6 +2307,7 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
                     index={index}
                     active={selectedMediaPath === clip.mediaPath}
                     onSelect={() => setSelectedMediaPath(clip.mediaPath)}
+                    libraryConfig={libraryConfig}
                   />
                 </li>
               ))}

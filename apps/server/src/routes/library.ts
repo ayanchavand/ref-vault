@@ -28,6 +28,10 @@ import type {
   CaptureFrameResponse,
   InitLibraryRequest,
   InitLibraryResponse,
+  GetLibraryConfigRequest,
+  GetLibraryConfigResponse,
+  PutLibraryConfigRequest,
+  PutLibraryConfigResponse,
 } from "@reference-vault/shared";
 
 import { validateLibraryRoot } from "../services/validate-library-root.js";
@@ -41,6 +45,7 @@ import { generateThumbnail } from "../services/generate-thumbnail.js";
 import { createVideoPlaceholder, resolveUploadDirectory, deleteVideo } from "../services/import-video.js";
 import { captureFrame } from "../services/capture-frame.js";
 import { initLibraryStructure } from "../services/init-library.js";
+import { readLibraryConfig, writeLibraryConfig } from "../services/library-config.js";
 
 
 export async function registerLibraryRoutes(app: FastifyInstance): Promise<void> {
@@ -942,6 +947,88 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
       }
 
       return reply.status(200).send(result.value);
+    },
+  );
+
+  app.post<{
+    Body: GetLibraryConfigRequest;
+    Reply: GetLibraryConfigResponse | ApiErrorResponse;
+  }>(
+    "/api/library/config",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["rootPath"],
+          additionalProperties: false,
+          properties: {
+            rootPath: { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await readLibraryConfig(request.body.rootPath);
+
+      if (!result.ok) {
+        const statusCode =
+          result.error.error === "LIBRARY_ROOT_NOT_FOUND" ? 404 : 400;
+        return reply.status(statusCode).send(result.error);
+      }
+
+      return { config: result.value };
+    },
+  );
+
+  app.put<{
+    Body: PutLibraryConfigRequest;
+    Reply: PutLibraryConfigResponse | ApiErrorResponse;
+  }>(
+    "/api/library/config",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["rootPath", "config"],
+          additionalProperties: false,
+          properties: {
+            rootPath: { type: "string" },
+            config: {
+              type: "object",
+              required: ["fields"],
+              properties: {
+                fields: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    required: ["name", "type", "isMulti", "values"],
+                    properties: {
+                      name: { type: "string" },
+                      type: { type: "string", enum: ["video", "clip"] },
+                      isMulti: { type: "boolean" },
+                      values: { type: "array", items: { type: "string" } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await writeLibraryConfig(
+        request.body.rootPath,
+        request.body.config,
+      );
+
+      if (!result.ok) {
+        const statusCode =
+          result.error.error === "LIBRARY_ROOT_NOT_FOUND" ? 404 : 500;
+        return reply.status(statusCode).send(result.error);
+      }
+
+      return reply.status(200).send({ success: true, config: result.value });
     },
   );
 }

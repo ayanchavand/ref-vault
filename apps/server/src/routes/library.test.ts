@@ -564,6 +564,64 @@ test("initializes directory structures for video and media libraries", async () 
   }
 });
 
+test("handles library config read and write operations", async () => {
+  const library = await mkdtemp(join(tmpdir(), "reference-vault-"));
+  const app = await buildApp();
+
+  try {
+    // 1. Read config when library.json is missing (should default to empty config)
+    const readResponse1 = await app.inject({
+      method: "POST",
+      url: "/api/library/config",
+      payload: { rootPath: library },
+    });
+
+    assert.equal(readResponse1.statusCode, 200);
+    assert.deepEqual(readResponse1.json(), { config: { fields: [] } });
+
+    // 2. Save a new configuration
+    const testConfig = {
+      fields: [
+        {
+          name: "Lighting",
+          type: "video",
+          isMulti: false,
+          values: ["Red", "Green", "Blue"],
+        },
+        {
+          name: "Character Position",
+          type: "clip",
+          isMulti: true,
+          values: ["Standing", "Sitting"],
+        },
+      ],
+    };
+
+    const writeResponse = await app.inject({
+      method: "PUT",
+      url: "/api/library/config",
+      payload: { rootPath: library, config: testConfig },
+    });
+
+    assert.equal(writeResponse.statusCode, 200);
+    assert.deepEqual(writeResponse.json(), { success: true, config: testConfig });
+
+    // 3. Read config again to make sure it was stored correctly
+    const readResponse2 = await app.inject({
+      method: "POST",
+      url: "/api/library/config",
+      payload: { rootPath: library },
+    });
+
+    assert.equal(readResponse2.statusCode, 200);
+    assert.deepEqual(readResponse2.json(), { config: testConfig });
+  } finally {
+    await app.close();
+    await rm(library, { force: true, recursive: true });
+  }
+});
+
+
 
 
 

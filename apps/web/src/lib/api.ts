@@ -21,6 +21,10 @@ import type {
   CaptureFrameResponse,
   InitLibraryRequest,
   InitLibraryResponse,
+  GetLibraryConfigRequest,
+  GetLibraryConfigResponse,
+  PutLibraryConfigRequest,
+  PutLibraryConfigResponse,
 } from "@reference-vault/shared";
 
 export class ApiError extends Error {
@@ -345,6 +349,43 @@ export async function initLibrary(
 
   return payload as InitLibraryResponse;
 }
+
+export async function getLibraryConfig(
+  request: GetLibraryConfigRequest,
+): Promise<GetLibraryConfigResponse> {
+  const response = await fetch("/api/library/config", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const payload: unknown = await response.json();
+
+  if (!response.ok) {
+    const error = payload as ApiErrorResponse;
+    throw new ApiError(error.message || "The library configuration could not be loaded.");
+  }
+
+  return payload as GetLibraryConfigResponse;
+}
+
+export async function putLibraryConfig(
+  request: PutLibraryConfigRequest,
+): Promise<PutLibraryConfigResponse> {
+  const response = await fetch("/api/library/config", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const payload: unknown = await response.json();
+
+  if (!response.ok) {
+    const error = payload as ApiErrorResponse;
+    throw new ApiError(error.message || "The library configuration could not be saved.");
+  }
+
+  return payload as PutLibraryConfigResponse;
+}
+
 
 
 

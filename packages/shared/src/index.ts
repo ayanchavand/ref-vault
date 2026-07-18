@@ -150,7 +150,9 @@ export type LibraryRootValidationErrorCode =
   | "INVALID_MEDIA_TYPE"
   | "THUMBNAIL_GENERATION_FAILED"
   | "MEDIA_SCAN_FAILED"
-  | "FRAME_CAPTURE_FAILED";
+  | "FRAME_CAPTURE_FAILED"
+  | "CONFIG_READ_FAILED"
+  | "CONFIG_WRITE_FAILED";
 
 export interface ApiErrorResponse {
   error: LibraryRootValidationErrorCode;
@@ -201,6 +203,37 @@ export interface CaptureFrameRequest {
 export interface CaptureFrameResponse {
   success: boolean;
   savedPath: string;
+}
+
+// ─── Library Configuration Types ──────────────────────────────────────────────
+
+export interface LibraryConfigField {
+  name: string;
+  type: "video" | "clip";
+  isMulti: boolean;
+  values: string[];
+}
+
+export interface LibraryConfig {
+  fields: LibraryConfigField[];
+}
+
+export interface GetLibraryConfigRequest {
+  rootPath: string;
+}
+
+export interface GetLibraryConfigResponse {
+  config: LibraryConfig;
+}
+
+export interface PutLibraryConfigRequest {
+  rootPath: string;
+  config: LibraryConfig;
+}
+
+export interface PutLibraryConfigResponse {
+  success: boolean;
+  config: LibraryConfig;
 }
 
 

@@ -4,6 +4,7 @@ import type {
   ScanLibraryResponse,
   ScannedVideo,
   VideoDetail as VideoDetailType,
+  LibraryConfig,
 } from "@reference-vault/shared";
 
 import { Library, Tag, Upload, Image, Settings as SettingsIcon, ChevronLeft, ChevronRight } from "lucide-react";
@@ -13,7 +14,7 @@ import { VideoList } from "./features/video-browser/VideoList";
 import { VideoDetail } from "./features/video-browser/VideoDetail";
 import { MediaBrowser } from "./features/media-browser/MediaBrowser";
 import { VideoImport } from "./features/video-import/VideoImport";
-import { scanLibrary, getVideoDetail, ApiError } from "./lib/api";
+import { scanLibrary, getVideoDetail, ApiError, getLibraryConfig } from "./lib/api";
 import { useHashRouter, navigate } from "./lib/router";
 
 const libraryRootStorageKey = "reference-vault.library-root";
@@ -166,6 +167,7 @@ export function App() {
   // a fresh scan happens; preserved when navigating to/from a video detail
   // or the tag browser so the user doesn't lose their place.
   const [videoPage, setVideoPage] = useState(1);
+  const [libraryConfig, setLibraryConfig] = useState<LibraryConfig>({ fields: [] });
 
   // Auto-load saved library on mount
   useEffect(() => {
@@ -175,9 +177,13 @@ export function App() {
       setError(null);
       setIsLoading(true);
 
-      scanLibrary(saved)
-        .then((result) => {
-          setScanResult(result);
+      Promise.all([
+        scanLibrary(saved),
+        getLibraryConfig({ rootPath: saved }).catch(() => ({ config: { fields: [] } })),
+      ])
+        .then(([scanRes, configRes]) => {
+          setScanResult(scanRes);
+          setLibraryConfig(configRes.config);
           setVideoPage(1);
         })
         .catch((cause) => {
@@ -233,8 +239,12 @@ export function App() {
     setIsLoading(true);
 
     try {
-      const result = await scanLibrary(newPath);
-      setScanResult(result);
+      const [scanRes, configRes] = await Promise.all([
+        scanLibrary(newPath),
+        getLibraryConfig({ rootPath: newPath }).catch(() => ({ config: { fields: [] } })),
+      ]);
+      setScanResult(scanRes);
+      setLibraryConfig(configRes.config);
       setVideoPage(1);
     } catch (cause) {
       const message =
@@ -255,6 +265,7 @@ export function App() {
     setSelectedVideo(null);
     setVideoDetail(null);
     setVideoPage(1);
+    setLibraryConfig({ fields: [] });
   }
 
   const [activeMediaRoot, setActiveMediaRoot] = useState(() => window.localStorage.getItem("reference-vault.media-root") ?? "");
@@ -523,6 +534,7 @@ export function App() {
                     setIsLoading(false);
                   }
                 }}
+                libraryConfig={libraryConfig}
               />
             </div>
           )}
@@ -538,6 +550,9 @@ export function App() {
                 onForgetVideoLibrary={handleVideoRootForget}
                 onMediaLibraryChange={handleMediaRootChange}
                 onForgetMediaLibrary={handleMediaRootForget}
+                videoLibraryPath={activeRootPath ?? ""}
+                libraryConfig={libraryConfig}
+                onUpdateLibraryConfig={setLibraryConfig}
               />
             </div>
           )}
