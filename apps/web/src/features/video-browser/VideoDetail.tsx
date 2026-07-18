@@ -1326,6 +1326,18 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
     setPlayRate(1);
   }, [video.mainVideoPath]);
 
+  function skipForward(seconds = 10) {
+    if (videoRef.current) {
+      videoRef.current.currentTime = Math.min(videoRef.current.duration || 0, videoRef.current.currentTime + seconds);
+    }
+  }
+
+  function skipBackward(seconds = 10) {
+    if (videoRef.current) {
+      videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - seconds);
+    }
+  }
+
   function stepFrameForward() {
     if (videoRef.current) {
       videoRef.current.currentTime += 0.04;
@@ -1360,8 +1372,14 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
 
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        stepFrameBackward();
+        skipBackward(10);
       } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        skipForward(10);
+      } else if (e.key === ",") {
+        e.preventDefault();
+        stepFrameBackward();
+      } else if (e.key === ".") {
         e.preventDefault();
         stepFrameForward();
       }
@@ -1488,7 +1506,7 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
               <button
                 type="button"
                 onClick={stepFrameBackward}
-                title="Step 1 Frame Back (Left Arrow)"
+                title="Step 1 Frame Back (Comma)"
                 className="flex-1 sm:flex-initial text-center rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-white/80 hover:border-amber-400/40 hover:bg-white/[0.06] transition focus:outline-none"
               >
                 ◀ Frame
@@ -1496,7 +1514,7 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
               <button
                 type="button"
                 onClick={stepFrameForward}
-                title="Step 1 Frame Forward (Right Arrow)"
+                title="Step 1 Frame Forward (Period)"
                 className="flex-1 sm:flex-initial text-center rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-white/80 hover:border-amber-400/40 hover:bg-white/[0.06] transition focus:outline-none"
               >
                 Frame ▶
