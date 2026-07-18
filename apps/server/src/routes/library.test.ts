@@ -508,6 +508,63 @@ test("capture-frame rejects requests with missing parameters", async () => {
   }
 });
 
+test("initializes directory structures for video and media libraries", async () => {
+  const library = await mkdtemp(join(tmpdir(), "reference-vault-"));
+  const app = await buildApp();
+
+  try {
+    // Test 1: Empty directory initialization
+    const responseEmpty = await app.inject({
+      method: "POST",
+      url: "/api/library/init",
+      payload: {
+        targetPath: library,
+      },
+    });
+
+    assert.equal(responseEmpty.statusCode, 200);
+    const bodyEmpty = responseEmpty.json();
+    assert.ok(bodyEmpty.success);
+    assert.equal(bodyEmpty.videoPath, join(library, "refVault_Videos"));
+    assert.equal(bodyEmpty.mediaPath, join(library, "refVault_Media"));
+
+    // Verify skeleton structure (media should have subdirectories)
+    assert.ok((await stat(join(library, "refVault_Videos"))).isDirectory());
+    assert.ok((await stat(join(library, "refVault_Media", "images"))).isDirectory());
+    assert.ok((await stat(join(library, "refVault_Media", "gifs"))).isDirectory());
+    assert.ok((await stat(join(library, "refVault_Media", "videos"))).isDirectory());
+
+    // Test 2: Non-empty directory initialization
+    const nestedDir = join(library, "non-empty-dir");
+    await mkdir(nestedDir, { recursive: true });
+    await writeFile(join(nestedDir, "unrelated.txt"), "hello");
+
+    const responseNonEmpty = await app.inject({
+      method: "POST",
+      url: "/api/library/init",
+      payload: {
+        targetPath: nestedDir,
+      },
+    });
+
+    assert.equal(responseNonEmpty.statusCode, 200);
+    const bodyNonEmpty = responseNonEmpty.json();
+    assert.ok(bodyNonEmpty.success);
+    assert.equal(bodyNonEmpty.videoPath, join(nestedDir, "refvault", "refVault_Videos"));
+    assert.equal(bodyNonEmpty.mediaPath, join(nestedDir, "refvault", "refVault_Media"));
+
+    // Verify sub-directories and skeleton structure
+    assert.ok((await stat(join(nestedDir, "refvault", "refVault_Videos"))).isDirectory());
+    assert.ok((await stat(join(nestedDir, "refvault", "refVault_Media", "images"))).isDirectory());
+    assert.ok((await stat(join(nestedDir, "refvault", "refVault_Media", "gifs"))).isDirectory());
+    assert.ok((await stat(join(nestedDir, "refvault", "refVault_Media", "videos"))).isDirectory());
+  } finally {
+    await app.close();
+    await rm(library, { force: true, recursive: true });
+  }
+});
+
+
 
 
 

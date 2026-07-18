@@ -1123,6 +1123,63 @@ function SegmentEditor({
     setSegments([]);
   }, [video]);
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const activeEl = document.activeElement;
+      const isTyping = activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
+      if (isTyping) return;
+
+      const key = e.key.toLowerCase();
+      if (key === "m") {
+        e.preventDefault();
+        addSegment();
+      } else if (key === "i") {
+        e.preventDefault();
+        setSegments((prev) => {
+          if (prev.length === 0) {
+            return [
+              {
+                start: Math.round(currentTime * 100) / 100,
+                end: Math.round((currentTime + 5) * 100) / 100,
+                tags: [],
+                notes: "",
+                rating: 0,
+              },
+            ];
+          }
+          return prev.map((seg, idx) =>
+            idx === prev.length - 1
+              ? { ...seg, start: Math.round(currentTime * 100) / 100 }
+              : seg
+          );
+        });
+      } else if (key === "o") {
+        e.preventDefault();
+        setSegments((prev) => {
+          if (prev.length === 0) {
+            return [
+              {
+                start: Math.max(0, Math.round((currentTime - 5) * 100) / 100),
+                end: Math.round(currentTime * 100) / 100,
+                tags: [],
+                notes: "",
+                rating: 0,
+              },
+            ];
+          }
+          return prev.map((seg, idx) =>
+            idx === prev.length - 1
+              ? { ...seg, end: Math.round(currentTime * 100) / 100 }
+              : seg
+          );
+        });
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentTime]);
+
   function addSegment() {
     setSegments((prev) => [
       ...prev,
@@ -1184,6 +1241,17 @@ function SegmentEditor({
           <p className="text-xs text-white/40">
             Define segments to chop later using the python script.
           </p>
+          <div className="mt-1 flex flex-wrap gap-1 text-[0.62rem] font-mono text-white/30 items-center">
+            <span>Shortcuts:</span>
+            <kbd className="bg-white/10 px-1 rounded text-white/60">M</kbd>
+            <span>Add Marker</span>
+            <span className="text-white/10">·</span>
+            <kbd className="bg-white/10 px-1 rounded text-white/60">I</kbd>
+            <span>Set Start</span>
+            <span className="text-white/10">·</span>
+            <kbd className="bg-white/10 px-1 rounded text-white/60">O</kbd>
+            <span>Set End</span>
+          </div>
         </div>
         <button
           type="button"

@@ -2,6 +2,17 @@ export interface ValidateLibraryRootRequest {
   rootPath: string;
 }
 
+export interface InitLibraryRequest {
+  targetPath: string;
+}
+
+export interface InitLibraryResponse {
+  success: boolean;
+  videoPath: string;
+  mediaPath: string;
+}
+
+
 export interface ValidateLibraryRootResponse {
   rootPath: string;
 }

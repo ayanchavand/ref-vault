@@ -19,6 +19,8 @@ import type {
   DeleteVideoResponse,
   CaptureFrameRequest,
   CaptureFrameResponse,
+  InitLibraryRequest,
+  InitLibraryResponse,
 } from "@reference-vault/shared";
 
 export class ApiError extends Error {
@@ -324,6 +326,24 @@ export async function captureFrame(
   }
 
   return payload as CaptureFrameResponse;
+}
+
+export async function initLibrary(
+  request: InitLibraryRequest,
+): Promise<InitLibraryResponse> {
+  const response = await fetch("/api/library/init", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const payload: unknown = await response.json();
+
+  if (!response.ok) {
+    const error = payload as ApiErrorResponse;
+    throw new ApiError(error.message || "The library directory structure could not be initialized.");
+  }
+
+  return payload as InitLibraryResponse;
 }
 
 

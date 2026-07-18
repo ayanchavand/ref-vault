@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { FolderOpen, Settings as SettingsIcon, CheckCircle, AlertCircle, Unlink } from "lucide-react";
-import { ApiError, validateLibraryRoot } from "../../lib/api";
+import { ApiError, validateLibraryRoot, initLibrary } from "../../lib/api";
 
 const videoStorageKey = "reference-vault.library-root";
 const mediaStorageKey = "reference-vault.media-root";
@@ -29,6 +29,10 @@ export function Settings({
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [isMediaSubmitting, setIsMediaSubmitting] = useState(false);
   const [mediaSuccess, setMediaSuccess] = useState(false);
+
+  const [initSuccessMessage, setInitSuccessMessage] = useState<string | null>(null);
+  const [initErrorMessage, setInitErrorMessage] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(false);
 
   async function handleVideoSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -94,20 +98,100 @@ export function Settings({
     onForgetMediaLibrary();
   }
 
+  async function handleInitializeLibrary(): Promise<void> {
+    const targetPath = window.prompt(
+      "Enter the absolute directory path where you want to initialize your libraries:\n\n(If the folder is empty, skeleton folders are created directly. Otherwise, 'refVault_Videos' and 'refVault_Media' subfolders will be created.)"
+    );
+
+    if (targetPath === null) {
+      return; // Cancelled
+    }
+
+    if (targetPath.trim().length === 0) {
+      setInitErrorMessage("The directory path cannot be empty.");
+      return;
+    }
+
+    setInitErrorMessage(null);
+    setInitSuccessMessage(null);
+    setIsInitializing(true);
+
+    try {
+      const response = await initLibrary({ targetPath: targetPath.trim() });
+      
+      // Update Video Library Path
+      setVideoPathInput(response.videoPath);
+      setActiveVideoPath(response.videoPath);
+      localStorage.setItem(videoStorageKey, response.videoPath);
+      setVideoSuccess(true);
+      await Promise.resolve(onVideoLibraryChange(response.videoPath));
+
+      // Update Media Library Path
+      setMediaPathInput(response.mediaPath);
+      setActiveMediaPath(response.mediaPath);
+      localStorage.setItem(mediaStorageKey, response.mediaPath);
+      setMediaSuccess(true);
+      await Promise.resolve(onMediaLibraryChange(response.mediaPath));
+
+      setInitSuccessMessage(
+        `Directory structures initialized successfully!\n\nVideo Library Path: ${response.videoPath}\nMedia Library Path: ${response.mediaPath}`
+      );
+    } catch (cause) {
+      setInitErrorMessage(
+        cause instanceof ApiError
+          ? cause.message
+          : "Failed to initialize the library structure."
+      );
+    } finally {
+      setIsInitializing(false);
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-3xl space-y-8 px-4 py-2 sm:px-0">
-      <div className="flex flex-col gap-2">
-        <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
-          Preferences
-        </p>
-        <h2 className="text-3xl font-semibold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-white to-white/60 sm:text-4xl flex items-center gap-2.5">
-          <SettingsIcon className="h-7 w-7 text-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.2)]" />
-          System Libraries
-        </h2>
-        <p className="max-w-xl text-sm leading-relaxed text-white/50">
-          Set up the source folders on your local machine. Files are read in-place directly from the filesystem without copying.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 border-b border-white/[0.06] pb-6">
+        <div className="flex flex-col gap-2">
+          <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
+            Preferences
+          </p>
+          <h2 className="text-3xl font-semibold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-white to-white/60 sm:text-4xl flex items-center gap-2.5">
+            <SettingsIcon className="h-7 w-7 text-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.2)]" />
+            System Libraries
+          </h2>
+          <p className="max-w-xl text-sm leading-relaxed text-white/50">
+            Set up the source folders on your local machine. Files are read in-place directly from the filesystem without copying.
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={isInitializing}
+          onClick={handleInitializeLibrary}
+          className="md:self-end rounded-lg bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-xs font-semibold text-[#0A0B0D] px-4 py-2.5 shadow-lg hover:shadow-amber-500/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 shrink-0"
+        >
+          <FolderOpen className="h-4 w-4" />
+          {isInitializing ? "Initializing..." : "Initialize Structure"}
+        </button>
       </div>
+
+      {initErrorMessage && (
+        <div role="alert" className="flex items-center gap-2.5 rounded-lg bg-rose-500/10 px-4 py-3 text-xs text-rose-300 leading-normal animate-[rv-shake_0.4s_ease-in-out_both] border border-rose-500/20">
+          <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+          <div>
+            <span className="font-semibold block mb-0.5">Initialization Failed</span>
+            {initErrorMessage}
+          </div>
+        </div>
+      )}
+
+      {initSuccessMessage && (
+        <div role="alert" className="flex items-start gap-2.5 rounded-lg bg-emerald-500/10 px-4 py-3 text-xs text-emerald-300 leading-normal animate-[rv-success-in_0.3s_cubic-bezier(0.34,1.56,0.64,1)_both] border border-emerald-500/20">
+          <CheckCircle className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+          <div>
+            <span className="font-semibold block mb-0.5">Libraries Initialized</span>
+            <div className="whitespace-pre-line opacity-90">{initSuccessMessage}</div>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Video Library Card */}

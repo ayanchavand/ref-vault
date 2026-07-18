@@ -26,6 +26,8 @@ import type {
   DeleteVideoResponse,
   CaptureFrameRequest,
   CaptureFrameResponse,
+  InitLibraryRequest,
+  InitLibraryResponse,
 } from "@reference-vault/shared";
 
 import { validateLibraryRoot } from "../services/validate-library-root.js";
@@ -38,6 +40,7 @@ import { writeSplitPlan } from "../services/write-split-plan.js";
 import { generateThumbnail } from "../services/generate-thumbnail.js";
 import { createVideoPlaceholder, resolveUploadDirectory, deleteVideo } from "../services/import-video.js";
 import { captureFrame } from "../services/capture-frame.js";
+import { initLibraryStructure } from "../services/init-library.js";
 
 
 export async function registerLibraryRoutes(app: FastifyInstance): Promise<void> {
@@ -65,6 +68,34 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
         const statusCode =
           result.error.error === "LIBRARY_ROOT_NOT_FOUND" ? 404 : 400;
         return reply.status(statusCode).send(result.error);
+      }
+
+      return result.value;
+    },
+  );
+
+  app.post<{
+    Body: InitLibraryRequest;
+    Reply: InitLibraryResponse | ApiErrorResponse;
+  }>(
+    "/api/library/init",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["targetPath"],
+          additionalProperties: false,
+          properties: {
+            targetPath: { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await initLibraryStructure(request.body.targetPath);
+
+      if (!result.ok) {
+        return reply.status(500).send(result.error);
       }
 
       return result.value;
