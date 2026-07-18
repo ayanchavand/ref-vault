@@ -127,21 +127,24 @@ export async function captureFrame(
   const outputFilename = `frame_${timecode}_${shortUuid}.png`;
   const outputFilePath = join(generatedDir, outputFilename);
 
-  // Command: ffmpeg -y -i <videoPath> -ss <timestamp> -vframes 1 -q:v 2 <outputFilePath>
-  // Placing -ss after -i makes seek frame-accurate (slower but accurate).
+  // Optimized two-stage seeking:
+  // 1. Fast seek (-ss before -i) to 10 seconds before the target timestamp to jump instantly near the frame.
+  // 2. Slow accurate seek (-ss after -i) for the remaining 10 seconds to pinpoint the exact frame.
+  const ffmpegArgs = ["-y"];
+  if (timestamp > 10) {
+    const fastSeek = Math.floor(timestamp - 10);
+    const slowSeek = timestamp - fastSeek;
+    ffmpegArgs.push("-ss", String(fastSeek));
+    ffmpegArgs.push("-i", videoPath);
+    ffmpegArgs.push("-ss", String(slowSeek));
+  } else {
+    ffmpegArgs.push("-i", videoPath);
+    ffmpegArgs.push("-ss", String(timestamp));
+  }
+  ffmpegArgs.push("-vframes", "1", "-q:v", "2", outputFilePath);
+
   try {
-    await runFfmpeg([
-      "-y",
-      "-i",
-      videoPath,
-      "-ss",
-      String(timestamp),
-      "-vframes",
-      "1",
-      "-q:v",
-      "2",
-      outputFilePath,
-    ]);
+    await runFfmpeg(ffmpegArgs);
   } catch (err) {
     return {
       ok: false,
