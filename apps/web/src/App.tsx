@@ -227,6 +227,7 @@ export function App() {
         if (v.relativePath === updatedVideo.relativePath) {
           return {
             ...v,
+            metadata: updatedVideo.metadata,
             clipsMetadataPath: updatedVideo.clipsMetadataPath || `${updatedVideo.relativePath}/clips.json`,
             clips: updatedVideo.clips.map((c) => ({
               mediaPath: c.mediaPath,
@@ -405,6 +406,22 @@ export function App() {
               allVideos={scanResult?.videos || []}
               onBack={handleBackToLibrary}
               onUpdateVideoDetail={handleUpdateVideoDetail}
+              onDeleteVideo={async () => {
+                setIsLoading(true);
+                setSelectedVideo(null);
+                setVideoDetail(null);
+                try {
+                  const result = await scanLibrary(activeRootPath!);
+                  setScanResult(result);
+                  setVideoPage(1);
+                  navigate({ view: "BROWSE_LIBRARY" });
+                } catch (cause) {
+                  setError(cause instanceof ApiError ? cause.message : "Failed to scan library.");
+                  navigate({ view: "BROWSE_LIBRARY" });
+                } finally {
+                  setIsLoading(false);
+                }
+              }}
             />
           )}
 

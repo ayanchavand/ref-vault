@@ -22,6 +22,8 @@ import type {
   DeleteClipResponse,
   CreateVideoPlaceholderRequest,
   CreateVideoPlaceholderResponse,
+  DeleteVideoRequest,
+  DeleteVideoResponse,
 } from "@reference-vault/shared";
 
 import { validateLibraryRoot } from "../services/validate-library-root.js";
@@ -32,7 +34,7 @@ import { writeClipMetadata, deleteClip } from "../services/write-clip-metadata.j
 import { writeVideoMetadata } from "../services/write-video-metadata.js";
 import { writeSplitPlan } from "../services/write-split-plan.js";
 import { generateThumbnail } from "../services/generate-thumbnail.js";
-import { createVideoPlaceholder, resolveUploadDirectory } from "../services/import-video.js";
+import { createVideoPlaceholder, resolveUploadDirectory, deleteVideo } from "../services/import-video.js";
 
 
 export async function registerLibraryRoutes(app: FastifyInstance): Promise<void> {
@@ -756,6 +758,43 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
           message: `Failed to stream file to disk: ${(err as Error).message}`,
         });
       }
+    },
+  );
+
+  app.post<{
+    Body: DeleteVideoRequest;
+    Reply: DeleteVideoResponse | ApiErrorResponse;
+  }>(
+    "/api/videos/delete",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["rootPath", "videoRelativePath"],
+          additionalProperties: false,
+          properties: {
+            rootPath: { type: "string" },
+            videoRelativePath: { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await deleteVideo(
+        request.body.rootPath,
+        request.body.videoRelativePath,
+      );
+
+      if (!result.ok) {
+        const statusCode =
+          result.error.error === "LIBRARY_ROOT_NOT_FOUND" ||
+          result.error.error === "VIDEO_NOT_FOUND"
+            ? 404
+            : 400;
+        return reply.status(statusCode).send(result.error);
+      }
+
+      return reply.status(200).send(result.value);
     },
   );
 }

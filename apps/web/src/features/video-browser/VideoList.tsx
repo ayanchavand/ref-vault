@@ -1,6 +1,42 @@
 import { useMemo, useState, useEffect } from "react";
-import type { ScannedVideo } from "@reference-vault/shared";
+import type { ScannedVideo, JsonObject } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover, useDynamicThumbnail } from "./Uselazythumbnail";
+
+function getTagColorClass(tag: string): string {
+  const clean = tag.toLowerCase().trim();
+  
+  if (clean.includes("camera") || clean.includes("pan") || clean.includes("tilt") || clean.includes("zoom") || clean.includes("track") || clean.includes("dolly") || clean.includes("shot")) {
+    return "border-sky-500/20 bg-sky-500/5 text-sky-300";
+  }
+  if (clean.includes("light") || clean.includes("glow") || clean.includes("shadow") || clean.includes("neon") || clean.includes("contrast") || clean.includes("dark") || clean.includes("bright")) {
+    return "border-amber-500/20 bg-amber-500/5 text-amber-300";
+  }
+  if (clean.includes("cut") || clean.includes("transition") || clean.includes("edit") || clean.includes("whip") || clean.includes("fade") || clean.includes("dissolve")) {
+    return "border-emerald-500/20 bg-emerald-500/5 text-emerald-300";
+  }
+  if (clean.includes("color") || clean.includes("grade") || clean.includes("lut") || clean.includes("mood") || clean.includes("warm") || clean.includes("cool")) {
+    return "border-rose-500/20 bg-rose-500/5 text-rose-300";
+  }
+  if (clean.includes("vfx") || clean.includes("cgi") || clean.includes("smoke") || clean.includes("particle") || clean.includes("effect")) {
+    return "border-indigo-500/20 bg-indigo-500/5 text-indigo-300";
+  }
+
+  const presetStyles = [
+    "border-white/[0.08] bg-white/[0.03] text-white/70",
+    "border-purple-500/20 bg-purple-500/5 text-purple-300",
+    "border-teal-500/20 bg-teal-500/5 text-teal-300",
+    "border-orange-500/20 bg-orange-500/5 text-orange-300",
+    "border-pink-500/20 bg-pink-500/5 text-pink-300"
+  ];
+  
+  let hash = 0;
+  for (let i = 0; i < clean.length; i++) {
+    hash = clean.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % presetStyles.length;
+  return presetStyles[index]!;
+}
+
 
 interface VideoListProps {
   rootPath: string;
@@ -53,6 +89,19 @@ function VideoThumbnailCard({
   onSelect(): void;
   viewMode?: "details" | "moodboard";
 }) {
+  const artist = video.metadata?.artist ? String(video.metadata.artist) : null;
+  const rating = video.metadata?.rating ? Number(video.metadata.rating) : 0;
+  const notes = video.metadata?.notes ? String(video.metadata.notes) : null;
+  const tags = useMemo(() => {
+    if (!video.metadata) return [];
+    const t = video.metadata.tags;
+    if (typeof t === "string") return [t];
+    if (Array.isArray(t)) {
+      return t.filter((item): item is string => typeof item === "string");
+    }
+    return [];
+  }, [video.metadata]);
+
   const [isHovering, setIsHovering] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
 
@@ -134,21 +183,101 @@ function VideoThumbnailCard({
           )}
 
           {isMoodboard && (
-            <div className="absolute inset-x-0 bottom-0 p-3.5 bg-gradient-to-t from-black via-black/75 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0">
-              <p className="truncate font-semibold text-white text-sm">{video.relativePath}</p>
-              <p className="mt-0.5 truncate font-mono text-[0.65rem] text-white/40">
-                {video.mainVideoPath.split("/").pop() ?? video.mainVideoPath}
-              </p>
+            <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/95 via-black/85 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 flex flex-col gap-1.5">
+              <div>
+                <p className="truncate font-semibold text-white text-xs">{video.relativePath}</p>
+                <p className="truncate font-mono text-[0.6rem] text-white/40">
+                  {video.mainVideoPath.split("/").pop() ?? video.mainVideoPath}
+                </p>
+              </div>
+
+              {(artist || rating > 0 || tags.length > 0) && (
+                <div className="flex flex-wrap items-center gap-1.5 border-t border-white/10 pt-1.5 mt-0.5">
+                  {rating > 0 && (
+                    <div className="flex items-center gap-0.5 text-amber-400 text-[0.65rem] drop-shadow-[0_0_2px_rgba(251,191,36,0.5)]">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <span key={i} className={i < rating ? "opacity-100" : "opacity-25"}>
+                          ★
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {artist && (
+                    <span className="truncate text-[0.6rem] text-white/60">
+                      by {artist}
+                    </span>
+                  )}
+                  {tags.slice(0, 2).map((tag, i) => (
+                    <span
+                      key={i}
+                      className={`inline-flex items-center rounded px-1 py-0.2 font-mono text-[0.55rem] leading-none ${getTagColorClass(tag)}`}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                  {tags.length > 2 && (
+                    <span className="text-[0.55rem] text-white/30">+{tags.length - 2}</span>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {!isMoodboard && (
-          <div className="w-full p-4 border-t border-white/[0.02]">
+          <div className="w-full p-4 border-t border-white/[0.02] flex flex-col gap-1">
             <p className="truncate font-semibold text-white/95">{video.relativePath}</p>
-            <p className="mt-1 truncate font-mono text-xs text-white/35">
+            <p className="truncate font-mono text-xs text-white/35">
               {video.mainVideoPath.split("/").pop() ?? video.mainVideoPath}
             </p>
+
+            {/* Tags section */}
+            {tags.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {tags.slice(0, 4).map((tag, i) => (
+                  <span
+                    key={i}
+                    className={`inline-flex items-center rounded-full border px-1.5 py-0.5 font-mono text-[0.6rem] leading-none ${getTagColorClass(tag)}`}
+                  >
+                    {tag}
+                  </span>
+                ))}
+                {tags.length > 4 && (
+                  <span className="inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 font-mono text-[0.6rem] leading-none text-white/40">
+                    +{tags.length - 4}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Notes Section */}
+            {notes && (
+              <p className="mt-2 line-clamp-2 text-left text-[0.7rem] text-white/45 leading-relaxed bg-white/[0.02] p-2 rounded-lg border border-white/[0.03] italic">
+                {notes}
+              </p>
+            )}
+
+            {/* Artist & Rating inline footer */}
+            {(artist || rating > 0) && (
+              <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-white/[0.02] pt-2">
+                {artist ? (
+                  <span className="truncate text-[0.68rem] text-white/60 font-medium">
+                    by <span className="text-white/80">{artist}</span>
+                  </span>
+                ) : (
+                  <span />
+                )}
+                {rating > 0 && (
+                  <div className="flex items-center gap-0.5 text-amber-400 text-xs drop-shadow-[0_0_3px_rgba(251,191,36,0.35)]">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <span key={i} className={i < rating ? "opacity-100" : "opacity-20"}>
+                        ★
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </button>

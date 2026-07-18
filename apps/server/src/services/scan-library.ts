@@ -1,4 +1,4 @@
-import { readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { basename, join, relative, sep } from "node:path";
 
 import type {
@@ -6,6 +6,7 @@ import type {
   ScanLibraryResponse,
   ScannedClip,
   ScannedVideo,
+  JsonObject,
 } from "@reference-vault/shared";
 
 import { validateLibraryRoot } from "./validate-library-root.js";
@@ -101,10 +102,20 @@ async function describeVideo(
   }
 
   if (entries.some((entry) => entry.name === "metadata.json" && entry.isFile())) {
+    const metadataPathAbs = join(directoryPath, "metadata.json");
     video.metadataPath = relativePath(
       libraryRootPath,
-      join(directoryPath, "metadata.json"),
+      metadataPathAbs,
     );
+    try {
+      const content = await readFile(metadataPathAbs, "utf8");
+      const parsed = JSON.parse(content);
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        video.metadata = parsed as JsonObject;
+      }
+    } catch {
+      // Ignore reading/parsing error during scan
+    }
   }
 
   if (entries.some((entry) => entry.name === "thumbnail.jpg" && entry.isFile())) {

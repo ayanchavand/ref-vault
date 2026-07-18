@@ -19,6 +19,7 @@ export interface ScannedVideo {
   relativePath: string;
   mainVideoPath: string;
   metadataPath?: string;
+  metadata?: JsonObject;
   thumbnailPath?: string;
   clipsMetadataPath?: string;
   clips: ScannedClip[];
@@ -168,3 +169,13 @@ export interface CreateVideoPlaceholderResponse {
   success: boolean;
   videoRelativePath: string;
 }
+
+export interface DeleteVideoRequest {
+  rootPath: string;
+  videoRelativePath: string;
+}
+
+export interface DeleteVideoResponse {
+  success: boolean;
+}
+

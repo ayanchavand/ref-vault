@@ -1,9 +1,10 @@
-import { mkdir, stat } from "node:fs/promises";
+import { mkdir, stat, rm } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type {
   ApiErrorResponse,
   CreateVideoPlaceholderRequest,
   CreateVideoPlaceholderResponse,
+  DeleteVideoResponse,
   JsonObject,
 } from "@reference-vault/shared";
 
@@ -174,6 +175,47 @@ export async function resolveUploadDirectory(
       error: {
         error: "VIDEO_NOT_FOUND",
         message: "The target video directory does not exist.",
+      },
+    };
+  }
+}
+
+type DeleteVideoResult =
+  | { ok: true; value: DeleteVideoResponse }
+  | { ok: false; error: ApiErrorResponse };
+
+export async function deleteVideo(
+  rootPath: string,
+  videoRelativePath: string,
+): Promise<DeleteVideoResult> {
+  const rootValidation = await validateLibraryRoot(rootPath);
+
+  if (!rootValidation.ok) {
+    return rootValidation;
+  }
+
+  const libraryRootPath = rootValidation.value.rootPath;
+
+  const resolvedDir = await resolveUploadDirectory(libraryRootPath, videoRelativePath);
+
+  if (!resolvedDir.ok) {
+    return resolvedDir;
+  }
+
+  const videoDirectory = resolvedDir.value;
+
+  try {
+    await rm(videoDirectory, { recursive: true, force: true });
+    return {
+      ok: true,
+      value: { success: true },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        error: "METADATA_WRITE_FAILED",
+        message: `Failed to delete video directory: ${(error as Error).message}`,
       },
     };
   }

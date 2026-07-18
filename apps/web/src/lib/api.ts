@@ -15,6 +15,8 @@ import type {
   DeleteClipResponse,
   CreateVideoPlaceholderRequest,
   CreateVideoPlaceholderResponse,
+  DeleteVideoRequest,
+  DeleteVideoResponse,
 } from "@reference-vault/shared";
 
 export class ApiError extends Error {
@@ -233,4 +235,23 @@ export function uploadVideo(
     xhr.send(file);
   });
 }
+
+export async function deleteVideo(
+  request: DeleteVideoRequest,
+): Promise<DeleteVideoResponse> {
+  const response = await fetch("/api/videos/delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const payload: unknown = await response.json();
+
+  if (!response.ok) {
+    const error = payload as ApiErrorResponse;
+    throw new ApiError(error.message || "The video directory could not be deleted.");
+  }
+
+  return payload as DeleteVideoResponse;
+}
+
 

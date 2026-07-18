@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { VideoDetail as VideoDetailType, JsonObject, ScannedVideo } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover } from "./Uselazythumbnail";
-import { putClipMetadata, putVideoMetadata, saveSplitPlan, getVideoDetail, deleteClip, ApiError } from "../../lib/api";
+import { putClipMetadata, putVideoMetadata, saveSplitPlan, getVideoDetail, deleteClip, deleteVideo, ApiError } from "../../lib/api";
 
 
 interface VideoDetailProps {
@@ -10,6 +10,7 @@ interface VideoDetailProps {
   allVideos: ScannedVideo[];
   onBack(): void;
   onUpdateVideoDetail(updatedVideo: VideoDetailType): void;
+  onDeleteVideo(): void;
 }
 
 
@@ -590,6 +591,7 @@ interface VideoMetadataEditorProps {
   video: VideoDetailType;
   globalTags: string[];
   onSaveSuccess(updatedVideo: VideoDetailType): void;
+  onDeleteSuccess(): void;
 }
 
 function VideoMetadataEditor({
@@ -597,6 +599,7 @@ function VideoMetadataEditor({
   video,
   globalTags,
   onSaveSuccess,
+  onDeleteSuccess,
 }: VideoMetadataEditorProps) {
   const [tagsInput, setTagsInput] = useState("");
   const [artistInput, setArtistInput] = useState("");
@@ -605,6 +608,24 @@ function VideoMetadataEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+
+  async function handleDeleteVideo() {
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await deleteVideo({
+        rootPath,
+        videoRelativePath: video.relativePath,
+      });
+      onDeleteSuccess();
+    } catch (err) {
+      setSaveError(err instanceof ApiError ? err.message : "Failed to delete video.");
+      setIsConfirmingDelete(false);
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   const allLibraryTags = useMemo(() => {
     const set = new Set<string>();
@@ -882,18 +903,53 @@ function VideoMetadataEditor({
           </button>
         </div>
 
-        {saveSuccess && (
-          <span className="flex items-center gap-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-emerald-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
-            Changes saved successfully!
-          </span>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {saveSuccess && (
+            <span className="flex items-center gap-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-emerald-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+              Changes saved successfully!
+            </span>
+          )}
 
-        {saveError && (
-          <span className="font-mono text-[0.65rem] uppercase tracking-wider text-rose-400">
-            Error: {saveError}
-          </span>
-        )}
+          {saveError && (
+            <span className="font-mono text-[0.65rem] uppercase tracking-wider text-rose-400">
+              Error: {saveError}
+            </span>
+          )}
+
+          {!isConfirmingDelete ? (
+            <button
+              type="button"
+              onClick={() => setIsConfirmingDelete(true)}
+              disabled={isSaving}
+              className="rounded-lg border border-rose-500/30 bg-rose-500/[0.06] px-4 py-2 text-sm font-medium text-rose-300 transition hover:bg-rose-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Delete Video
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/[0.03] p-1.5">
+              <span className="font-mono text-[0.65rem] uppercase tracking-wider text-rose-400 px-1">
+                Confirm delete?
+              </span>
+              <button
+                type="button"
+                onClick={handleDeleteVideo}
+                disabled={isSaving}
+                className="rounded bg-rose-500 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-rose-600 focus-visible:outline-none"
+              >
+                Yes, Delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsConfirmingDelete(false)}
+                disabled={isSaving}
+                className="rounded border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-xs font-medium text-white/80 hover:bg-white/[0.06]"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </form>
   );
@@ -1260,7 +1316,7 @@ function SegmentEditor({
   );
 }
 
-export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoDetail }: VideoDetailProps) {
+export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoDetail, onDeleteVideo }: VideoDetailProps) {
 
   const [selectedMediaPath, setSelectedMediaPath] = useState(video.mainVideoPath);
   const [isEditingSegments, setIsEditingSegments] = useState(false);
@@ -1583,6 +1639,7 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
                   video={video}
                   globalTags={globalTags}
                   onSaveSuccess={onUpdateVideoDetail}
+                  onDeleteSuccess={onDeleteVideo}
                 />
               </div>
             )
