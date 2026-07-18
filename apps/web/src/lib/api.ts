@@ -3,6 +3,7 @@ import type {
   GetVideoDetailRequest,
   GetVideoDetailResponse,
   ScanLibraryResponse,
+  ScanMediaResponse,
   ValidateLibraryRootResponse,
   PutClipMetadataRequest,
   PutClipMetadataResponse,
@@ -125,3 +126,18 @@ export async function saveSplitPlan(
   return payload as SaveSplitPlanResponse;
 }
 
+export async function scanMedia(rootPath: string): Promise<ScanMediaResponse> {
+  const response = await fetch("/api/media/scan", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ rootPath }),
+  });
+  const payload: unknown = await response.json();
+
+  if (!response.ok) {
+    const error = payload as ApiErrorResponse;
+    throw new ApiError(error.message || "The media folder could not be scanned.");
+  }
+
+  return payload as ScanMediaResponse;
+}

@@ -10,6 +10,7 @@ import { LibraryRootForm } from "./features/library-root/LibraryRootForm";
 import { TagBrowser } from "./features/tag-browser/TagBrowser";
 import { VideoList } from "./features/video-browser/VideoList";
 import { VideoDetail } from "./features/video-browser/VideoDetail";
+import { MediaBrowser } from "./features/media-browser/MediaBrowser";
 import { scanLibrary, getVideoDetail, ApiError } from "./lib/api";
 
 const libraryRootStorageKey = "reference-vault.library-root";
@@ -17,7 +18,7 @@ const libraryRootStorageKey = "reference-vault.library-root";
 // How many videos to show per page in the browse view.
 const VIDEOS_PER_PAGE = 6;
 
-type AppView = "SELECT_LIBRARY" | "BROWSE_LIBRARY" | "BROWSE_TAGS" | "VIEW_VIDEO";
+type AppView = "SELECT_LIBRARY" | "BROWSE_LIBRARY" | "BROWSE_TAGS" | "VIEW_VIDEO" | "BROWSE_MEDIA";
 
 function loadSavedLibraryRoot(): string {
   return window.localStorage.getItem(libraryRootStorageKey) ?? "";
@@ -196,6 +197,18 @@ export function App() {
     setCurrentView("BROWSE_TAGS");
   }
 
+  function handleBrowseMedia(): void {
+    setCurrentView("BROWSE_MEDIA");
+  }
+
+  function handleBackFromMedia(): void {
+    if (scanResult) {
+      setCurrentView("BROWSE_LIBRARY");
+    } else {
+      setCurrentView("SELECT_LIBRARY");
+    }
+  }
+
   function handleBackToLibrary(): void {
     setSelectedVideo(null);
     setVideoDetail(null);
@@ -266,7 +279,7 @@ export function App() {
         </div>
       )}
 
-      <div className="flex min-h-screen w-full flex-col px-4 py-6 sm:px-10 sm:py-8">
+      <div className="flex h-screen w-full flex-col px-4 py-6 sm:px-10 sm:py-8">
         <header className="flex items-center justify-between border-b border-white/[0.06] pb-4 sm:pb-6">
           <div className="flex items-center gap-3">
             <span
@@ -283,12 +296,21 @@ export function App() {
               </h1>
             </div>
           </div>
-          <span className="hidden rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest text-white/40 sm:inline-block">
-            Filesystem source of truth
-          </span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleBrowseMedia}
+              className="rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest text-white/50 transition hover:bg-white/[0.06] hover:text-white/80"
+            >
+              Media
+            </button>
+            <span className="hidden rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest text-white/40 sm:inline-block">
+              Filesystem source of truth
+            </span>
+          </div>
         </header>
 
-        <section className="flex flex-col flex-1 py-6 sm:py-12">
+        <section className="flex flex-col flex-1 min-h-0 overflow-y-auto py-6 sm:py-12">
           {currentView === "SELECT_LIBRARY" && (
             <div className="flex flex-1 items-center">
               <div className="grid w-full gap-6 lg:gap-10 lg:grid-cols-[1fr_0.85fr] lg:items-center">
@@ -356,6 +378,10 @@ export function App() {
               onBack={handleBackToLibrary}
               onUpdateVideoDetail={handleUpdateVideoDetail}
             />
+          )}
+
+          {currentView === "BROWSE_MEDIA" && (
+            <MediaBrowser onBack={handleBackFromMedia} />
           )}
         </section>
       </div>

@@ -98,6 +98,30 @@ export interface SaveSplitPlanResponse {
   success: boolean;
 }
 
+// ─── Media (Tinder-style) browser types ──────────────────────────────────────
+
+export interface ScanMediaRequest {
+  rootPath: string;
+}
+
+export type ScannedMediaType = "image" | "gif" | "video";
+
+export interface ScannedMediaItem {
+  /** Path relative to the scanned rootPath */
+  relativePath: string;
+  /** Inferred media type */
+  type: ScannedMediaType;
+  /** Byte size of the file */
+  sizeBytes: number;
+}
+
+export interface ScanMediaResponse {
+  rootPath: string;
+  items: ScannedMediaItem[];
+}
+
+// ─── Error codes ──────────────────────────────────────────────────────────────
+
 export type LibraryRootValidationErrorCode =
   | "INVALID_LIBRARY_ROOT"
   | "LIBRARY_ROOT_NOT_FOUND"
@@ -112,7 +136,8 @@ export type LibraryRootValidationErrorCode =
   | "MEDIA_NOT_FOUND"
   | "METADATA_WRITE_FAILED"
   | "INVALID_MEDIA_TYPE"
-  | "THUMBNAIL_GENERATION_FAILED";
+  | "THUMBNAIL_GENERATION_FAILED"
+  | "MEDIA_SCAN_FAILED";
 
 export interface ApiErrorResponse {
   error: LibraryRootValidationErrorCode;

@@ -21,6 +21,7 @@ import type {
 
 import { validateLibraryRoot } from "../services/validate-library-root.js";
 import { scanLibrary } from "../services/scan-library.js";
+import { scanMedia } from "../services/scan-media.js";
 import { readVideoDetail } from "../services/read-video-detail.js";
 import { writeClipMetadata } from "../services/write-clip-metadata.js";
 import { writeVideoMetadata } from "../services/write-video-metadata.js";
@@ -77,6 +78,39 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
     },
     async (request, reply) => {
       const result = await scanLibrary(request.body.rootPath);
+
+      if (!result.ok) {
+        const statusCode =
+          result.error.error === "LIBRARY_ROOT_NOT_FOUND" ? 404 : 400;
+        return reply.status(statusCode).send(result.error);
+      }
+
+      return result.value;
+    },
+  );
+
+  // ── Media (Tinder-style browser) scan ──────────────────────────────────────
+  app.post<{
+    Body: import("@reference-vault/shared").ScanMediaRequest;
+    Reply:
+      | import("@reference-vault/shared").ScanMediaResponse
+      | ApiErrorResponse;
+  }>(
+    "/api/media/scan",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["rootPath"],
+          additionalProperties: false,
+          properties: {
+            rootPath: { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await scanMedia(request.body.rootPath);
 
       if (!result.ok) {
         const statusCode =
@@ -305,7 +339,17 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
       };
     }
 
-    if (!filePath.endsWith(".mp4") && !filePath.endsWith(".jpg") && !filePath.endsWith(".jpeg")) {
+    if (
+      !filePath.endsWith(".mp4") &&
+      !filePath.endsWith(".webm") &&
+      !filePath.endsWith(".mov") &&
+      !filePath.endsWith(".jpg") &&
+      !filePath.endsWith(".jpeg") &&
+      !filePath.endsWith(".png") &&
+      !filePath.endsWith(".webp") &&
+      !filePath.endsWith(".avif") &&
+      !filePath.endsWith(".gif")
+    ) {
       return {
         ok: false,
         error: {
@@ -347,9 +391,21 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
     switch (extension) {
       case ".mp4":
         return "video/mp4";
+      case ".webm":
+        return "video/webm";
+      case ".mov":
+        return "video/quicktime";
       case ".jpg":
       case ".jpeg":
         return "image/jpeg";
+      case ".png":
+        return "image/png";
+      case ".webp":
+        return "image/webp";
+      case ".avif":
+        return "image/avif";
+      case ".gif":
+        return "image/gif";
       default:
         return "application/octet-stream";
     }
