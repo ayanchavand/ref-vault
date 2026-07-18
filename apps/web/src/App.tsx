@@ -12,13 +12,12 @@ import { VideoList } from "./features/video-browser/VideoList";
 import { VideoDetail } from "./features/video-browser/VideoDetail";
 import { MediaBrowser } from "./features/media-browser/MediaBrowser";
 import { scanLibrary, getVideoDetail, ApiError } from "./lib/api";
+import { useHashRouter, navigate } from "./lib/router";
 
 const libraryRootStorageKey = "reference-vault.library-root";
 
 // How many videos to show per page in the browse view.
 const VIDEOS_PER_PAGE = 6;
-
-type AppView = "SELECT_LIBRARY" | "BROWSE_LIBRARY" | "BROWSE_TAGS" | "VIEW_VIDEO" | "BROWSE_MEDIA";
 
 function loadSavedLibraryRoot(): string {
   return window.localStorage.getItem(libraryRootStorageKey) ?? "";
@@ -89,8 +88,8 @@ function VideoListPagination({
 
 export function App() {
   const [savedRootPath, setSavedRootPath] = useState(loadSavedLibraryRoot);
-  const [currentView, setCurrentView] = useState<AppView>("SELECT_LIBRARY");
   const [activeRootPath, setActiveRootPath] = useState<string | null>(null);
+  const activeRoute = useHashRouter(activeRootPath !== null);
   const [scanResult, setScanResult] = useState<ScanLibraryResponse | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<ScannedVideo | null>(null);
   const [videoDetail, setVideoDetail] = useState<VideoDetailType | null>(null);
@@ -114,7 +113,6 @@ export function App() {
         .then((result) => {
           setScanResult(result);
           setVideoPage(1);
-          setCurrentView("BROWSE_LIBRARY");
         })
         .catch((cause) => {
           const message =
@@ -129,6 +127,38 @@ export function App() {
     }
   }, []);
 
+  // Fetch video details when activeRoute is VIEW_VIDEO
+  useEffect(() => {
+    if (activeRoute.view === "VIEW_VIDEO" && activeRootPath) {
+      const path = activeRoute.path;
+      if (!videoDetail || videoDetail.relativePath !== path) {
+        setVideoDetail(null);
+        setError(null);
+        setOpeningVideoPath(path);
+
+        getVideoDetail({
+          rootPath: activeRootPath,
+          videoRelativePath: path,
+        })
+          .then((result) => {
+            setVideoDetail(result.video);
+          })
+          .catch((cause) => {
+            const message =
+              cause instanceof ApiError
+                ? cause.message
+                : "The video details could not be loaded.";
+            setError(message);
+            // Fallback back to library browser on error
+            navigate({ view: "BROWSE_LIBRARY" });
+          })
+          .finally(() => {
+            setOpeningVideoPath(null);
+          });
+      }
+    }
+  }, [activeRoute, activeRootPath, videoDetail]);
+
   async function handleValidatedRoot(rootPath: string): Promise<void> {
     window.localStorage.setItem(libraryRootStorageKey, rootPath);
     setSavedRootPath(rootPath);
@@ -140,7 +170,7 @@ export function App() {
       const result = await scanLibrary(rootPath);
       setScanResult(result);
       setVideoPage(1);
-      setCurrentView("BROWSE_LIBRARY");
+      navigate({ view: "BROWSE_LIBRARY" });
     } catch (cause) {
       const message =
         cause instanceof ApiError
@@ -156,63 +186,36 @@ export function App() {
     window.localStorage.removeItem(libraryRootStorageKey);
     setSavedRootPath("");
     setActiveRootPath(null);
-    setCurrentView("SELECT_LIBRARY");
     setScanResult(null);
     setSelectedVideo(null);
+    setVideoDetail(null);
     setVideoPage(1);
+    navigate({ view: "BROWSE_LIBRARY" });
   }
 
-  async function handleSelectVideo(video: ScannedVideo): Promise<void> {
+  function handleSelectVideo(video: ScannedVideo): void {
     setSelectedVideo(video);
-    setVideoDetail(null);
-    setError(null);
-    setOpeningVideoPath(video.relativePath);
-
-    try {
-      if (!activeRootPath) {
-        throw new Error("No active library root selected.");
-      }
-
-      const result = await getVideoDetail({
-        rootPath: activeRootPath,
-        videoRelativePath: video.relativePath,
-      });
-
-      setVideoDetail(result.video);
-      setCurrentView("VIEW_VIDEO");
-    } catch (cause) {
-      const message =
-        cause instanceof ApiError
-          ? cause.message
-          : "The video details could not be loaded.";
-      setError(message);
-    } finally {
-      setOpeningVideoPath(null);
-    }
+    navigate({ view: "VIEW_VIDEO", path: video.relativePath });
   }
 
   function handleBrowseTags(): void {
     setSelectedVideo(null);
     setVideoDetail(null);
-    setCurrentView("BROWSE_TAGS");
+    navigate({ view: "BROWSE_TAGS" });
   }
 
   function handleBrowseMedia(): void {
-    setCurrentView("BROWSE_MEDIA");
+    navigate({ view: "BROWSE_MEDIA" });
   }
 
   function handleBackFromMedia(): void {
-    if (scanResult) {
-      setCurrentView("BROWSE_LIBRARY");
-    } else {
-      setCurrentView("SELECT_LIBRARY");
-    }
+    navigate({ view: "BROWSE_LIBRARY" });
   }
 
   function handleBackToLibrary(): void {
     setSelectedVideo(null);
     setVideoDetail(null);
-    setCurrentView("BROWSE_LIBRARY");
+    navigate({ view: "BROWSE_LIBRARY" });
   }
 
   function handleUpdateVideoDetail(updatedVideo: VideoDetailType): void {
@@ -311,7 +314,7 @@ export function App() {
         </header>
 
         <section className="flex flex-col flex-1 min-h-0 overflow-y-auto py-6 sm:py-12">
-          {currentView === "SELECT_LIBRARY" && (
+          {activeRoute.view === "SELECT_LIBRARY" && (
             <div className="flex flex-1 items-center">
               <div className="grid w-full gap-6 lg:gap-10 lg:grid-cols-[1fr_0.85fr] lg:items-center">
                 <div>
@@ -340,7 +343,7 @@ export function App() {
             </div>
           )}
 
-          {currentView === "BROWSE_LIBRARY" && scanResult && (
+          {activeRoute.view === "BROWSE_LIBRARY" && scanResult && (
             <>
               <VideoList
                 rootPath={activeRootPath!}
@@ -361,7 +364,7 @@ export function App() {
             </>
           )}
 
-          {currentView === "BROWSE_TAGS" && scanResult && (
+          {activeRoute.view === "BROWSE_TAGS" && scanResult && (
             <TagBrowser
               rootPath={activeRootPath!}
               videos={scanResult.videos}
@@ -370,7 +373,7 @@ export function App() {
             />
           )}
 
-          {currentView === "VIEW_VIDEO" && videoDetail && (
+          {activeRoute.view === "VIEW_VIDEO" && videoDetail && (
             <VideoDetail
               rootPath={activeRootPath!}
               video={videoDetail}
@@ -380,7 +383,7 @@ export function App() {
             />
           )}
 
-          {currentView === "BROWSE_MEDIA" && (
+          {activeRoute.view === "BROWSE_MEDIA" && (
             <MediaBrowser onBack={handleBackFromMedia} />
           )}
         </section>
