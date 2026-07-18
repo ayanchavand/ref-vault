@@ -10,6 +10,21 @@ def format_time(seconds):
     ms = int(round((seconds % 1) * 1000))
     return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
 
+def get_next_clip_index(output_dir: Path) -> int:
+    if not output_dir.exists():
+        return 1
+    import re
+    max_index = 0
+    pattern = re.compile(r'^scene_(\d+)\.mp4$', re.IGNORECASE)
+    for file in output_dir.iterdir():
+        if file.is_file():
+            match = pattern.match(file.name)
+            if match:
+                idx = int(match.group(1))
+                if idx > max_index:
+                    max_index = idx
+    return max_index + 1
+
 def process_split_plan(plan_file: Path):
     print(f"\n========================================")
     print(f"Processing split plan: {plan_file.name}")
@@ -41,14 +56,17 @@ def process_split_plan(plan_file: Path):
 
     clips_metadata = {}
 
-    for i, seg in enumerate(segments, start=1):
+    start_num = get_next_clip_index(output_dir)
+
+    for idx, seg in enumerate(segments):
         start_seconds = seg.get("start", 0)
         end_seconds = seg.get("end", 0)
         tags = seg.get("tags", [])
         notes = seg.get("notes", "")
         rating = seg.get("rating", 0)
 
-        clip_name = f"scene_{i:02d}"
+        clip_index = start_num + idx
+        clip_name = f"scene_{clip_index:02d}"
         output_file = output_dir / f"{clip_name}.mp4"
 
         start_tc = format_time(start_seconds)
@@ -71,7 +89,7 @@ def process_split_plan(plan_file: Path):
             # Run silently or capture output
             subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
         except subprocess.CalledProcessError as e:
-            print(f"  ffmpeg failed for segment {i}: {e}")
+            print(f"  ffmpeg failed for segment {idx + 1}: {e}")
             continue
 
         # Prepare metadata

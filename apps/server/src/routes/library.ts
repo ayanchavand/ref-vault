@@ -17,13 +17,15 @@ import type {
   ScanLibraryResponse,
   ValidateLibraryRootRequest,
   ValidateLibraryRootResponse,
+  DeleteClipRequest,
+  DeleteClipResponse,
 } from "@reference-vault/shared";
 
 import { validateLibraryRoot } from "../services/validate-library-root.js";
 import { scanLibrary } from "../services/scan-library.js";
 import { scanMedia } from "../services/scan-media.js";
 import { readVideoDetail } from "../services/read-video-detail.js";
-import { writeClipMetadata } from "../services/write-clip-metadata.js";
+import { writeClipMetadata, deleteClip } from "../services/write-clip-metadata.js";
 import { writeVideoMetadata } from "../services/write-video-metadata.js";
 import { writeSplitPlan } from "../services/write-split-plan.js";
 import { generateThumbnail } from "../services/generate-thumbnail.js";
@@ -549,6 +551,48 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
         const statusCode =
           result.error.error === "LIBRARY_ROOT_NOT_FOUND" ||
           result.error.error === "VIDEO_NOT_FOUND"
+            ? 404
+            : result.error.error === "METADATA_WRITE_FAILED"
+              ? 500
+              : 400;
+        return reply.status(statusCode).send(result.error);
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  );
+
+  app.post<{
+    Body: DeleteClipRequest;
+    Reply: DeleteClipResponse | ApiErrorResponse;
+  }>(
+    "/api/clips/delete",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["rootPath", "videoRelativePath", "clipMediaPath"],
+          additionalProperties: false,
+          properties: {
+            rootPath: { type: "string" },
+            videoRelativePath: { type: "string" },
+            clipMediaPath: { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await deleteClip(
+        request.body.rootPath,
+        request.body.videoRelativePath,
+        request.body.clipMediaPath,
+      );
+
+      if (!result.ok) {
+        const statusCode =
+          result.error.error === "LIBRARY_ROOT_NOT_FOUND" ||
+          result.error.error === "VIDEO_NOT_FOUND" ||
+          result.error.error === "CLIP_NOT_FOUND"
             ? 404
             : result.error.error === "METADATA_WRITE_FAILED"
               ? 500

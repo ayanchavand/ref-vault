@@ -11,6 +11,8 @@ import type {
   PutVideoMetadataResponse,
   SaveSplitPlanRequest,
   SaveSplitPlanResponse,
+  DeleteClipRequest,
+  DeleteClipResponse,
 } from "@reference-vault/shared";
 
 export class ApiError extends Error {
@@ -140,4 +142,22 @@ export async function scanMedia(rootPath: string): Promise<ScanMediaResponse> {
   }
 
   return payload as ScanMediaResponse;
+}
+
+export async function deleteClip(
+  request: DeleteClipRequest,
+): Promise<DeleteClipResponse> {
+  const response = await fetch("/api/clips/delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const payload: unknown = await response.json();
+
+  if (!response.ok) {
+    const error = payload as ApiErrorResponse;
+    throw new ApiError(error.message || "The clip could not be deleted.");
+  }
+
+  return payload as DeleteClipResponse;
 }

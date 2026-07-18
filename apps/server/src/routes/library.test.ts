@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -395,4 +395,104 @@ test("serves existing thumbnail via /api/media/thumbnail with Cache-Control and 
     await rm(library, { force: true, recursive: true });
   }
 });
+
+test("increments clip names based on existing clips in the clips directory", async () => {
+  const library = await mkdtemp(join(tmpdir(), "reference-vault-"));
+  const videoDirectory = join(library, "video-a");
+  const clipsDirectory = join(videoDirectory, "clips");
+  await mkdir(clipsDirectory, { recursive: true });
+  await writeFile(join(videoDirectory, "main.mp4"), "");
+
+  // Pre-create scene_01.mp4 and scene_02.mp4
+  await writeFile(join(clipsDirectory, "scene_01.mp4"), "");
+  await writeFile(join(clipsDirectory, "scene_02.mp4"), "");
+
+  const app = await buildApp();
+  const segments = [
+    { start: 0, end: 10, tags: ["new-first"] },
+    { start: 10, end: 20, tags: ["new-second"] },
+  ];
+
+  try {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/videos/split-plan",
+      payload: {
+        rootPath: library,
+        videoRelativePath: "video-a",
+        segments,
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    // Verify clips.json has scene_03 and scene_04 (incremented)
+    const clipsJson = JSON.parse(await readFile(join(videoDirectory, "clips.json"), "utf8"));
+    assert.ok(clipsJson["scene_03"], "Should have created scene_03");
+    assert.ok(clipsJson["scene_04"], "Should have created scene_04");
+    assert.ok(!clipsJson["scene_01"], "Should not have overwritten scene_01 metadata");
+  } finally {
+    await app.close();
+    await rm(library, { force: true, recursive: true });
+  }
+});
+
+test("deletes a clip and resequences remaining clips on disk and in clips.json metadata", async () => {
+  const library = await mkdtemp(join(tmpdir(), "reference-vault-"));
+  const videoDirectory = join(library, "video-a");
+  const clipsDirectory = join(videoDirectory, "clips");
+  await mkdir(clipsDirectory, { recursive: true });
+  await writeFile(join(videoDirectory, "main.mp4"), "");
+
+  // Pre-create clip files with distinct content
+  await writeFile(join(clipsDirectory, "scene_01.mp4"), "one");
+  await writeFile(join(clipsDirectory, "scene_02.mp4"), "two");
+  await writeFile(join(clipsDirectory, "scene_03.mp4"), "three");
+
+  // Write clips metadata
+  const initialMetadata = {
+    "scene_01": { tags: ["first"], notes: "Clip one notes" },
+    "scene_02": { tags: ["second"], notes: "Clip two notes" },
+    "scene_03": { tags: ["third"], notes: "Clip three notes" },
+  };
+  await writeFile(join(videoDirectory, "clips.json"), JSON.stringify(initialMetadata, null, 2));
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/clips/delete",
+      payload: {
+        rootPath: library,
+        videoRelativePath: "video-a",
+        clipMediaPath: "video-a/clips/scene_02.mp4",
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), { success: true });
+
+    // Verify files on disk
+    const content1 = await readFile(join(clipsDirectory, "scene_01.mp4"), "utf8");
+    assert.equal(content1, "one");
+
+    const content2 = await readFile(join(clipsDirectory, "scene_02.mp4"), "utf8");
+    assert.equal(content2, "three"); // scene_03 should be renamed to scene_02
+
+    await assert.rejects(stat(join(clipsDirectory, "scene_03.mp4")), { code: "ENOENT" });
+
+    // Verify clips.json metadata keys and values
+    const clipsJson = JSON.parse(await readFile(join(videoDirectory, "clips.json"), "utf8"));
+    assert.deepEqual(clipsJson, {
+      "scene_01": { tags: ["first"], notes: "Clip one notes" },
+      "scene_02": { tags: ["third"], notes: "Clip three notes" },
+    });
+  } finally {
+    await app.close();
+    await rm(library, { force: true, recursive: true });
+  }
+});
+
+
 

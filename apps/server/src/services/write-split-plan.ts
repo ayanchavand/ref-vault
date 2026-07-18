@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdir, readFile, stat } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   ApiErrorResponse,
@@ -33,6 +33,25 @@ function runFfmpeg(args: string[]): Promise<void> {
       reject(err);
     });
   });
+}
+
+async function getNextClipIndex(clipsDir: string): Promise<number> {
+  try {
+    const files = await readdir(clipsDir);
+    let maxIndex = 0;
+    for (const file of files) {
+      const match = file.match(/^scene_(\d+)\.mp4$/i);
+      if (match) {
+        const index = parseInt(match[1]!, 10);
+        if (index > maxIndex) {
+          maxIndex = index;
+        }
+      }
+    }
+    return maxIndex + 1;
+  } catch {
+    return 1;
+  }
 }
 
 export async function writeSplitPlan(
@@ -89,10 +108,12 @@ export async function writeSplitPlan(
 
   const clipsMetadata: JsonObject = {};
   const mainVideoPath = join(videoDirectory.value, "main.mp4");
+  const startNum = await getNextClipIndex(outputDir);
 
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i]!;
-    const clipName = `scene_${String(i + 1).padStart(2, "0")}`;
+    const clipIndex = startNum + i;
+    const clipName = `scene_${String(clipIndex).padStart(2, "0")}`;
     const outputFilePath = join(outputDir, `${clipName}.mp4`);
 
     const ffmpegArgs = [

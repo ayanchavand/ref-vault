@@ -1,17 +1,22 @@
 import { randomUUID } from "node:crypto";
-import { readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
+import { readFile, realpath, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import type {
   ApiErrorResponse,
   JsonObject,
   PutClipMetadataResponse,
+  DeleteClipResponse,
 } from "@reference-vault/shared";
 
 import { validateLibraryRoot } from "./validate-library-root.js";
 
 type WriteClipMetadataResult =
   | { ok: true; value: PutClipMetadataResponse }
+  | { ok: false; error: ApiErrorResponse };
+
+export type DeleteClipResult =
+  | { ok: true; value: DeleteClipResponse }
   | { ok: false; error: ApiErrorResponse };
 
 export async function writeClipMetadata(
@@ -241,4 +246,181 @@ function isContainedPath(parentPath: string, targetPath: string): boolean {
 
 export function toLibraryRelativePath(libraryRootPath: string, targetPath: string): string {
   return relative(libraryRootPath, targetPath).split(sep).join("/");
+}
+
+export async function deleteClip(
+  rootPath: string,
+  videoRelativePath: string,
+  clipMediaPath: string,
+): Promise<DeleteClipResult> {
+  const rootValidation = await validateLibraryRoot(rootPath);
+
+  if (!rootValidation.ok) {
+    return rootValidation;
+  }
+
+  const videoDirectory = await resolveVideoDirectory(
+    rootValidation.value.rootPath,
+    videoRelativePath,
+  );
+
+  if (!videoDirectory.ok) {
+    return videoDirectory;
+  }
+
+  const clipPath = await resolveClipPath(
+    rootValidation.value.rootPath,
+    videoDirectory.value,
+    clipMediaPath,
+  );
+
+  if (!clipPath.ok) {
+    return clipPath;
+  }
+
+  const resolvedClipPath = clipPath.value;
+  const clipFileName = basename(resolvedClipPath);
+  const match = clipFileName.match(/^scene_(\d+)\.mp4$/i);
+
+  // If the clip to delete does not match the scene_XX format, we just delete the file and its metadata without resequencing
+  if (!match) {
+    try {
+      await rm(resolvedClipPath, { force: true });
+    } catch (err) {
+      return {
+        ok: false,
+        error: {
+          error: "METADATA_WRITE_FAILED",
+          message: `Failed to delete clip file: ${(err as Error).message}`,
+        },
+      };
+    }
+
+    const clipsMetadataPath = join(videoDirectory.value, "clips.json");
+    let clipsMetadata: JsonObject = {};
+    try {
+      const existingContents = await readFile(clipsMetadataPath, "utf8");
+      const parsed = JSON.parse(existingContents);
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        clipsMetadata = parsed;
+      }
+    } catch {
+      // Ignore if file doesn't exist
+    }
+
+    const clipKey = basename(resolvedClipPath, ".mp4");
+    delete clipsMetadata[clipKey];
+
+    try {
+      await writeJsonAtomically(clipsMetadataPath, clipsMetadata);
+    } catch {
+      // Ignore write errors
+    }
+
+    return {
+      ok: true,
+      value: {
+        success: true,
+      },
+    };
+  }
+
+  // Resequence scene clips
+  const deletedIndex = parseInt(match[1]!, 10);
+  const clipsDir = dirname(resolvedClipPath);
+
+  try {
+    await rm(resolvedClipPath, { force: true });
+  } catch (err) {
+    return {
+      ok: false,
+      error: {
+        error: "METADATA_WRITE_FAILED",
+        message: `Failed to delete clip file: ${(err as Error).message}`,
+      },
+    };
+  }
+
+  let files: string[] = [];
+  try {
+    files = await readdir(clipsDir);
+  } catch {
+    // Ignore error
+  }
+
+  const remainingSceneIndices: number[] = [];
+  for (const file of files) {
+    const fileMatch = file.match(/^scene_(\d+)\.mp4$/i);
+    if (fileMatch) {
+      const idx = parseInt(fileMatch[1]!, 10);
+      if (idx > deletedIndex) {
+        remainingSceneIndices.push(idx);
+      }
+    }
+  }
+
+  remainingSceneIndices.sort((a, b) => a - b);
+
+  for (const idx of remainingSceneIndices) {
+    const oldName = `scene_${String(idx).padStart(2, "0")}.mp4`;
+    const newName = `scene_${String(idx - 1).padStart(2, "0")}.mp4`;
+    try {
+      await rename(join(clipsDir, oldName), join(clipsDir, newName));
+    } catch (err) {
+      // Ignore errors
+    }
+  }
+
+  const clipsMetadataPath = join(videoDirectory.value, "clips.json");
+  let clipsMetadata: JsonObject = {};
+  let hasMetadataFile = false;
+  try {
+    const existingContents = await readFile(clipsMetadataPath, "utf8");
+    const parsed = JSON.parse(existingContents);
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      clipsMetadata = parsed;
+      hasMetadataFile = true;
+    }
+  } catch {
+    // Ignore
+  }
+
+  if (hasMetadataFile) {
+    const updatedMetadata: JsonObject = {};
+    for (const key of Object.keys(clipsMetadata)) {
+      const keyMatch = key.match(/^scene_(\d+)$/i);
+      if (keyMatch) {
+        const idx = parseInt(keyMatch[1]!, 10);
+        if (idx === deletedIndex) {
+          continue;
+        } else if (idx > deletedIndex) {
+          const newKey = `scene_${String(idx - 1).padStart(2, "0")}`;
+          updatedMetadata[newKey] = clipsMetadata[key]!;
+        } else {
+          updatedMetadata[key] = clipsMetadata[key]!;
+        }
+      } else {
+        updatedMetadata[key] = clipsMetadata[key]!;
+      }
+    }
+
+    try {
+      await writeJsonAtomically(clipsMetadataPath, updatedMetadata);
+    } catch (err) {
+      return {
+        ok: false,
+        error: {
+          error: "METADATA_WRITE_FAILED",
+          message: `Failed to save updated clips.json: ${(err as Error).message}`,
+        },
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    value: {
+      success: true,
+    },
+  };
 }

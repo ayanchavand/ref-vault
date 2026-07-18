@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { VideoDetail as VideoDetailType, JsonObject, ScannedVideo } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover } from "./Uselazythumbnail";
-import { putClipMetadata, putVideoMetadata, saveSplitPlan, getVideoDetail, ApiError } from "../../lib/api";
+import { putClipMetadata, putVideoMetadata, saveSplitPlan, getVideoDetail, deleteClip, ApiError } from "../../lib/api";
 
 
 interface VideoDetailProps {
@@ -250,6 +250,7 @@ interface ClipMetadataEditorProps {
   video: VideoDetailType;
   globalTags: string[];
   onSaveSuccess(updatedVideo: VideoDetailType): void;
+  onDeleteSuccess(updatedVideo: VideoDetailType): void;
 }
 
 function ClipMetadataEditor({
@@ -259,6 +260,7 @@ function ClipMetadataEditor({
   video,
   globalTags,
   onSaveSuccess,
+  onDeleteSuccess,
 }: ClipMetadataEditorProps) {
   const [tagsInput, setTagsInput] = useState("");
   const [notesInput, setNotesInput] = useState("");
@@ -380,6 +382,31 @@ function ClipMetadataEditor({
     setRatingInput(Number(clip.metadata?.rating ?? 0));
     setSaveError(null);
     setSaveSuccess(false);
+  }
+
+  async function handleDelete() {
+    if (!window.confirm("Are you sure you want to delete this clip? This will physically rename subsequent clips to keep the sequence in sync.")) {
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+
+    try {
+      await deleteClip({
+        rootPath,
+        videoRelativePath,
+        clipMediaPath: clip.mediaPath,
+      });
+
+      const response = await getVideoDetail({ rootPath, videoRelativePath });
+      onDeleteSuccess(response.video);
+    } catch (err) {
+      setSaveError(err instanceof ApiError ? err.message : "Failed to delete clip.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   const isModified = useMemo(() => {
@@ -530,6 +557,14 @@ function ClipMetadataEditor({
             className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Reset
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isSaving}
+            className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-400 transition hover:bg-rose-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Delete Clip
           </button>
         </div>
 
@@ -1513,6 +1548,10 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
                 video={video}
                 globalTags={globalTags}
                 onSaveSuccess={onUpdateVideoDetail}
+                onDeleteSuccess={(updatedVideo) => {
+                  onUpdateVideoDetail(updatedVideo);
+                  setSelectedMediaPath(updatedVideo.mainVideoPath);
+                }}
               />
             </div>
           ) : (

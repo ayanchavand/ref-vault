@@ -144,3 +144,14 @@ export interface ApiErrorResponse {
   message: string;
   path?: string;
 }
+
+export interface DeleteClipRequest {
+  rootPath: string;
+  videoRelativePath: string;
+  clipMediaPath: string;
+}
+
+export interface DeleteClipResponse {
+  success: boolean;
+}
+
