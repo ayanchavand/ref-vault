@@ -47,16 +47,7 @@ function shuffle<T>(arr: T[]): T[] {
 // ─── Skeleton loader card ─────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
-    >
+    <div className="tiktok-card-container">
       <style>{`
         @keyframes mb-shimmer {
           0%   { background-position: -400px 0; }
@@ -83,16 +74,8 @@ function SkeletonCard() {
 
       {/* Card shell */}
       <div
-        className="mb-skeleton"
-        style={{
-          width: "100%",
-          maxWidth: 520,
-          aspectRatio: "3/4",
-          borderRadius: 20,
-          position: "relative",
-          overflow: "hidden",
-          border: "1px solid rgba(255,255,255,0.06)",
-        }}
+        className="mb-skeleton tiktok-skeleton"
+        style={{}}
       >
         {/* Faint scan line sweep */}
         <div
@@ -206,12 +189,8 @@ function MediaCard({
 
   return (
     <div
+      className="tiktok-card-container"
       style={{
-        position: "absolute",
-        inset: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
         ...exitStyle,
       }}
       onTransitionEnd={exitDirection !== null ? onAnimationEnd : undefined}
@@ -267,21 +246,9 @@ function MediaCard({
       )}
 
       <div
+        className="tiktok-card"
         style={{
-          width: "100%",
-          maxWidth: 420,
-          height: "calc(100% - 32px)",
-          position: "relative",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: 24,
-          background: "#000",
-          boxShadow: "0 24px 60px rgba(0,0,0,0.8)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          overflow: "hidden",
           opacity: loaded ? 1 : 0,
-          transition: "opacity 0.25s ease",
         }}
       >
         {isVideo ? (
@@ -297,7 +264,7 @@ function MediaCard({
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "contain",
+              objectFit: "cover",
             }}
           />
         ) : (
@@ -310,7 +277,7 @@ function MediaCard({
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "contain",
+              objectFit: "cover",
             }}
             loading="eager"
             decoding="async"
@@ -1145,6 +1112,56 @@ export function MediaBrowser({ onBack }: MediaBrowserProps) {
         @keyframes mb-fadein {
           from { opacity: 0; transform: translateY(6px) scale(0.98); }
           to   { opacity: 1; transform: translateY(0)   scale(1); }
+        }
+        .tiktok-card-container {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          alignItems: center;
+          justify-content: center;
+          padding: 16px;
+        }
+        .tiktok-card {
+          width: 100%;
+          max-width: 420px;
+          height: calc(100% - 32px);
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 24px;
+          background: #000;
+          box-shadow: 0 24px 60px rgba(0,0,0,0.8);
+          border: 1px solid rgba(255,255,255,0.08);
+          overflow: hidden;
+          transition: opacity 0.25s ease;
+        }
+        .tiktok-skeleton {
+          width: 100%;
+          max-width: 420px;
+          height: calc(100% - 32px);
+          position: relative;
+          overflow: hidden;
+          border-radius: 24px;
+          border: 1px solid rgba(255,255,255,0.08);
+        }
+        @media (max-width: 640px) {
+          .tiktok-card-container {
+            padding: 0px !important;
+          }
+          .tiktok-card {
+            max-width: 100% !important;
+            height: 100% !important;
+            border-radius: 0px !important;
+            border: none !important;
+            box-shadow: none !important;
+          }
+          .tiktok-skeleton {
+            max-width: 100% !important;
+            height: 100% !important;
+            border-radius: 0px !important;
+            border: none !important;
+          }
         }
       `}</style>
 

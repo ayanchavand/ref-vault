@@ -163,21 +163,65 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
 
       const { filePath, fileStats, contentType } = mediaResult.value;
 
-      if (contentType.startsWith("image/")) {
-        const etag = `W/"${fileStats.size}-${fileStats.mtime.getTime()}"`;
+      const etag = `W/"${fileStats.size}-${fileStats.mtime.getTime()}"`;
+      const lastModified = fileStats.mtime.toUTCString();
+
+      if (contentType.startsWith("image/") || contentType.startsWith("video/")) {
         reply
           .header("Cache-Control", "public, max-age=604800, must-revalidate")
-          .header("ETag", etag);
+          .header("ETag", etag)
+          .header("Last-Modified", lastModified)
+          .header("Accept-Ranges", "bytes");
 
         if (request.headers["if-none-match"] === etag) {
           return reply.code(304).send();
         }
+
+        const ifModifiedSince = request.headers["if-modified-since"];
+        if (ifModifiedSince) {
+          try {
+            const clientTime = Math.floor(new Date(ifModifiedSince).getTime() / 1000);
+            const serverTime = Math.floor(fileStats.mtime.getTime() / 1000);
+            if (clientTime >= serverTime) {
+              return reply.code(304).send();
+            }
+          } catch {
+            // Ignore invalid date formats
+          }
+        }
       }
 
       const rangeHeader = request.headers.range;
+      let rangeRequested = !!rangeHeader;
 
       if (rangeHeader) {
-        const rangeMatch = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader);
+        const ifRange = request.headers["if-range"];
+        if (ifRange) {
+          if (ifRange.startsWith("W/") || ifRange.startsWith('"')) {
+            if (ifRange !== etag) {
+              rangeRequested = false;
+            }
+          } else {
+            try {
+              const parsedDate = new Date(ifRange).getTime();
+              if (!Number.isNaN(parsedDate)) {
+                const clientTime = Math.floor(parsedDate / 1000);
+                const serverTime = Math.floor(fileStats.mtime.getTime() / 1000);
+                if (clientTime < serverTime) {
+                  rangeRequested = false;
+                }
+              } else {
+                rangeRequested = false;
+              }
+            } catch {
+              rangeRequested = false;
+            }
+          }
+        }
+      }
+
+      if (rangeRequested && rangeHeader) {
+        const rangeMatch = /^bytes\s*=\s*(\d*)\s*-\s*(\d*)$/.exec(rangeHeader);
 
         if (!rangeMatch) {
           return reply.status(416).send({
@@ -186,8 +230,18 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
           });
         }
 
-        const start = (rangeMatch[1] ?? "").length > 0 ? Number(rangeMatch[1]) : 0;
-        const end = (rangeMatch[2] ?? "").length > 0 ? Number(rangeMatch[2]) : fileStats.size - 1;
+        let start = 0;
+        let end = fileStats.size - 1;
+
+        if (rangeMatch[1] === "" && rangeMatch[2] !== "") {
+          const suffixLength = Number(rangeMatch[2]);
+          start = Math.max(0, fileStats.size - suffixLength);
+        } else {
+          start = rangeMatch[1] ? Number(rangeMatch[1]) : 0;
+          if (rangeMatch[2]) {
+            end = Number(rangeMatch[2]);
+          }
+        }
 
         if (Number.isNaN(start) || Number.isNaN(end) || start > end || start >= fileStats.size) {
           reply
@@ -197,13 +251,17 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
           return;
         }
 
+        const MAX_CHUNK_SIZE = 2 * 1024 * 1024;
+        if (end - start + 1 > MAX_CHUNK_SIZE) {
+          end = start + MAX_CHUNK_SIZE - 1;
+        }
+
         const chunkSize = end - start + 1;
         const stream = createReadStream(filePath, { start, end });
 
         return reply
           .code(206)
           .header("Content-Type", contentType)
-          .header("Accept-Ranges", "bytes")
           .header("Content-Range", `bytes ${start}-${end}/${fileStats.size}`)
           .header("Content-Length", String(chunkSize))
           .send(stream);
