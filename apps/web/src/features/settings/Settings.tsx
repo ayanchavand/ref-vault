@@ -142,14 +142,14 @@ export function Settings({
             </div>
 
             {videoError && (
-              <p role="alert" className="flex items-center gap-2 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300 leading-normal">
+              <p role="alert" className="flex items-center gap-2 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300 leading-normal animate-[rv-shake_0.4s_ease-in-out_both]">
                 <AlertCircle className="h-3.5 w-3.5 shrink-0 text-rose-400" />
                 {videoError}
               </p>
             )}
 
             {videoSuccess && (
-              <p role="alert" className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 leading-normal">
+              <p role="alert" className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 leading-normal animate-[rv-success-in_0.3s_cubic-bezier(0.34,1.56,0.64,1)_both]">
                 <CheckCircle className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
                 Video library root updated successfully!
               </p>
@@ -158,7 +158,7 @@ export function Settings({
             <button
               type="submit"
               disabled={isVideoSubmitting || videoPathInput.trim().length === 0}
-              className="w-full rounded-lg bg-amber-400 px-4 py-2.5 text-xs font-semibold text-[#0A0B0D] transition active:scale-[0.98] hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
+              className="w-full rounded-lg bg-amber-400 px-4 py-2.5 text-xs font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(251,191,36,0.4)] active:translate-y-px active:shadow-none active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 disabled:hover:translate-y-0 disabled:hover:shadow-none"
             >
               {isVideoSubmitting ? "Checking path…" : activeVideoPath ? "Update Path" : "Configure Path"}
             </button>
@@ -216,14 +216,14 @@ export function Settings({
             </div>
 
             {mediaError && (
-              <p role="alert" className="flex items-center gap-2 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300 leading-normal">
+              <p role="alert" className="flex items-center gap-2 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300 leading-normal animate-[rv-shake_0.4s_ease-in-out_both]">
                 <AlertCircle className="h-3.5 w-3.5 shrink-0 text-rose-400" />
                 {mediaError}
               </p>
             )}
 
             {mediaSuccess && (
-              <p role="alert" className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 leading-normal">
+              <p role="alert" className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 leading-normal animate-[rv-success-in_0.3s_cubic-bezier(0.34,1.56,0.64,1)_both]">
                 <CheckCircle className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
                 Media library root updated successfully!
               </p>
@@ -232,7 +232,7 @@ export function Settings({
             <button
               type="submit"
               disabled={isMediaSubmitting || mediaPathInput.trim().length === 0}
-              className="w-full rounded-lg bg-amber-400 px-4 py-2.5 text-xs font-semibold text-[#0A0B0D] transition active:scale-[0.98] hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
+              className="w-full rounded-lg bg-amber-400 px-4 py-2.5 text-xs font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(251,191,36,0.4)] active:translate-y-px active:shadow-none active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 disabled:hover:translate-y-0 disabled:hover:shadow-none"
             >
               {isMediaSubmitting ? "Checking path…" : activeMediaPath ? "Update Path" : "Configure Path"}
             </button>

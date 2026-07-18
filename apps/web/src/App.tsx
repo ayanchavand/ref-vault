@@ -44,6 +44,64 @@ function GlobalMotionStyles() {
         from { opacity: 0; transform: translateY(-8px); }
         to { opacity: 1; transform: translateY(0); }
       }
+
+      /* --- New animations --- */
+
+      /* View route entrance */
+      @keyframes rv-fade-up {
+        from { opacity: 0; transform: translateY(14px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
+      /* Staggered card entrance */
+      @keyframes rv-card-in {
+        from { opacity: 0; transform: translateY(18px) scale(0.98); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      /* Tag pill spring pop on selection */
+      @keyframes rv-spring-pop {
+        0%   { transform: scale(1); }
+        40%  { transform: scale(1.1); }
+        70%  { transform: scale(0.96); }
+        100% { transform: scale(1); }
+      }
+
+      /* Danger hover glow pulse */
+      @keyframes rv-danger-pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(244,63,94,0); }
+        50%       { box-shadow: 0 0 0 5px rgba(244,63,94,0.18); }
+      }
+
+      /* Success message slide-in from right */
+      @keyframes rv-success-in {
+        from { opacity: 0; transform: translateX(14px); }
+        to   { opacity: 1; transform: translateX(0); }
+      }
+
+      /* Error message shake */
+      @keyframes rv-shake {
+        0%, 100% { transform: translateX(0); }
+        20%      { transform: translateX(-5px); }
+        40%      { transform: translateX(5px); }
+        60%      { transform: translateX(-3px); }
+        80%      { transform: translateX(3px); }
+      }
+
+      /* Segment marker drop-in */
+      @keyframes rv-drop-in {
+        from { opacity: 0; transform: translateY(-10px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
+      /* Respect prefers-reduced-motion */
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
     `}</style>
   );
 }
@@ -363,7 +421,7 @@ export function App() {
 
         <section className="flex flex-col flex-1 min-h-0 overflow-y-auto pt-6 pb-24 sm:py-12">
           {activeRoute.view === "SELECT_LIBRARY" && (
-            <div className="flex flex-1 items-center justify-center py-10 animate-fade-in">
+            <div className="flex flex-1 items-center justify-center py-10 animate-[rv-fade-up_0.4s_ease-out_both]">
               <div className="max-w-xl text-center space-y-6">
                 <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-400 font-mono text-3xl font-bold text-[#0A0B0D] shadow-[0_0_30px_rgba(232,163,61,0.3)] mx-auto">
                   RV
@@ -379,7 +437,7 @@ export function App() {
                 <button
                   type="button"
                   onClick={() => navigate({ view: "SETTINGS" })}
-                  className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-6 py-3 text-sm font-semibold text-[#0A0B0D] hover:bg-amber-300 transition active:scale-[0.98]"
+                  className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-6 py-3 text-sm font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_6px_24px_rgba(251,191,36,0.45)] active:translate-y-px active:shadow-none active:scale-[0.97]"
                 >
                   <SettingsIcon className="h-4 w-4" />
                   Configure System Libraries
@@ -389,7 +447,7 @@ export function App() {
           )}
 
           {activeRoute.view === "BROWSE_LIBRARY" && scanResult && (
-            <>
+            <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
               <VideoList
                 rootPath={activeRootPath!}
                 videos={paginatedVideos}
@@ -404,63 +462,69 @@ export function App() {
                 onPrevPage={handlePrevVideoPage}
                 onNextPage={handleNextVideoPage}
               />
-            </>
+            </div>
           )}
 
           {activeRoute.view === "IMPORT_VIDEO" && (
-            <VideoImport
-              rootPath={activeRootPath!}
-              onImportSuccess={async () => {
-                setIsLoading(true);
-                try {
-                  const result = await scanLibrary(activeRootPath!);
-                  setScanResult(result);
-                  setVideoPage(1);
+            <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
+              <VideoImport
+                rootPath={activeRootPath!}
+                onImportSuccess={async () => {
+                  setIsLoading(true);
+                  try {
+                    const result = await scanLibrary(activeRootPath!);
+                    setScanResult(result);
+                    setVideoPage(1);
+                    navigate({ view: "BROWSE_LIBRARY" });
+                  } catch (cause) {
+                    setError(cause instanceof ApiError ? cause.message : "Failed to scan library.");
+                    navigate({ view: "BROWSE_LIBRARY" });
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                onBack={() => {
                   navigate({ view: "BROWSE_LIBRARY" });
-                } catch (cause) {
-                  setError(cause instanceof ApiError ? cause.message : "Failed to scan library.");
-                  navigate({ view: "BROWSE_LIBRARY" });
-                } finally {
-                  setIsLoading(false);
-                }
-              }}
-              onBack={() => {
-                navigate({ view: "BROWSE_LIBRARY" });
-              }}
-            />
+                }}
+              />
+            </div>
           )}
 
           {activeRoute.view === "BROWSE_TAGS" && scanResult && (
-            <TagBrowser
-              rootPath={activeRootPath!}
-              videos={scanResult.videos}
-              onSelectVideo={handleSelectVideo}
-            />
+            <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
+              <TagBrowser
+                rootPath={activeRootPath!}
+                videos={scanResult.videos}
+                onSelectVideo={handleSelectVideo}
+              />
+            </div>
           )}
 
           {activeRoute.view === "VIEW_VIDEO" && videoDetail && (
-            <VideoDetail
-              rootPath={activeRootPath!}
-              video={videoDetail}
-              allVideos={scanResult?.videos || []}
-              onUpdateVideoDetail={handleUpdateVideoDetail}
-              onDeleteVideo={async () => {
-                setIsLoading(true);
-                setSelectedVideo(null);
-                setVideoDetail(null);
-                try {
-                  const result = await scanLibrary(activeRootPath!);
-                  setScanResult(result);
-                  setVideoPage(1);
-                  navigate({ view: "BROWSE_LIBRARY" });
-                } catch (cause) {
-                  setError(cause instanceof ApiError ? cause.message : "Failed to scan library.");
-                  navigate({ view: "BROWSE_LIBRARY" });
-                } finally {
-                  setIsLoading(false);
-                }
-              }}
-            />
+            <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
+              <VideoDetail
+                rootPath={activeRootPath!}
+                video={videoDetail}
+                allVideos={scanResult?.videos || []}
+                onUpdateVideoDetail={handleUpdateVideoDetail}
+                onDeleteVideo={async () => {
+                  setIsLoading(true);
+                  setSelectedVideo(null);
+                  setVideoDetail(null);
+                  try {
+                    const result = await scanLibrary(activeRootPath!);
+                    setScanResult(result);
+                    setVideoPage(1);
+                    navigate({ view: "BROWSE_LIBRARY" });
+                  } catch (cause) {
+                    setError(cause instanceof ApiError ? cause.message : "Failed to scan library.");
+                    navigate({ view: "BROWSE_LIBRARY" });
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+              />
+            </div>
           )}
 
           {activeRoute.view === "BROWSE_MEDIA" && (
@@ -468,12 +532,14 @@ export function App() {
           )}
 
           {activeRoute.view === "SETTINGS" && (
-            <Settings
-              onVideoLibraryChange={handleVideoRootChange}
-              onForgetVideoLibrary={handleVideoRootForget}
-              onMediaLibraryChange={handleMediaRootChange}
-              onForgetMediaLibrary={handleMediaRootForget}
-            />
+            <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
+              <Settings
+                onVideoLibraryChange={handleVideoRootChange}
+                onForgetVideoLibrary={handleVideoRootForget}
+                onMediaLibraryChange={handleMediaRootChange}
+                onForgetMediaLibrary={handleMediaRootForget}
+              />
+            </div>
           )}
         </section>
       </div>

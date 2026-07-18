@@ -262,6 +262,8 @@ function MediaCard({
             onLoadedData={() => setLoaded(true)}
             onError={() => { setLoaded(false); setImgError(true); }}
             style={{
+              position: "absolute",
+              inset: 0,
               width: "100%",
               height: "100%",
               objectFit: "cover",
@@ -275,6 +277,8 @@ function MediaCard({
             onLoad={() => setLoaded(true)}
             onError={() => { setLoaded(false); setImgError(true); }}
             style={{
+              position: "absolute",
+              inset: 0,
               width: "100%",
               height: "100%",
               objectFit: "cover",
@@ -1095,7 +1099,8 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "100%",
+        flex: 1,
+        minHeight: 0,
         position: "relative",
         userSelect: "none",
       }}
@@ -1117,7 +1122,7 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
           position: absolute;
           inset: 0;
           display: flex;
-          alignItems: center;
+          align-items: center;
           justify-content: center;
           padding: 16px;
         }

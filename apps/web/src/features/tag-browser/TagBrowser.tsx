@@ -289,11 +289,15 @@ export function TagBrowser({ rootPath, videos, onSelectVideo }: TagBrowserProps)
                         isSelected ? prev.filter((t) => t !== tag) : [...prev, tag],
                       );
                     }}
-                    className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm transition duration-200 ${
+                    className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm ${
                       isSelected
                         ? "border-amber-400 bg-amber-400/20 text-white shadow-[0_0_8px_rgba(232,163,61,0.2)]"
                         : "border-white/[0.06] bg-white/[0.03] text-white/80 hover:border-amber-400/30 hover:bg-white/[0.06]"
                     }`}
+                    style={{
+                      transition: "all 200ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+                      animation: isSelected ? "rv-spring-pop 0.35s cubic-bezier(0.34,1.56,0.64,1) both" : undefined,
+                    }}
                   >
                     <Tag className="h-3 w-3 opacity-60" />
                     <span className="font-medium">{tag}</span>
@@ -331,11 +335,15 @@ export function TagBrowser({ rootPath, videos, onSelectVideo }: TagBrowserProps)
                         isSelected ? prev.filter((t) => t !== tag) : [...prev, tag],
                       );
                     }}
-                    className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm transition duration-200 ${
+                    className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm ${
                       isSelected
                         ? "border-sky-400 bg-sky-400/20 text-white shadow-[0_0_8px_rgba(56,189,248,0.2)]"
                         : "border-white/[0.06] bg-white/[0.03] text-white/80 hover:border-sky-400/30 hover:bg-white/[0.06]"
                     }`}
+                    style={{
+                      transition: "all 200ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+                      animation: isSelected ? "rv-spring-pop 0.35s cubic-bezier(0.34,1.56,0.64,1) both" : undefined,
+                    }}
                   >
                     <Scissors className="h-3 w-3 opacity-60" />
                     <span className="font-medium">{tag}</span>
@@ -358,7 +366,7 @@ export function TagBrowser({ rootPath, videos, onSelectVideo }: TagBrowserProps)
                 setSelectedVideoTags([]);
                 setSelectedClipTags([]);
               }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-white/60 transition hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/70"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-white/60 transition-all duration-200 hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-300 hover:-translate-y-0.5 active:translate-y-px active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/70"
             >
               <X className="h-3 w-3" />
               Clear filters

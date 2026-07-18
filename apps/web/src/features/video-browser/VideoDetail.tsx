@@ -174,8 +174,8 @@ function ClipCard({
       }`}
     >
       <span
-        className={`absolute left-0 top-0 h-full w-[3px] rounded-l-xl transition-colors ${
-          active ? "bg-amber-400" : "bg-transparent group-hover:bg-amber-400/30"
+        className={`absolute left-0 top-0 h-full w-[3px] rounded-l-xl transition-all duration-200 origin-top ${
+          active ? "bg-amber-400 scale-y-100" : "scale-y-0 bg-transparent group-hover:scale-y-100 group-hover:bg-amber-400/30"
         }`}
         aria-hidden="true"
       />
@@ -542,7 +542,7 @@ function ClipMetadataEditor({
           <button
             type="submit"
             disabled={isSaving || !isModified}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(251,191,36,0.4)] active:translate-y-px active:shadow-none active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-none"
           >
             <Save className="h-3.5 w-3.5" />
             {isSaving ? "Saving..." : "Save Changes"}
@@ -551,7 +551,7 @@ function ClipMetadataEditor({
             type="button"
             onClick={handleReset}
             disabled={isSaving || !isModified}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06] active:translate-y-px active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Reset
@@ -560,7 +560,10 @@ function ClipMetadataEditor({
             type="button"
             onClick={handleDelete}
             disabled={isSaving}
-            className="inline-flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-400 transition hover:bg-rose-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-400 transition-all duration-200 hover:bg-rose-500/20 hover:-translate-y-0.5 active:translate-y-px active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 disabled:cursor-not-allowed disabled:opacity-40"
+            style={{ }}
+            onMouseEnter={(e) => { if (!isSaving) e.currentTarget.style.animation = 'rv-danger-pulse 1s ease-in-out infinite'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.animation = ''; }}
           >
             <Trash2 className="h-3.5 w-3.5" />
             Delete Clip
@@ -568,14 +571,14 @@ function ClipMetadataEditor({
         </div>
 
         {saveSuccess && (
-          <span className="flex items-center gap-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-emerald-400">
+          <span className="flex items-center gap-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-emerald-400 animate-[rv-success-in_0.3s_cubic-bezier(0.34,1.56,0.64,1)_both]">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
             Changes saved successfully!
           </span>
         )}
 
         {saveError && (
-          <span className="font-mono text-[0.65rem] uppercase tracking-wider text-rose-400">
+          <span className="font-mono text-[0.65rem] uppercase tracking-wider text-rose-400 animate-[rv-shake_0.4s_ease-in-out_both]">
             Error: {saveError}
           </span>
         )}
@@ -887,7 +890,7 @@ function VideoMetadataEditor({
           <button
             type="submit"
             disabled={isSaving || !isModified}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(251,191,36,0.4)] active:translate-y-px active:shadow-none active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-none"
           >
             <Save className="h-3.5 w-3.5" />
             {isSaving ? "Saving..." : "Save Changes"}
@@ -896,7 +899,7 @@ function VideoMetadataEditor({
             type="button"
             onClick={handleReset}
             disabled={isSaving || !isModified}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06] active:translate-y-px active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Reset
@@ -905,14 +908,14 @@ function VideoMetadataEditor({
 
         <div className="flex flex-wrap items-center gap-3">
           {saveSuccess && (
-            <span className="flex items-center gap-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-emerald-400">
+            <span className="flex items-center gap-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-emerald-400 animate-[rv-success-in_0.3s_cubic-bezier(0.34,1.56,0.64,1)_both]">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
               Changes saved successfully!
             </span>
           )}
 
           {saveError && (
-            <span className="font-mono text-[0.65rem] uppercase tracking-wider text-rose-400">
+            <span className="font-mono text-[0.65rem] uppercase tracking-wider text-rose-400 animate-[rv-shake_0.4s_ease-in-out_both]">
               Error: {saveError}
             </span>
           )}
@@ -922,7 +925,9 @@ function VideoMetadataEditor({
               type="button"
               onClick={() => setIsConfirmingDelete(true)}
               disabled={isSaving}
-              className="inline-flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/[0.06] px-4 py-2 text-sm font-medium text-rose-300 transition hover:bg-rose-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/[0.06] px-4 py-2 text-sm font-medium text-rose-300 transition-all duration-200 hover:bg-rose-500/20 hover:-translate-y-0.5 active:translate-y-px active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+              onMouseEnter={(e) => { if (!isSaving) e.currentTarget.style.animation = 'rv-danger-pulse 1s ease-in-out infinite'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.animation = ''; }}
             >
               <Trash2 className="h-3.5 w-3.5" />
               Delete Video
@@ -1080,7 +1085,7 @@ function SegmentEditor({
         <button
           type="button"
           onClick={addSegment}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-400 px-3 py-1.5 text-xs font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus:outline-none"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-400 px-3 py-1.5 text-xs font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(251,191,36,0.4)] active:translate-y-px active:shadow-none active:scale-[0.97] focus:outline-none"
         >
           <Plus className="h-3.5 w-3.5" />
           Add Marker
@@ -1102,6 +1107,7 @@ function SegmentEditor({
             <div
               key={index}
               className="relative space-y-3 rounded-xl border border-white/[0.06] bg-black/20 p-3"
+              style={{ animation: "rv-drop-in 0.25s ease-out both" }}
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="font-mono text-[0.65rem] uppercase tracking-wider text-white/40">
@@ -1287,7 +1293,7 @@ function SegmentEditor({
             type="button"
             onClick={handleSave}
             disabled={isSaving || segments.length === 0}
-            className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(251,191,36,0.4)] active:translate-y-px active:shadow-none active:scale-[0.97] focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-none"
           >
             {isSaving ? "Saving..." : "Confirm & Save Split Plan"}
           </button>
@@ -1295,21 +1301,21 @@ function SegmentEditor({
             type="button"
             onClick={onCancel}
             disabled={isSaving}
-            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06] active:translate-y-px active:scale-[0.97] focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
           >
             Cancel
           </button>
         </div>
 
         {saveSuccess && (
-          <span className="flex items-center gap-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-emerald-400">
+          <span className="flex items-center gap-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-emerald-400 animate-[rv-success-in_0.3s_cubic-bezier(0.34,1.56,0.64,1)_both]">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
             Plan saved successfully!
           </span>
         )}
 
         {saveError && (
-          <span className="font-mono text-[0.65rem] uppercase tracking-wider text-rose-400">
+          <span className="font-mono text-[0.65rem] uppercase tracking-wider text-rose-400 animate-[rv-shake_0.4s_ease-in-out_both]">
             Error: {saveError}
           </span>
         )}
@@ -1605,7 +1611,7 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
             <button
               type="button"
               onClick={() => setIsLooping(!isLooping)}
-              className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition focus:outline-none text-center ${
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition-all duration-200 focus:outline-none text-center hover:-translate-y-0.5 active:translate-y-px active:scale-[0.97] ${
                 isLooping
                   ? "bg-amber-400/20 border border-amber-400/50 text-amber-300 font-semibold shadow-[0_0_8px_rgba(232,163,61,0.2)]"
                   : "border border-white/[0.08] bg-white/[0.03] text-white/60 hover:text-white"
@@ -1663,13 +1669,13 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
               <button
                 type="button"
                 onClick={() => setIsEditingSegments(true)}
-                className="inline-flex items-center gap-1.5 rounded border border-amber-400/30 bg-amber-400/[0.06] px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-wider text-amber-300 hover:bg-amber-400/10 focus:outline-none"
+                className="inline-flex items-center gap-1.5 rounded border border-amber-400/30 bg-amber-400/[0.06] px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-wider text-amber-300 transition-all duration-200 hover:bg-amber-400/10 hover:-translate-y-0.5 active:translate-y-px active:scale-[0.97] focus:outline-none"
               >
                 <Scissors className="h-3 w-3" />
                 Create Clips
               </button>
             ) : (
-              <span className="rounded bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-wider text-amber-300">
+              <span className="rounded bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-wider text-amber-300 animate-[rv-fade-up_0.2s_ease-out_both]">
                 Editing
               </span>
             )}

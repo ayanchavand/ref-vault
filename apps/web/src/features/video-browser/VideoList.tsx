@@ -79,6 +79,7 @@ function VideoThumbnailCard({
   disabled,
   onSelect,
   viewMode = "details",
+  cardIndex = 0,
 }: {
   rootPath: string;
   video: ScannedVideo;
@@ -86,6 +87,7 @@ function VideoThumbnailCard({
   disabled: boolean;
   onSelect(): void;
   viewMode?: "details" | "moodboard";
+  cardIndex?: number;
 }) {
   const artist = video.metadata?.artist ? String(video.metadata.artist) : null;
   const rating = video.metadata?.rating ? Number(video.metadata.rating) : 0;
@@ -136,6 +138,10 @@ function VideoThumbnailCard({
           ? "border-amber-400/50"
           : "border-white/[0.06] hover:-translate-y-1 hover:border-amber-400/50 hover:shadow-[0_12px_36px_rgba(0,0,0,0.5)]"
       } bg-[#111316]/50 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]`}
+      style={{
+        animation: `rv-card-in 0.4s cubic-bezier(0.22,1,0.36,1) both`,
+        animationDelay: `${Math.min(cardIndex, 5) * 60}ms`,
+      }}
       onMouseEnter={() => !isTouchDevice && setIsHovering(true)}
       onMouseLeave={() => !isTouchDevice && setIsHovering(false)}
     >
@@ -311,10 +317,10 @@ export function VideoList({
           <div className="flex rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5 mr-1 backdrop-blur-sm">
             <button
               onClick={() => setViewMode("details")}
-              className={`flex items-center gap-1 rounded-md px-2.5 py-1 sm:px-3 sm:py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition active:scale-[0.98] ${
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 sm:px-3 sm:py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition-all duration-200 active:scale-[0.97] ${
                 viewMode === "details"
-                  ? "bg-amber-400 font-semibold text-[#0A0B0D]"
-                  : "text-white/60 hover:text-white"
+                  ? "bg-amber-400 font-semibold text-[#0A0B0D] shadow-[0_2px_8px_rgba(251,191,36,0.35)]"
+                  : "text-white/60 hover:text-white hover:bg-white/[0.06]"
               }`}
             >
               <List className="h-3 w-3" />
@@ -322,10 +328,10 @@ export function VideoList({
             </button>
             <button
               onClick={() => setViewMode("moodboard")}
-              className={`flex items-center gap-1 rounded-md px-2.5 py-1 sm:px-3 sm:py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition active:scale-[0.98] ${
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 sm:px-3 sm:py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition-all duration-200 active:scale-[0.97] ${
                 viewMode === "moodboard"
-                  ? "bg-amber-400 font-semibold text-[#0A0B0D]"
-                  : "text-white/60 hover:text-white"
+                  ? "bg-amber-400 font-semibold text-[#0A0B0D] shadow-[0_2px_8px_rgba(251,191,36,0.35)]"
+                  : "text-white/60 hover:text-white hover:bg-white/[0.06]"
               }`}
             >
               <LayoutGrid className="h-3 w-3" />
@@ -370,12 +376,13 @@ export function VideoList({
               : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
           }`}>
 
-            {videos.map((video) => (
+            {videos.map((video, index) => (
               <VideoThumbnailCard
                 key={video.relativePath}
                 rootPath={rootPath}
                 video={video}
                 viewMode={viewMode}
+                cardIndex={index}
                 isOpening={openingVideoPath === video.relativePath}
                 disabled={openingVideoPath !== null}
                 onSelect={() => onSelectVideo(video)}
