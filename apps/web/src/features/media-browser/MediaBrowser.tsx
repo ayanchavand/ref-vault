@@ -944,9 +944,10 @@ function RootPicker({ onRoot, savedLocations, isLoading }: RootPickerProps) {
 // ─── Main MediaBrowser ────────────────────────────────────────────────────────
 interface MediaBrowserProps {
   onBack: () => void;
+  onGoToSettings: () => void;
 }
 
-export function MediaBrowser({ onBack }: MediaBrowserProps) {
+export function MediaBrowser({ onBack, onGoToSettings }: MediaBrowserProps) {
   const [mediaRoot, setMediaRoot] = useState(() => localStorage.getItem(MEDIA_ROOT_KEY) ?? "");
   const [savedLocations, setSavedLocations] = useState<string[]>(loadSavedLocations);
   const [items, setItems] = useState<ScannedMediaItem[]>([]);
@@ -1221,76 +1222,29 @@ export function MediaBrowser({ onBack }: MediaBrowserProps) {
           </div>
         </div>
 
-        {/* Right side: folder pill + locations button */}
+        {/* Right side: folder pill */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {mediaRoot && !isLoading && (
             <span
               style={{
                 fontFamily: "monospace",
                 fontSize: 10,
-                color: "rgba(255,255,255,0.25)",
-                maxWidth: 180,
+                color: "rgba(255,255,255,0.35)",
+                backgroundColor: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.06)",
+                borderRadius: 8,
+                padding: "6px 12px",
+                maxWidth: 240,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
-                display: "none", // hide on mobile, show via media query below
               }}
-              className="mb-root-label"
               title={mediaRoot}
             >
-              {mediaRoot.split("/").pop() || mediaRoot}
+              📁 {mediaRoot.split("/").pop() || mediaRoot}
             </span>
           )}
-          <button
-            onClick={() => setShowLocations((v) => !v)}
-            style={{
-              background: showLocations ? "rgba(240,192,96,0.12)" : "rgba(255,255,255,0.04)",
-              border: showLocations ? "1px solid rgba(240,192,96,0.3)" : "1px solid rgba(255,255,255,0.08)",
-              borderRadius: 8,
-              color: showLocations ? "#f0c060" : "rgba(255,255,255,0.5)",
-              fontFamily: "monospace",
-              fontSize: 11,
-              letterSpacing: "0.08em",
-              padding: "6px 12px",
-              cursor: "pointer",
-              textTransform: "uppercase",
-              transition: "all 0.15s",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            <span style={{ fontSize: 13 }}>📁</span>
-            Locations
-            {savedLocations.length > 0 && (
-              <span
-                style={{
-                  background: "rgba(240,192,96,0.2)",
-                  color: "#f0c060",
-                  borderRadius: 10,
-                  padding: "1px 6px",
-                  fontSize: 9,
-                  fontWeight: 700,
-                }}
-              >
-                {savedLocations.length}
-              </span>
-            )}
-          </button>
         </div>
-
-        {/* Location manager dropdown */}
-        {showLocations && (
-          <LocationManager
-            savedLocations={savedLocations}
-            activeRoot={mediaRoot}
-            isLoading={isLoading}
-            onSelect={loadMedia}
-            onAdd={loadMedia}
-            onRemove={handleRemoveLocation}
-            onClose={() => setShowLocations(false)}
-          />
-        )}
       </div>
 
       {/* Stage */}
@@ -1318,21 +1272,7 @@ export function MediaBrowser({ onBack }: MediaBrowserProps) {
             </p>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
               <button
-                onClick={handleClearRoot}
-                style={{
-                  background: "rgba(252,165,165,0.1)",
-                  border: "1px solid rgba(252,165,165,0.2)",
-                  borderRadius: 8,
-                  color: "#fca5a5",
-                  padding: "8px 16px",
-                  cursor: "pointer",
-                  fontSize: 13,
-                }}
-              >
-                Try another folder
-              </button>
-              <button
-                onClick={() => setShowLocations(true)}
+                onClick={onGoToSettings}
                 style={{
                   background: "rgba(240,192,96,0.1)",
                   border: "1px solid rgba(240,192,96,0.2)",
@@ -1343,19 +1283,25 @@ export function MediaBrowser({ onBack }: MediaBrowserProps) {
                   fontSize: 13,
                 }}
               >
-                Manage locations
+                Go to Settings
               </button>
             </div>
           </div>
         )}
 
         {showPicker && (
-          <div style={{ position: "absolute", inset: 0, animation: "mb-fadein 0.3s ease" }}>
-            <RootPicker
-              onRoot={loadMedia}
-              savedLocations={savedLocations}
-              isLoading={isLoading}
-            />
+          <div className="flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto gap-4" style={{ animation: "mb-fadein 0.3s ease" }}>
+            <span className="text-4xl">📁</span>
+            <h3 className="text-xl font-semibold text-white">Media folder not configured</h3>
+            <p className="text-sm text-white/50 leading-relaxed">
+              Set up your media folder path in Settings to start browsing independent loops, GIFs, and reference images.
+            </p>
+            <button
+              onClick={onGoToSettings}
+              className="mt-2 rounded-lg bg-amber-400 px-5 py-2.5 text-xs font-semibold text-[#0A0B0D] hover:bg-amber-300 transition active:scale-[0.98]"
+            >
+              Go to Settings
+            </button>
           </div>
         )}
 

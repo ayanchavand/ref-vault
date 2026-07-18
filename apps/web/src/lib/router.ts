@@ -6,7 +6,8 @@ export type Route =
   | { view: "BROWSE_TAGS" }
   | { view: "BROWSE_MEDIA" }
   | { view: "VIEW_VIDEO"; path: string }
-  | { view: "IMPORT_VIDEO" };
+  | { view: "IMPORT_VIDEO" }
+  | { view: "SETTINGS" };
 
 function parseHash(hash: string): Route {
   // Strip leading '#'
@@ -26,6 +27,10 @@ function parseHash(hash: string): Route {
 
   if (path === "/import") {
     return { view: "IMPORT_VIDEO" };
+  }
+
+  if (path === "/settings") {
+    return { view: "SETTINGS" };
   }
 
   if (path.startsWith("/video")) {
@@ -50,6 +55,8 @@ export function navigate(route: Route) {
     hash = "#/media";
   } else if (route.view === "IMPORT_VIDEO") {
     hash = "#/import";
+  } else if (route.view === "SETTINGS") {
+    hash = "#/settings";
   } else if (route.view === "VIEW_VIDEO") {
     hash = `#/video?path=${encodeURIComponent(route.path)}`;
   }
@@ -70,8 +77,8 @@ export function useHashRouter(hasActiveLibrary: boolean): Route {
     };
   }, []);
 
-  // Override view if library is not validated yet (unless browsing independent media)
-  if (!hasActiveLibrary && route.view !== "BROWSE_MEDIA") {
+  // Override view if library is not validated yet (unless browsing independent media or settings)
+  if (!hasActiveLibrary && route.view !== "BROWSE_MEDIA" && route.view !== "SETTINGS") {
     return { view: "SELECT_LIBRARY" };
   }
 

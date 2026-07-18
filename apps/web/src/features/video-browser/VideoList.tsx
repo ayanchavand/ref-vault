@@ -42,9 +42,6 @@ interface VideoListProps {
   rootPath: string;
   videos: ScannedVideo[];
   onSelectVideo(video: ScannedVideo): void;
-  onBrowseTags(): void;
-  onImportVideo(): void;
-  onChangeRoot(): void;
   isLoading: boolean;
   openingVideoPath: string | null;
   error: string | null;
@@ -284,9 +281,6 @@ export function VideoList({
   rootPath,
   videos,
   onSelectVideo,
-  onBrowseTags,
-  onImportVideo,
-  onChangeRoot,
   isLoading,
   openingVideoPath,
   error,
@@ -330,24 +324,6 @@ export function VideoList({
               Board
             </button>
           </div>
-          <button
-            onClick={onImportVideo}
-            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
-          >
-            Import video
-          </button>
-          <button
-            onClick={onBrowseTags}
-            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
-          >
-            Browse tags
-          </button>
-          <button
-            onClick={onChangeRoot}
-            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
-          >
-            Change library
-          </button>
         </div>
 
       </div>

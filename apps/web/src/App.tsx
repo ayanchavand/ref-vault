@@ -6,7 +6,7 @@ import type {
   VideoDetail as VideoDetailType,
 } from "@reference-vault/shared";
 
-import { LibraryRootForm } from "./features/library-root/LibraryRootForm";
+import { Settings } from "./features/settings/Settings";
 import { TagBrowser } from "./features/tag-browser/TagBrowser";
 import { VideoList } from "./features/video-browser/VideoList";
 import { VideoDetail } from "./features/video-browser/VideoDetail";
@@ -160,18 +160,17 @@ export function App() {
     }
   }, [activeRoute, activeRootPath, videoDetail]);
 
-  async function handleValidatedRoot(rootPath: string): Promise<void> {
-    window.localStorage.setItem(libraryRootStorageKey, rootPath);
-    setSavedRootPath(rootPath);
-    setActiveRootPath(rootPath);
+  async function handleVideoRootChange(newPath: string): Promise<void> {
+    window.localStorage.setItem(libraryRootStorageKey, newPath);
+    setSavedRootPath(newPath);
+    setActiveRootPath(newPath);
     setError(null);
     setIsLoading(true);
 
     try {
-      const result = await scanLibrary(rootPath);
+      const result = await scanLibrary(newPath);
       setScanResult(result);
       setVideoPage(1);
-      navigate({ view: "BROWSE_LIBRARY" });
     } catch (cause) {
       const message =
         cause instanceof ApiError
@@ -183,7 +182,7 @@ export function App() {
     }
   }
 
-  function forgetSavedRoot(): void {
+  function handleVideoRootForget(): void {
     window.localStorage.removeItem(libraryRootStorageKey);
     setSavedRootPath("");
     setActiveRootPath(null);
@@ -191,7 +190,16 @@ export function App() {
     setSelectedVideo(null);
     setVideoDetail(null);
     setVideoPage(1);
-    navigate({ view: "BROWSE_LIBRARY" });
+  }
+
+  const [activeMediaRoot, setActiveMediaRoot] = useState(() => window.localStorage.getItem("reference-vault.media-root") ?? "");
+
+  function handleMediaRootChange(newPath: string): void {
+    setActiveMediaRoot(newPath);
+  }
+
+  function handleMediaRootForget(): void {
+    setActiveMediaRoot("");
   }
 
   function handleSelectVideo(video: ScannedVideo): void {
@@ -244,9 +252,6 @@ export function App() {
     }
   }
 
-  function handleBackToRoot(): void {
-    forgetSavedRoot();
-  }
 
   function handlePrevVideoPage(): void {
     setVideoPage((page) => Math.max(1, page - 1));
@@ -285,62 +290,96 @@ export function App() {
       )}
 
       <div className="flex h-screen w-full flex-col px-4 py-6 sm:px-10 sm:py-8">
-        <header className="flex items-center justify-between border-b border-white/[0.06] pb-4 sm:pb-6">
+        <header className="flex flex-col gap-4 border-b border-white/[0.06] pb-4 sm:pb-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <span
-              className={`h-2 w-2 shrink-0 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(232,163,61,0.7)] ${
+              className={`h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400 shadow-[0_0_10px_rgba(232,163,61,0.8)] ${
                 isBusy ? "animate-pulse" : ""
               }`}
             />
             <div>
-              <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
-                Local-first reference library
-              </p>
-              <h1 className="mt-1.5 text-xl font-semibold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-white to-white/50 sm:text-2xl">
+              <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-white to-white/60 sm:text-2xl">
                 Reference Vault
               </h1>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleBrowseMedia}
-              className="rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest text-white/50 transition hover:bg-white/[0.06] hover:text-white/80 active:scale-[0.98]"
-            >
-              Media
-            </button>
-            <span className="hidden rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest text-white/40 sm:inline-block">
-              Filesystem source of truth
-            </span>
-          </div>
+
+          <nav className="flex flex-wrap items-center gap-1 sm:gap-2">
+            {[
+              {
+                label: "Library",
+                view: "BROWSE_LIBRARY" as const,
+                requiresVideo: true,
+                active: activeRoute.view === "BROWSE_LIBRARY" || activeRoute.view === "VIEW_VIDEO",
+              },
+              {
+                label: "Tags",
+                view: "BROWSE_TAGS" as const,
+                requiresVideo: true,
+                active: activeRoute.view === "BROWSE_TAGS",
+              },
+              {
+                label: "Import",
+                view: "IMPORT_VIDEO" as const,
+                requiresVideo: true,
+                active: activeRoute.view === "IMPORT_VIDEO",
+              },
+              {
+                label: "Media",
+                view: "BROWSE_MEDIA" as const,
+                requiresVideo: false,
+                active: activeRoute.view === "BROWSE_MEDIA",
+              },
+              {
+                label: "Settings",
+                view: "SETTINGS" as const,
+                requiresVideo: false,
+                active: activeRoute.view === "SETTINGS",
+              },
+            ].map((item) => {
+              const isDisabled = item.requiresVideo && !activeRootPath;
+              return (
+                <button
+                  key={item.label}
+                  disabled={isDisabled}
+                  onClick={() => navigate({ view: item.view })}
+                  className={`relative rounded-lg px-3.5 py-2 font-mono text-[0.68rem] uppercase tracking-wider transition-all duration-300 ${
+                    isDisabled
+                      ? "opacity-25 cursor-not-allowed text-white/40"
+                      : item.active
+                      ? "bg-amber-400 font-semibold text-[#0A0B0D] shadow-[0_0_15px_rgba(251,191,36,0.3)]"
+                      : "text-white/60 hover:bg-white/[0.04] hover:text-white"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
         </header>
 
         <section className="flex flex-col flex-1 min-h-0 overflow-y-auto py-6 sm:py-12">
           {activeRoute.view === "SELECT_LIBRARY" && (
-            <div className="flex flex-1 items-center">
-              <div className="grid w-full gap-6 lg:gap-10 lg:grid-cols-[1fr_0.85fr] lg:items-center">
-                <div>
-                  <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
-                    01 · Open a library
-                  </p>
-                  <h2 className="mt-4 max-w-lg text-4xl font-semibold leading-[1.1] tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-white to-white/50 sm:text-5xl">
-                    Your reference files stay exactly where you put them.
+            <div className="flex flex-1 items-center justify-center py-10 animate-fade-in">
+              <div className="max-w-xl text-center space-y-6">
+                <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-400 font-mono text-3xl font-bold text-[#0A0B0D] shadow-[0_0_30px_rgba(232,163,61,0.3)] mx-auto">
+                  RV
+                </span>
+                <div className="space-y-2">
+                  <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    Welcome to Reference Vault
                   </h2>
-                  <p className="mt-5 max-w-xl text-base leading-7 text-white/50">
-                    Choose the folder that contains your video directories. Reference Vault
-                    reads its media and JSON metadata in place; it never imports them into a
-                    database.
+                  <p className="text-sm text-white/50 leading-relaxed">
+                    To start pairing video references and managing clips, please configure your source libraries. Your reference files stay exactly where they are on your local drive.
                   </p>
                 </div>
-
-                <div className="rounded-2xl border border-white/[0.06] bg-[#111316] p-1">
-                  <LibraryRootForm
-                    initialRootPath={savedRootPath}
-                    activeRootPath={activeRootPath}
-                    onValidatedRoot={handleValidatedRoot}
-                    onForgetSavedRoot={forgetSavedRoot}
-                  />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate({ view: "SETTINGS" })}
+                  className="rounded-lg bg-amber-400 px-6 py-3 text-sm font-semibold text-[#0A0B0D] hover:bg-amber-300 transition active:scale-[0.98]"
+                >
+                  Configure System Libraries
+                </button>
               </div>
             </div>
           )}
@@ -351,9 +390,6 @@ export function App() {
                 rootPath={activeRootPath!}
                 videos={paginatedVideos}
                 onSelectVideo={handleSelectVideo}
-                onBrowseTags={handleBrowseTags}
-                onImportVideo={() => navigate({ view: "IMPORT_VIDEO" })}
-                onChangeRoot={handleBackToRoot}
                 isLoading={isLoading}
                 openingVideoPath={openingVideoPath}
                 error={error}
@@ -426,7 +462,16 @@ export function App() {
           )}
 
           {activeRoute.view === "BROWSE_MEDIA" && (
-            <MediaBrowser onBack={handleBackFromMedia} />
+            <MediaBrowser onBack={handleBackFromMedia} onGoToSettings={() => navigate({ view: "SETTINGS" })} />
+          )}
+
+          {activeRoute.view === "SETTINGS" && (
+            <Settings
+              onVideoLibraryChange={handleVideoRootChange}
+              onForgetVideoLibrary={handleVideoRootForget}
+              onMediaLibraryChange={handleMediaRootChange}
+              onForgetMediaLibrary={handleMediaRootForget}
+            />
           )}
         </section>
       </div>
