@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { VideoDetail as VideoDetailType, JsonObject, ScannedVideo } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover } from "./Uselazythumbnail";
 import { putClipMetadata, putVideoMetadata, saveSplitPlan, getVideoDetail, deleteClip, deleteVideo, ApiError, captureFrame } from "../../lib/api";
-import { Save, RotateCcw, Trash2, Repeat, Gauge, Scissors, PlayCircle, Film, Plus, Camera } from "lucide-react";
+import { Save, RotateCcw, Trash2, Repeat, Gauge, Scissors, PlayCircle, Film, Plus, Camera, Star, User, FileText, ChevronDown, ChevronUp, Edit } from "lucide-react";
 
 
 interface VideoDetailProps {
@@ -64,41 +64,38 @@ const TAG_PREVIEW_LIMIT = 4;
 function MetadataTags({ metadata }: { metadata: NonNullable<VideoDetailType["clips"][number]["metadata"]> }) {
   const [expanded, setExpanded] = useState(false);
 
-  const entries = useMemo(() => {
-    return Object.entries(metadata).flatMap(([key, value]) => {
-      const values = Array.isArray(value) ? value : [value];
-      return values.map((entry) => ({
-        key,
-        display:
-          typeof entry === "object" && entry !== null ? JSON.stringify(entry) : String(entry),
-      }));
-    });
-  }, [metadata]);
+  const tags = useMemo(() => {
+    const t = metadata.tags;
+    if (!t) return [];
+    if (typeof t === "string") return [t];
+    if (Array.isArray(t)) return t.filter((x): x is string => typeof x === "string");
+    return [];
+  }, [metadata.tags]);
 
-  const visible = expanded ? entries : entries.slice(0, TAG_PREVIEW_LIMIT);
-  const hiddenCount = entries.length - visible.length;
+  const rating = typeof metadata.rating === "number" ? metadata.rating : undefined;
 
-  if (entries.length === 0) {
+  if (tags.length === 0 && !rating) {
     return null;
   }
 
+  const visibleTags = expanded ? tags : tags.slice(0, TAG_PREVIEW_LIMIT);
+  const hiddenCount = tags.length - visibleTags.length;
+
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
-      {visible.map((tag, i) => {
-        const isTag = tag.key === "tags";
-        const colorClass = isTag ? getTagColorClass(tag.display) : "border-white/[0.08] bg-white/[0.03] text-white/70";
+      {rating !== undefined && rating > 0 && (
+        <span className="inline-flex items-center gap-0.5 rounded-full border border-amber-500/20 bg-amber-500/5 px-2 py-0.5 font-mono text-[0.62rem] text-amber-300">
+          ★ {rating}
+        </span>
+      )}
+      {visibleTags.map((tag, i) => {
+        const colorClass = getTagColorClass(tag);
         return (
           <span
-            key={`${tag.key}-${i}`}
+            key={`${tag}-${i}`}
             className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[0.62rem] ${colorClass}`}
           >
-            {!isTag && (
-              <>
-                <span className="font-semibold text-amber-300/70">{tag.key}</span>
-                <span className="text-white/20">·</span>
-              </>
-            )}
-            <span className="max-w-[10rem] truncate">{tag.display}</span>
+            <span className="max-w-[10rem] truncate">{tag}</span>
           </span>
         );
       })}
@@ -116,7 +113,7 @@ function MetadataTags({ metadata }: { metadata: NonNullable<VideoDetailType["cli
         </button>
       )}
 
-      {expanded && entries.length > TAG_PREVIEW_LIMIT && (
+      {expanded && tags.length > TAG_PREVIEW_LIMIT && (
         <button
           type="button"
           onClick={(event) => {
@@ -127,6 +124,112 @@ function MetadataTags({ metadata }: { metadata: NonNullable<VideoDetailType["cli
         >
           Show less
         </button>
+      )}
+    </div>
+  );
+}
+
+interface VideoDetailsDisplayProps {
+  metadata?: JsonObject;
+}
+
+function VideoDetailsDisplay({ metadata }: VideoDetailsDisplayProps) {
+  if (!metadata) return null;
+
+  const tags = useMemo(() => {
+    const t = metadata.tags;
+    if (!t) return [];
+    if (typeof t === "string") return [t];
+    if (Array.isArray(t)) return t.filter((x): x is string => typeof x === "string");
+    return [];
+  }, [metadata.tags]);
+
+  const rating = typeof metadata.rating === "number" ? metadata.rating : undefined;
+  const artist = typeof metadata.artist === "string" ? metadata.artist : undefined;
+  const notes = typeof metadata.notes === "string" ? metadata.notes : undefined;
+
+  // Other custom metadata fields (excluding tags, rating, artist, notes)
+  const customFields = useMemo(() => {
+    return Object.entries(metadata).filter(
+      ([key]) => !["tags", "rating", "artist", "notes"].includes(key)
+    );
+  }, [metadata]);
+
+  return (
+    <div className="mt-3 space-y-3">
+      {/* Rating and Artist Row */}
+      {(rating || artist) && (
+        <div className="flex flex-wrap gap-2">
+          {rating !== undefined && rating > 0 && (
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/5 px-2.5 py-1 text-xs text-amber-300">
+              <span className="flex items-center gap-0.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`h-3 w-3 ${
+                      i < rating ? "fill-amber-400 text-amber-400" : "text-white/20"
+                    }`}
+                  />
+                ))}
+              </span>
+              <span className="font-mono text-[0.68rem] font-semibold text-amber-300/80">({rating}/5)</span>
+            </div>
+          )}
+
+          {artist && (
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/20 bg-purple-500/5 px-2.5 py-1 font-mono text-xs text-purple-300">
+              <User className="h-3.5 w-3.5 text-purple-400" />
+              <span>{artist}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Notes display */}
+      {notes && (
+        <div className="inline-flex items-start gap-2 rounded-xl border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-300 max-w-xl">
+          <FileText className="h-4 w-4 mt-0.5 shrink-0 text-blue-400" />
+          <div className="space-y-0.5 text-left">
+            <span className="block font-mono text-[0.55rem] uppercase tracking-wider text-blue-400/70">Notes</span>
+            <p className="font-sans leading-relaxed text-white/90 whitespace-pre-wrap">{notes}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Tags Display */}
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {tags.map((tag, i) => {
+            const colorClass = getTagColorClass(tag);
+            return (
+              <span
+                key={`tag-${i}`}
+                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-mono text-[0.62rem] ${colorClass}`}
+              >
+                {tag}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Custom Fields Display */}
+      {customFields.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {customFields.map(([key, value]) => {
+            const displayValue = typeof value === "object" && value !== null ? JSON.stringify(value) : String(value);
+            return (
+              <span
+                key={key}
+                className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 font-mono text-[0.62rem] text-white/70"
+              >
+                <span className="font-semibold text-amber-300/70">{key}</span>
+                <span className="text-white/20">·</span>
+                <span className="max-w-[10rem] truncate">{displayValue}</span>
+              </span>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -421,7 +524,7 @@ function ClipMetadataEditor({
     <form onSubmit={handleSave} className="space-y-4">
       <div className="flex flex-col gap-1">
         <h3 className="font-mono text-xs uppercase tracking-wider text-amber-300">
-          Clip Metadata Editor
+          Clip Details Editor
         </h3>
         <p className="text-xs text-white/40">
           Edits are saved directly to the video's library folder.
@@ -754,7 +857,7 @@ function VideoMetadataEditor({
     <form onSubmit={handleSave} className="space-y-4">
       <div className="flex flex-col gap-1">
         <h3 className="font-mono text-xs uppercase tracking-wider text-amber-300">
-          Video Metadata Editor
+          Video Details Editor
         </h3>
         <p className="text-xs text-white/40">
           Edits are saved directly to metadata.json in the library.
@@ -1136,7 +1239,7 @@ function SegmentEditor({
                       onChange={(e) =>
                         updateSegment(index, { start: parseFloat(e.target.value) || 0 })
                       }
-                      className="w-full rounded bg-white/[0.03] border border-white/[0.08] px-2 py-1 text-xs text-white"
+                      className="w-full rounded bg-white/[0.03] border border-white/[0.08] px-2 py-1 text-xs text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                     <button
                       type="button"
@@ -1163,7 +1266,7 @@ function SegmentEditor({
                       onChange={(e) =>
                         updateSegment(index, { end: parseFloat(e.target.value) || 0 })
                       }
-                      className="w-full rounded bg-white/[0.03] border border-white/[0.08] px-2 py-1 text-xs text-white"
+                      className="w-full rounded bg-white/[0.03] border border-white/[0.08] px-2 py-1 text-xs text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                     <button
                       type="button"
@@ -1328,6 +1431,7 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
 
   const [selectedMediaPath, setSelectedMediaPath] = useState(video.mainVideoPath);
   const [isEditingSegments, setIsEditingSegments] = useState(false);
+  const [isEditorExpanded, setIsEditorExpanded] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isLooping, setIsLooping] = useState(false);
@@ -1539,8 +1643,12 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
                   ? video.relativePath
                   : `Clip ${pad(video.clips.findIndex((c) => c.mediaPath === selectedMediaPath))}`}
               </h2>
-              {isMainPlaying && video.metadata && (
-                <MetadataTags metadata={video.metadata} />
+              {isMainPlaying && video.metadata ? (
+                <VideoDetailsDisplay metadata={video.metadata} />
+              ) : (
+                !isMainPlaying && activeClip?.metadata && (
+                  <VideoDetailsDisplay metadata={activeClip.metadata} />
+                )
               )}
             </div>
             {!isMainPlaying && (
@@ -1566,19 +1674,8 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
             </div>
 
             {/* Viewfinder HUD overlays */}
-            <div className="absolute top-3.5 left-3.5 z-20 hidden md:flex items-center gap-1.5 pointer-events-none font-mono text-[0.62rem] tracking-wider text-rose-500 uppercase bg-black/40 px-2 py-0.5 rounded backdrop-blur-[1px]">
-              <span className="h-1.5 w-1.5 rounded-full bg-rose-600 animate-pulse" />
-              <span>REC</span>
-            </div>
             <div className="absolute top-3.5 right-3.5 z-20 pointer-events-none hidden md:block font-mono text-[0.62rem] tracking-wider text-white/40 bg-black/40 px-2 py-0.5 rounded backdrop-blur-[1px]">
               <span>1080p · 24fps</span>
-            </div>
-
-            <div className="absolute bottom-3.5 left-3.5 z-20 pointer-events-none hidden md:block font-mono text-[0.68rem] tracking-widest text-amber-300 font-semibold bg-black/60 px-2.5 py-0.5 rounded backdrop-blur-[1px] border border-amber-400/10">
-              <span>TC {formatTimecode(currentTime)}</span>
-            </div>
-            <div className="absolute bottom-3.5 right-3.5 z-20 pointer-events-none hidden md:block font-mono text-[0.68rem] tracking-widest text-white/40 bg-black/60 px-2.5 py-0.5 rounded backdrop-blur-[1px]">
-              <span>DUR {formatTimecode(duration)}</span>
             </div>
 
             {/* Ambilight Glow */}
@@ -1693,34 +1790,57 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
           </div>
 
 
-          {!isMainPlaying && activeClip ? (
-            <div className="mt-4 border-t border-white/[0.06] pt-6">
-              <ClipMetadataEditor
-                rootPath={rootPath}
-                videoRelativePath={video.relativePath}
-                clip={activeClip}
-                video={video}
-                globalTags={globalTags}
-                onSaveSuccess={onUpdateVideoDetail}
-                onDeleteSuccess={(updatedVideo) => {
-                  onUpdateVideoDetail(updatedVideo);
-                  setSelectedMediaPath(updatedVideo.mainVideoPath);
-                }}
-              />
-            </div>
-          ) : (
-            isMainPlaying && (
-              <div className="mt-4 border-t border-white/[0.06] pt-6">
-                <VideoMetadataEditor
-                  rootPath={rootPath}
-                  video={video}
-                  globalTags={globalTags}
-                  onSaveSuccess={onUpdateVideoDetail}
-                  onDeleteSuccess={onDeleteVideo}
-                />
+          {/* Details Editor Section */}
+          <div className="mt-4 border-t border-white/[0.06] pt-4">
+            <button
+              type="button"
+              onClick={() => setIsEditorExpanded(!isEditorExpanded)}
+              className="flex w-full items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.05] hover:border-amber-400/30 focus-visible:outline-none"
+            >
+              <div className="flex items-center gap-2">
+                <Edit className="h-4 w-4 text-amber-400" />
+                <span className="font-mono text-xs uppercase tracking-wider">
+                  {isMainPlaying ? "Video Details Editor" : "Clip Details Editor"}
+                </span>
               </div>
-            )
-          )}
+              <div>
+                {isEditorExpanded ? (
+                  <ChevronUp className="h-4 w-4 text-white/50" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-white/50" />
+                )}
+              </div>
+            </button>
+
+            {isEditorExpanded && (
+              <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.01] p-4 animate-[rv-fade-up_0.2s_ease-out_both]">
+                {!isMainPlaying && activeClip ? (
+                  <ClipMetadataEditor
+                    rootPath={rootPath}
+                    videoRelativePath={video.relativePath}
+                    clip={activeClip}
+                    video={video}
+                    globalTags={globalTags}
+                    onSaveSuccess={onUpdateVideoDetail}
+                    onDeleteSuccess={(updatedVideo) => {
+                      onUpdateVideoDetail(updatedVideo);
+                      setSelectedMediaPath(updatedVideo.mainVideoPath);
+                    }}
+                  />
+                ) : (
+                  isMainPlaying && (
+                    <VideoMetadataEditor
+                      rootPath={rootPath}
+                      video={video}
+                      globalTags={globalTags}
+                      onSaveSuccess={onUpdateVideoDetail}
+                      onDeleteSuccess={onDeleteVideo}
+                    />
+                  )
+                )}
+              </div>
+            )}
+          </div>
         </section>
 
 
