@@ -39,6 +39,10 @@ function GlobalMotionStyles() {
         50% { transform: translateX(20%); }
         100% { transform: translateX(110%); }
       }
+      @keyframes rv-slide-down {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
     `}</style>
   );
 }
@@ -217,15 +221,6 @@ export function App() {
     navigate({ view: "BROWSE_MEDIA" });
   }
 
-  function handleBackFromMedia(): void {
-    navigate({ view: "BROWSE_LIBRARY" });
-  }
-
-  function handleBackToLibrary(): void {
-    setSelectedVideo(null);
-    setVideoDetail(null);
-    navigate({ view: "BROWSE_LIBRARY" });
-  }
 
   function handleUpdateVideoDetail(updatedVideo: VideoDetailType): void {
     setVideoDetail(updatedVideo);
@@ -290,21 +285,20 @@ export function App() {
       )}
 
       <div className="flex h-screen w-full flex-col px-4 py-6 sm:px-10 sm:py-8">
-        <header className="flex flex-col gap-4 border-b border-white/[0.06] pb-4 sm:pb-6 sm:flex-row sm:items-center sm:justify-between">
+        <header className="relative flex flex-col gap-4 border-b border-white/[0.06] pb-4 sm:pb-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <span
               className={`h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400 shadow-[0_0_10px_rgba(232,163,61,0.8)] ${
                 isBusy ? "animate-pulse" : ""
               }`}
             />
-            <div>
-              <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-white to-white/60 sm:text-2xl">
-                Reference Vault
-              </h1>
-            </div>
+            <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-white to-white/60 sm:text-2xl">
+              Reference Vault
+            </h1>
           </div>
 
-          <nav className="flex flex-wrap items-center gap-1 sm:gap-2">
+          {/* Desktop navbar (hidden on mobile) */}
+          <nav className="hidden sm:flex sm:items-center sm:gap-2">
             {[
               {
                 label: "Library",
@@ -358,7 +352,7 @@ export function App() {
           </nav>
         </header>
 
-        <section className="flex flex-col flex-1 min-h-0 overflow-y-auto py-6 sm:py-12">
+        <section className="flex flex-col flex-1 min-h-0 overflow-y-auto pt-6 pb-24 sm:py-12">
           {activeRoute.view === "SELECT_LIBRARY" && (
             <div className="flex flex-1 items-center justify-center py-10 animate-fade-in">
               <div className="max-w-xl text-center space-y-6">
@@ -430,7 +424,6 @@ export function App() {
             <TagBrowser
               rootPath={activeRootPath!}
               videos={scanResult.videos}
-              onBack={handleBackToLibrary}
               onSelectVideo={handleSelectVideo}
             />
           )}
@@ -440,7 +433,6 @@ export function App() {
               rootPath={activeRootPath!}
               video={videoDetail}
               allVideos={scanResult?.videos || []}
-              onBack={handleBackToLibrary}
               onUpdateVideoDetail={handleUpdateVideoDetail}
               onDeleteVideo={async () => {
                 setIsLoading(true);
@@ -462,7 +454,7 @@ export function App() {
           )}
 
           {activeRoute.view === "BROWSE_MEDIA" && (
-            <MediaBrowser onBack={handleBackFromMedia} onGoToSettings={() => navigate({ view: "SETTINGS" })} />
+            <MediaBrowser onGoToSettings={() => navigate({ view: "SETTINGS" })} />
           )}
 
           {activeRoute.view === "SETTINGS" && (
@@ -475,6 +467,70 @@ export function App() {
           )}
         </section>
       </div>
+
+      {/* Mobile Bottom Tab Bar */}
+      <nav className="fixed bottom-0 inset-x-0 z-50 flex items-center justify-around border-t border-white/[0.06] bg-[#0E1012]/90 backdrop-blur-xl px-2 py-2.5 sm:hidden shadow-[0_-8px_30px_rgba(0,0,0,0.6)] animate-[rv-slide-down_0.2s_ease-out]">
+        {[
+          {
+            label: "Library",
+            view: "BROWSE_LIBRARY" as const,
+            requiresVideo: true,
+            icon: "📚",
+            active: activeRoute.view === "BROWSE_LIBRARY" || activeRoute.view === "VIEW_VIDEO",
+          },
+          {
+            label: "Tags",
+            view: "BROWSE_TAGS" as const,
+            requiresVideo: true,
+            icon: "🏷️",
+            active: activeRoute.view === "BROWSE_TAGS",
+          },
+          {
+            label: "Import",
+            view: "IMPORT_VIDEO" as const,
+            requiresVideo: true,
+            icon: "📥",
+            active: activeRoute.view === "IMPORT_VIDEO",
+          },
+          {
+            label: "Media",
+            view: "BROWSE_MEDIA" as const,
+            requiresVideo: false,
+            icon: "📁",
+            active: activeRoute.view === "BROWSE_MEDIA",
+          },
+          {
+            label: "Settings",
+            view: "SETTINGS" as const,
+            requiresVideo: false,
+            icon: "⚙️",
+            active: activeRoute.view === "SETTINGS",
+          },
+        ].map((item) => {
+          const isDisabled = item.requiresVideo && !activeRootPath;
+          return (
+            <button
+              key={item.label}
+              disabled={isDisabled}
+              onClick={() => navigate({ view: item.view })}
+              className={`flex flex-col items-center gap-1 px-3 py-1 font-mono transition duration-200 ${
+                isDisabled
+                  ? "opacity-25 cursor-not-allowed text-white/40"
+                  : item.active
+                  ? "text-amber-400 font-semibold"
+                  : "text-white/60 hover:text-white"
+              }`}
+            >
+              <span className={`text-lg transition-transform ${item.active && !isDisabled ? "scale-110 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" : ""}`}>
+                {item.icon}
+              </span>
+              <span className="text-[0.58rem] uppercase tracking-wider">
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
     </main>
   );
 }

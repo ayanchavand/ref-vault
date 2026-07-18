@@ -8,7 +8,6 @@ interface VideoDetailProps {
   rootPath: string;
   video: VideoDetailType;
   allVideos: ScannedVideo[];
-  onBack(): void;
   onUpdateVideoDetail(updatedVideo: VideoDetailType): void;
   onDeleteVideo(): void;
 }
@@ -1311,7 +1310,7 @@ function SegmentEditor({
   );
 }
 
-export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoDetail, onDeleteVideo }: VideoDetailProps) {
+export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, onDeleteVideo }: VideoDetailProps) {
 
   const [selectedMediaPath, setSelectedMediaPath] = useState(video.mainVideoPath);
   const [isEditingSegments, setIsEditingSegments] = useState(false);
@@ -1474,12 +1473,6 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
             <p className="mt-1 truncate font-mono text-sm text-white/50">{video.relativePath}</p>
           </div>
         </div>
-        <button
-          onClick={onBack}
-          className="flex shrink-0 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
-        >
-          <span aria-hidden="true">&larr;</span> All videos
-        </button>
       </div>
 
       <div className="grid flex-1 gap-5 xl:grid-cols-[minmax(0,2.3fr)_minmax(0,0.9fr)]">

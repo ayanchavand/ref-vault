@@ -943,11 +943,10 @@ function RootPicker({ onRoot, savedLocations, isLoading }: RootPickerProps) {
 
 // ─── Main MediaBrowser ────────────────────────────────────────────────────────
 interface MediaBrowserProps {
-  onBack: () => void;
   onGoToSettings: () => void;
 }
 
-export function MediaBrowser({ onBack, onGoToSettings }: MediaBrowserProps) {
+export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
   const [mediaRoot, setMediaRoot] = useState(() => localStorage.getItem(MEDIA_ROOT_KEY) ?? "");
   const [savedLocations, setSavedLocations] = useState<string[]>(loadSavedLocations);
   const [items, setItems] = useState<ScannedMediaItem[]>([]);
@@ -1179,23 +1178,6 @@ export function MediaBrowser({ onBack, onGoToSettings }: MediaBrowserProps) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button
-            onClick={onBack}
-            style={{
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: 8,
-              color: "rgba(255,255,255,0.6)",
-              fontFamily: "monospace",
-              fontSize: 11,
-              letterSpacing: "0.1em",
-              padding: "6px 12px",
-              cursor: "pointer",
-              textTransform: "uppercase",
-            }}
-          >
-            ← Back
-          </button>
           <div>
             <p
               style={{
