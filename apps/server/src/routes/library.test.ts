@@ -494,5 +494,20 @@ test("deletes a clip and resequences remaining clips on disk and in clips.json m
   }
 });
 
+test("capture-frame rejects requests with missing parameters", async () => {
+  const app = await buildApp();
+  try {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/videos/capture-frame",
+      payload: { rootPath: "dummy" },
+    });
+    assert.equal(response.statusCode, 400);
+  } finally {
+    await app.close();
+  }
+});
+
+
 
 

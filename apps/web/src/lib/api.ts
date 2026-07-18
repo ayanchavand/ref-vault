@@ -17,6 +17,8 @@ import type {
   CreateVideoPlaceholderResponse,
   DeleteVideoRequest,
   DeleteVideoResponse,
+  CaptureFrameRequest,
+  CaptureFrameResponse,
 } from "@reference-vault/shared";
 
 export class ApiError extends Error {
@@ -305,5 +307,24 @@ export function uploadMediaFile(
     xhr.send(file);
   });
 }
+
+export async function captureFrame(
+  request: CaptureFrameRequest,
+): Promise<CaptureFrameResponse> {
+  const response = await fetch("/api/videos/capture-frame", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const payload: unknown = await response.json();
+
+  if (!response.ok) {
+    const error = payload as ApiErrorResponse;
+    throw new ApiError(error.message || "The frame could not be captured.");
+  }
+
+  return payload as CaptureFrameResponse;
+}
+
 
 

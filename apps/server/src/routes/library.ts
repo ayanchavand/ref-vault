@@ -24,6 +24,8 @@ import type {
   CreateVideoPlaceholderResponse,
   DeleteVideoRequest,
   DeleteVideoResponse,
+  CaptureFrameRequest,
+  CaptureFrameResponse,
 } from "@reference-vault/shared";
 
 import { validateLibraryRoot } from "../services/validate-library-root.js";
@@ -35,6 +37,7 @@ import { writeVideoMetadata } from "../services/write-video-metadata.js";
 import { writeSplitPlan } from "../services/write-split-plan.js";
 import { generateThumbnail } from "../services/generate-thumbnail.js";
 import { createVideoPlaceholder, resolveUploadDirectory, deleteVideo } from "../services/import-video.js";
+import { captureFrame } from "../services/capture-frame.js";
 
 
 export async function registerLibraryRoutes(app: FastifyInstance): Promise<void> {
@@ -844,4 +847,46 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
       return reply.status(200).send(result.value);
     },
   );
+
+  app.post<{
+    Body: CaptureFrameRequest;
+    Reply: CaptureFrameResponse | ApiErrorResponse;
+  }>(
+    "/api/videos/capture-frame",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["rootPath", "mediaPath", "timestamp"],
+          additionalProperties: false,
+          properties: {
+            rootPath: { type: "string" },
+            mediaPath: { type: "string" },
+            timestamp: { type: "number" },
+            mediaRootPath: { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await captureFrame(
+        request.body.rootPath,
+        request.body.mediaPath,
+        request.body.timestamp,
+        request.body.mediaRootPath,
+      );
+
+      if (!result.ok) {
+        const statusCode =
+          result.error.error === "LIBRARY_ROOT_NOT_FOUND" ||
+          result.error.error === "MEDIA_NOT_FOUND"
+            ? 404
+            : 500;
+        return reply.status(statusCode).send(result.error);
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  );
 }
+

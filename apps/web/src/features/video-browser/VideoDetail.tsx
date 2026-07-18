@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { VideoDetail as VideoDetailType, JsonObject, ScannedVideo } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover } from "./Uselazythumbnail";
-import { putClipMetadata, putVideoMetadata, saveSplitPlan, getVideoDetail, deleteClip, deleteVideo, ApiError } from "../../lib/api";
-import { Save, RotateCcw, Trash2, Repeat, Gauge, Scissors, PlayCircle, Film, Plus } from "lucide-react";
+import { putClipMetadata, putVideoMetadata, saveSplitPlan, getVideoDetail, deleteClip, deleteVideo, ApiError, captureFrame } from "../../lib/api";
+import { Save, RotateCcw, Trash2, Repeat, Gauge, Scissors, PlayCircle, Film, Plus, Camera } from "lucide-react";
 
 
 interface VideoDetailProps {
@@ -1335,6 +1335,43 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
+  const [isPaused, setIsPaused] = useState(true);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [captureResult, setCaptureResult] = useState<string | null>(null);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+
+  async function handleCaptureFrame() {
+    if (!videoRef.current) return;
+    setIsCapturing(true);
+    setCaptureError(null);
+    setCaptureResult(null);
+
+    const savedMediaRoot = typeof window !== "undefined"
+      ? localStorage.getItem("reference-vault.media-root")
+      : null;
+
+    try {
+      const response = await captureFrame({
+        rootPath,
+        mediaPath: selectedMediaPath,
+        timestamp: videoRef.current.currentTime,
+        mediaRootPath: savedMediaRoot || undefined,
+      });
+      setCaptureResult(response.savedPath);
+      // Auto-clear success message after 4 seconds
+      setTimeout(() => {
+        setCaptureResult(null);
+      }, 4000);
+    } catch (err) {
+      setCaptureError(err instanceof ApiError ? err.message : "Failed to capture frame.");
+      setTimeout(() => {
+        setCaptureError(null);
+      }, 5000);
+    } finally {
+      setIsCapturing(false);
+    }
+  }
+
   const [globalTags, setGlobalTags] = useState<string[]>([]);
 
   useEffect(() => {
@@ -1555,6 +1592,9 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
                 src={mediaUrl}
                 poster={posterUrl}
                 preload="metadata"
+                onPlay={() => setIsPaused(false)}
+                onPause={() => setIsPaused(true)}
+                onSeeked={(e) => setIsPaused(e.currentTarget.paused)}
                 onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                 onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
               >
@@ -1562,6 +1602,20 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
               </video>
             </div>
           </div>
+
+          {/* Capture Feedback Toast */}
+          {(captureResult || captureError) && (
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-[0.7rem] font-mono uppercase tracking-wider ${
+              captureResult
+                ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400"
+                : "border-rose-500/20 bg-rose-500/5 text-rose-400"
+            }`} style={{ animation: "rv-success-in 0.3s cubic-bezier(0.34,1.56,0.64,1) both" }}>
+              <span className={`h-1.5 w-1.5 rounded-full ${captureResult ? "bg-emerald-400 animate-ping" : "bg-rose-400"}`} />
+              <span>
+                {captureResult ? `Saved: ${captureResult.split("/").pop()}` : `Error: ${captureError}`}
+              </span>
+            </div>
+          )}
 
           {/* Advanced Playback Control Panel */}
           <div className="grid grid-cols-2 gap-3 p-2.5 text-xs sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:p-3 sm:text-sm rounded-xl border border-white/[0.04] bg-white/[0.01]">
@@ -1619,6 +1673,22 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
             >
               <Repeat className="h-3.5 w-3.5" />
               Loop: {isLooping ? "ON" : "OFF"}
+            </button>
+
+            {/* Capture Frame Button */}
+            <button
+              type="button"
+              onClick={handleCaptureFrame}
+              disabled={isCapturing || !isPaused}
+              title={!isPaused ? "Pause the video first to capture a frame" : "Capture current frame to Generated/"}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition-all duration-200 focus:outline-none text-center hover:-translate-y-0.5 active:translate-y-px active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${
+                isCapturing
+                  ? "bg-amber-400/20 border border-amber-400/50 text-amber-300 font-semibold animate-pulse"
+                  : "border border-white/[0.08] bg-white/[0.03] text-white/60 hover:text-white hover:border-amber-400/50"
+              }`}
+            >
+              <Camera className="h-3.5 w-3.5" />
+              {isCapturing ? "Capturing..." : "Capture Frame"}
             </button>
           </div>
 

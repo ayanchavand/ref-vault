@@ -138,7 +138,8 @@ export type LibraryRootValidationErrorCode =
   | "METADATA_WRITE_FAILED"
   | "INVALID_MEDIA_TYPE"
   | "THUMBNAIL_GENERATION_FAILED"
-  | "MEDIA_SCAN_FAILED";
+  | "MEDIA_SCAN_FAILED"
+  | "FRAME_CAPTURE_FAILED";
 
 export interface ApiErrorResponse {
   error: LibraryRootValidationErrorCode;
@@ -178,4 +179,17 @@ export interface DeleteVideoRequest {
 export interface DeleteVideoResponse {
   success: boolean;
 }
+
+export interface CaptureFrameRequest {
+  rootPath: string;
+  mediaPath: string;
+  timestamp: number;
+  mediaRootPath?: string;
+}
+
+export interface CaptureFrameResponse {
+  success: boolean;
+  savedPath: string;
+}
+
 
