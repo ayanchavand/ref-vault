@@ -480,6 +480,7 @@ export function App() {
             <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
               <VideoImport
                 rootPath={activeRootPath!}
+                libraryConfig={libraryConfig}
                 onImportSuccess={async () => {
                   setIsLoading(true);
                   try {
@@ -507,6 +508,7 @@ export function App() {
                 rootPath={activeRootPath!}
                 videos={scanResult.videos}
                 onSelectVideo={handleSelectVideo}
+                libraryConfig={libraryConfig}
               />
             </div>
           )}

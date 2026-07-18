@@ -1,12 +1,14 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { UploadCloud } from "lucide-react";
-import { createVideoPlaceholder, uploadVideo, uploadMediaFile, ApiError } from "../../lib/api";
+import { createVideoPlaceholder, uploadVideo, uploadMediaFile, putVideoMetadata, ApiError } from "../../lib/api";
 import { navigate } from "../../lib/router";
+import type { LibraryConfig, LibraryConfigField, JsonObject } from "@reference-vault/shared";
 
 interface VideoImportProps {
   rootPath: string;
   onImportSuccess(): void;
   onBack(): void;
+  libraryConfig?: LibraryConfig;
 }
 
 // Load video duration using a temporary HTMLVideoElement
@@ -24,7 +26,7 @@ const checkVideoDuration = (file: File): Promise<number> => {
   });
 };
 
-export function VideoImport({ rootPath, onImportSuccess, onBack }: VideoImportProps) {
+export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }: VideoImportProps) {
   const [importType, setImportType] = useState<"video" | "media">("video");
   const mediaRoot = useMemo(() => window.localStorage.getItem("reference-vault.media-root") || "", []);
 
@@ -34,6 +36,19 @@ export function VideoImport({ rootPath, onImportSuccess, onBack }: VideoImportPr
   const [tagsInput, setTagsInput] = useState("");
   const [notes, setNotes] = useState("");
   const [rating, setRating] = useState(0);
+  const [structuredFields, setStructuredFields] = useState<Record<string, string | string[]>>({});
+
+  const configuredVideoFields = useMemo(() => {
+    return libraryConfig?.fields.filter((f: LibraryConfigField) => f.type === "video") ?? [];
+  }, [libraryConfig]);
+
+  useEffect(() => {
+    const initial: Record<string, string | string[]> = {};
+    configuredVideoFields.forEach((field) => {
+      initial[field.name] = field.isMulti ? [] : "";
+    });
+    setStructuredFields(initial);
+  }, [configuredVideoFields]);
 
   const [isDragOver, setIsDragOver] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -211,6 +226,41 @@ export function VideoImport({ rootPath, onImportSuccess, onBack }: VideoImportPr
         notes,
         rating,
       });
+
+      const hasCustomFields = Object.keys(structuredFields).some((k) => {
+        const val = structuredFields[k];
+        return Array.isArray(val) ? val.length > 0 : !!val;
+      });
+
+      if (hasCustomFields) {
+        const fullMetadata: JsonObject = {
+          tags,
+        };
+        if (notes) fullMetadata.notes = notes;
+        if (artist) fullMetadata.artist = artist;
+        if (rating) fullMetadata.rating = rating;
+
+        configuredVideoFields.forEach((field) => {
+          const val = structuredFields[field.name];
+          if (field.isMulti) {
+            const arr = Array.isArray(val) ? val : [];
+            if (arr.length > 0) {
+              fullMetadata[field.name] = arr;
+            }
+          } else {
+            const str = typeof val === "string" ? val : "";
+            if (str) {
+              fullMetadata[field.name] = str;
+            }
+          }
+        });
+
+        await putVideoMetadata({
+          rootPath,
+          videoRelativePath: placeholder.videoRelativePath,
+          metadata: fullMetadata,
+        });
+      }
 
       setImportStep("uploading_video");
       await uploadVideo(
@@ -479,6 +529,55 @@ export function VideoImport({ rootPath, onImportSuccess, onBack }: VideoImportPr
                   )}
                 </div>
               </div>
+
+              {/* Configured Structured Fields */}
+              {configuredVideoFields.map((field) => (
+                <div key={field.name} className="space-y-1.5 animate-[rv-slide-down_0.2s_ease-out]">
+                  <label className="block font-mono text-[0.65rem] uppercase tracking-wider text-white/50">
+                    {field.name}
+                  </label>
+                  {field.isMulti ? (
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {field.values.map((val) => {
+                        const isSelected = (structuredFields[field.name] as string[] ?? []).includes(val);
+                        return (
+                          <button
+                            key={val}
+                            type="button"
+                            disabled={isImporting}
+                            onClick={() => {
+                              const current = (structuredFields[field.name] as string[] ?? []);
+                              const next = isSelected
+                                ? current.filter((c) => c !== val)
+                                : [...current, val];
+                              setStructuredFields({ ...structuredFields, [field.name]: next });
+                            }}
+                            className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
+                              isSelected
+                                ? "border-purple-400/50 bg-purple-400/10 text-purple-300 font-semibold"
+                                : "border-white/[0.08] bg-white/[0.02] text-white/60 hover:bg-white/[0.04]"
+                            }`}
+                          >
+                            {val}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <select
+                      value={structuredFields[field.name] as string ?? ""}
+                      disabled={isImporting}
+                      onChange={(e) => setStructuredFields({ ...structuredFields, [field.name]: e.target.value })}
+                      className="w-full rounded-lg border border-white/[0.08] bg-[#111316] px-3.5 py-2 text-sm text-white focus:border-amber-400/50 focus:outline-none focus:ring-1 focus:ring-amber-400/50"
+                    >
+                      <option value="" className="text-white/40 bg-[#111316]">Select {field.name}...</option>
+                      {field.values.map((val) => (
+                        <option key={val} value={val} className="text-white bg-[#111316]">{val}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              ))}
 
               {/* Tags Field */}
               <div className="space-y-1.5">
