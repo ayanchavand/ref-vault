@@ -211,15 +211,10 @@ function ClipCard({
         )}
       </div>
 
-      <div className="min-w-0 flex-1 py-0.5">
-        <p className="truncate font-mono text-[0.8rem] font-medium text-white/90">
-          {clip.mediaPath.split("/").pop()}
+      <div className="min-w-0 flex-1 py-0.5 flex flex-col gap-1">
+        <p className="truncate font-mono text-xs font-semibold text-white/90">
+          Clip {pad(index)}
         </p>
-        {clip.metadataPath && (
-          <p className="mt-0.5 truncate font-mono text-[0.65rem] text-white/30">
-            {clip.metadataPath}
-          </p>
-        )}
         {clip.metadata && <MetadataTags metadata={clip.metadata} />}
       </div>
     </div>
@@ -1496,7 +1491,9 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
                 {isMainPlaying ? "Now Playing · Main" : "Now Playing · Clip"}
               </p>
               <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-white sm:text-xl">
-                {selectedMediaPath.split("/").pop()}
+                {isMainPlaying
+                  ? video.relativePath
+                  : `Clip ${pad(video.clips.findIndex((c) => c.mediaPath === selectedMediaPath))}`}
               </h2>
               {isMainPlaying && video.metadata && (
                 <MetadataTags metadata={video.metadata} />

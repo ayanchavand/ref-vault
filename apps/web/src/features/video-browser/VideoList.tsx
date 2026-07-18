@@ -186,9 +186,6 @@ function VideoThumbnailCard({
             <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/95 via-black/85 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 flex flex-col gap-1.5">
               <div>
                 <p className="truncate font-semibold text-white text-xs">{video.relativePath}</p>
-                <p className="truncate font-mono text-[0.6rem] text-white/40">
-                  {video.mainVideoPath.split("/").pop() ?? video.mainVideoPath}
-                </p>
               </div>
 
               {(artist || rating > 0 || tags.length > 0) && (
@@ -227,9 +224,6 @@ function VideoThumbnailCard({
         {!isMoodboard && (
           <div className="w-full p-4 border-t border-white/[0.02] flex flex-col gap-1">
             <p className="truncate font-semibold text-white/95">{video.relativePath}</p>
-            <p className="truncate font-mono text-xs text-white/35">
-              {video.mainVideoPath.split("/").pop() ?? video.mainVideoPath}
-            </p>
 
             {/* Tags section */}
             {tags.length > 0 && (
