@@ -6,6 +6,7 @@ import type {
   VideoDetail as VideoDetailType,
 } from "@reference-vault/shared";
 
+import { Library, Tag, Upload, Image, Settings as SettingsIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { Settings } from "./features/settings/Settings";
 import { TagBrowser } from "./features/tag-browser/TagBrowser";
 import { VideoList } from "./features/video-browser/VideoList";
@@ -72,8 +73,9 @@ function VideoListPagination({
         type="button"
         onClick={onPrevPage}
         disabled={currentPage === 1}
-        className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 font-mono text-[0.7rem] uppercase tracking-widest text-white/70 transition hover:bg-white/[0.06] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:active:scale-100"
+        className="flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 font-mono text-[0.7rem] uppercase tracking-widest text-white/70 transition hover:bg-white/[0.06] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:active:scale-100"
       >
+        <ChevronLeft className="h-3.5 w-3.5" />
         Prev
       </button>
       <span className="font-mono text-[0.7rem] uppercase tracking-widest text-white/40">
@@ -83,9 +85,10 @@ function VideoListPagination({
         type="button"
         onClick={onNextPage}
         disabled={currentPage === totalPages}
-        className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 font-mono text-[0.7rem] uppercase tracking-widest text-white/70 transition hover:bg-white/[0.06] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:active:scale-100"
+        className="flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 font-mono text-[0.7rem] uppercase tracking-widest text-white/70 transition hover:bg-white/[0.06] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:active:scale-100"
       >
         Next
+        <ChevronRight className="h-3.5 w-3.5" />
       </button>
     </div>
   );
@@ -304,30 +307,35 @@ export function App() {
                 label: "Library",
                 view: "BROWSE_LIBRARY" as const,
                 requiresVideo: true,
+                icon: Library,
                 active: activeRoute.view === "BROWSE_LIBRARY" || activeRoute.view === "VIEW_VIDEO",
               },
               {
                 label: "Tags",
                 view: "BROWSE_TAGS" as const,
                 requiresVideo: true,
+                icon: Tag,
                 active: activeRoute.view === "BROWSE_TAGS",
               },
               {
                 label: "Import",
                 view: "IMPORT_VIDEO" as const,
                 requiresVideo: true,
+                icon: Upload,
                 active: activeRoute.view === "IMPORT_VIDEO",
               },
               {
                 label: "Media",
                 view: "BROWSE_MEDIA" as const,
                 requiresVideo: false,
+                icon: Image,
                 active: activeRoute.view === "BROWSE_MEDIA",
               },
               {
                 label: "Settings",
                 view: "SETTINGS" as const,
                 requiresVideo: false,
+                icon: SettingsIcon,
                 active: activeRoute.view === "SETTINGS",
               },
             ].map((item) => {
@@ -337,7 +345,7 @@ export function App() {
                   key={item.label}
                   disabled={isDisabled}
                   onClick={() => navigate({ view: item.view })}
-                  className={`relative rounded-lg px-3.5 py-2 font-mono text-[0.68rem] uppercase tracking-wider transition-all duration-300 ${
+                  className={`relative flex items-center gap-1.5 rounded-lg px-3.5 py-2 font-mono text-[0.68rem] uppercase tracking-wider transition-all duration-300 ${
                     isDisabled
                       ? "opacity-25 cursor-not-allowed text-white/40"
                       : item.active
@@ -345,6 +353,7 @@ export function App() {
                       : "text-white/60 hover:bg-white/[0.04] hover:text-white"
                   }`}
                 >
+                  <item.icon className="h-3.5 w-3.5" />
                   {item.label}
                 </button>
               );
@@ -370,8 +379,9 @@ export function App() {
                 <button
                   type="button"
                   onClick={() => navigate({ view: "SETTINGS" })}
-                  className="rounded-lg bg-amber-400 px-6 py-3 text-sm font-semibold text-[#0A0B0D] hover:bg-amber-300 transition active:scale-[0.98]"
+                  className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-6 py-3 text-sm font-semibold text-[#0A0B0D] hover:bg-amber-300 transition active:scale-[0.98]"
                 >
+                  <SettingsIcon className="h-4 w-4" />
                   Configure System Libraries
                 </button>
               </div>
@@ -475,35 +485,35 @@ export function App() {
             label: "Library",
             view: "BROWSE_LIBRARY" as const,
             requiresVideo: true,
-            icon: "📚",
+            icon: Library,
             active: activeRoute.view === "BROWSE_LIBRARY" || activeRoute.view === "VIEW_VIDEO",
           },
           {
             label: "Tags",
             view: "BROWSE_TAGS" as const,
             requiresVideo: true,
-            icon: "🏷️",
+            icon: Tag,
             active: activeRoute.view === "BROWSE_TAGS",
           },
           {
             label: "Import",
             view: "IMPORT_VIDEO" as const,
             requiresVideo: true,
-            icon: "📥",
+            icon: Upload,
             active: activeRoute.view === "IMPORT_VIDEO",
           },
           {
             label: "Media",
             view: "BROWSE_MEDIA" as const,
             requiresVideo: false,
-            icon: "📁",
+            icon: Image,
             active: activeRoute.view === "BROWSE_MEDIA",
           },
           {
             label: "Settings",
             view: "SETTINGS" as const,
             requiresVideo: false,
-            icon: "⚙️",
+            icon: SettingsIcon,
             active: activeRoute.view === "SETTINGS",
           },
         ].map((item) => {
@@ -521,9 +531,7 @@ export function App() {
                   : "text-white/60 hover:text-white"
               }`}
             >
-              <span className={`text-lg transition-transform ${item.active && !isDisabled ? "scale-110 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" : ""}`}>
-                {item.icon}
-              </span>
+              <item.icon className={`h-5 w-5 transition-transform ${item.active && !isDisabled ? "scale-110 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" : ""}`} />
               <span className="text-[0.58rem] uppercase tracking-wider">
                 {item.label}
               </span>

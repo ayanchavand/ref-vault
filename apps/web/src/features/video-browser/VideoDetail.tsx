@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { VideoDetail as VideoDetailType, JsonObject, ScannedVideo } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover } from "./Uselazythumbnail";
 import { putClipMetadata, putVideoMetadata, saveSplitPlan, getVideoDetail, deleteClip, deleteVideo, ApiError } from "../../lib/api";
+import { Save, RotateCcw, Trash2, Repeat, Gauge, Scissors, PlayCircle, Film, Plus } from "lucide-react";
 
 
 interface VideoDetailProps {
@@ -541,24 +542,27 @@ function ClipMetadataEditor({
           <button
             type="submit"
             disabled={isSaving || !isModified}
-            className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
           >
+            <Save className="h-3.5 w-3.5" />
             {isSaving ? "Saving..." : "Save Changes"}
           </button>
           <button
             type="button"
             onClick={handleReset}
             disabled={isSaving || !isModified}
-            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
           >
+            <RotateCcw className="h-3.5 w-3.5" />
             Reset
           </button>
           <button
             type="button"
             onClick={handleDelete}
             disabled={isSaving}
-            className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-400 transition hover:bg-rose-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-400 transition hover:bg-rose-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
+            <Trash2 className="h-3.5 w-3.5" />
             Delete Clip
           </button>
         </div>
@@ -883,16 +887,18 @@ function VideoMetadataEditor({
           <button
             type="submit"
             disabled={isSaving || !isModified}
-            className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
           >
+            <Save className="h-3.5 w-3.5" />
             {isSaving ? "Saving..." : "Save Changes"}
           </button>
           <button
             type="button"
             onClick={handleReset}
             disabled={isSaving || !isModified}
-            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
           >
+            <RotateCcw className="h-3.5 w-3.5" />
             Reset
           </button>
         </div>
@@ -916,8 +922,9 @@ function VideoMetadataEditor({
               type="button"
               onClick={() => setIsConfirmingDelete(true)}
               disabled={isSaving}
-              className="rounded-lg border border-rose-500/30 bg-rose-500/[0.06] px-4 py-2 text-sm font-medium text-rose-300 transition hover:bg-rose-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/[0.06] px-4 py-2 text-sm font-medium text-rose-300 transition hover:bg-rose-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70 disabled:cursor-not-allowed disabled:opacity-40"
             >
+              <Trash2 className="h-3.5 w-3.5" />
               Delete Video
             </button>
           ) : (
@@ -1073,9 +1080,10 @@ function SegmentEditor({
         <button
           type="button"
           onClick={addSegment}
-          className="rounded-lg bg-amber-400 px-3 py-1.5 text-xs font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus:outline-none"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-400 px-3 py-1.5 text-xs font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus:outline-none"
         >
-          + Add Marker
+          <Plus className="h-3.5 w-3.5" />
+          Add Marker
         </button>
       </div>
 
@@ -1496,8 +1504,9 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
               <button
                 type="button"
                 onClick={() => setSelectedMediaPath(video.mainVideoPath)}
-                className="self-start rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#111316]"
+                className="inline-flex items-center gap-2 self-start rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#111316]"
               >
+                <PlayCircle className="h-4 w-4" />
                 Play main video
               </button>
             )}
@@ -1572,6 +1581,7 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
 
             {/* Playback speed rate selection */}
             <div className="flex items-center gap-1 justify-between sm:justify-start sm:gap-1.5">
+              <Gauge className="h-3.5 w-3.5 text-white/30 shrink-0" />
               <span className="font-mono text-[0.6rem] uppercase tracking-widest text-white/30 mr-1 hidden min-[370px]:inline">Speed</span>
               <div className="flex items-center gap-1">
                 {[0.25, 0.5, 1, 2].map((rate) => (
@@ -1595,12 +1605,13 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
             <button
               type="button"
               onClick={() => setIsLooping(!isLooping)}
-              className={`rounded-lg px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition focus:outline-none text-center ${
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition focus:outline-none text-center ${
                 isLooping
                   ? "bg-amber-400/20 border border-amber-400/50 text-amber-300 font-semibold shadow-[0_0_8px_rgba(232,163,61,0.2)]"
                   : "border border-white/[0.08] bg-white/[0.03] text-white/60 hover:text-white"
               }`}
             >
+              <Repeat className="h-3.5 w-3.5" />
               Loop: {isLooping ? "ON" : "OFF"}
             </button>
           </div>
@@ -1652,8 +1663,9 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
               <button
                 type="button"
                 onClick={() => setIsEditingSegments(true)}
-                className="rounded border border-amber-400/30 bg-amber-400/[0.06] px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-wider text-amber-300 hover:bg-amber-400/10 focus:outline-none"
+                className="inline-flex items-center gap-1.5 rounded border border-amber-400/30 bg-amber-400/[0.06] px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-wider text-amber-300 hover:bg-amber-400/10 focus:outline-none"
               >
+                <Scissors className="h-3 w-3" />
                 Create Clips
               </button>
             ) : (
@@ -1685,6 +1697,7 @@ export function VideoDetail({ rootPath, video, allVideos, onUpdateVideoDetail, o
             />
           ) : video.clips.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 px-4 py-10 text-center">
+              <Film className="h-8 w-8 text-white/20 mb-1" />
               <span className="font-mono text-[0.65rem] uppercase tracking-widest text-white/30">
                 No entries
               </span>

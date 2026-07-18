@@ -7,6 +7,7 @@ import type {
 
 import { getVideoDetail, ApiError } from "../../lib/api";
 import { useLazyThumbnail, usePrefetchOnHover } from "../video-browser/Uselazythumbnail";
+import { Tag, Scissors, X, Film, SlidersHorizontal } from "lucide-react";
 
 interface TagBrowserProps {
   rootPath: string;
@@ -86,7 +87,8 @@ function TagBrowserClipCard({
           <p className="truncate text-xs text-white/50">{entry.video.relativePath}</p>
         </div>
         <div className="flex flex-wrap gap-1">
-          <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[0.6rem] text-white/60">
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[0.6rem] text-white/60">
+            {entry.source === "clip" ? <Scissors className="h-3 w-3" /> : <Film className="h-3 w-3" />}
             {entry.source === "clip" ? "clip" : "video"}
           </span>
           <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[0.6rem] text-white/60">
@@ -257,7 +259,8 @@ export function TagBrowser({ rootPath, videos, onSelectVideo }: TagBrowserProps)
               Select multiple video tags and clip subtags to filter clips in your library.
             </p>
           </div>
-          <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/50">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/50">
+            <SlidersHorizontal className="h-3 w-3" />
             {matchedClips.length} matched
           </span>
         </div>
@@ -292,6 +295,7 @@ export function TagBrowser({ rootPath, videos, onSelectVideo }: TagBrowserProps)
                         : "border-white/[0.06] bg-white/[0.03] text-white/80 hover:border-amber-400/30 hover:bg-white/[0.06]"
                     }`}
                   >
+                    <Tag className="h-3 w-3 opacity-60" />
                     <span className="font-medium">{tag}</span>
                     <span className="rounded-full bg-white/[0.08] px-2 text-[0.65rem] text-white/60">
                       {formatTagCount(videoTagCounts[tag] || 0)}
@@ -333,6 +337,7 @@ export function TagBrowser({ rootPath, videos, onSelectVideo }: TagBrowserProps)
                         : "border-white/[0.06] bg-white/[0.03] text-white/80 hover:border-sky-400/30 hover:bg-white/[0.06]"
                     }`}
                   >
+                    <Scissors className="h-3 w-3 opacity-60" />
                     <span className="font-medium">{tag}</span>
                     <span className="rounded-full bg-white/[0.08] px-2 text-[0.65rem] text-white/60">
                       {formatTagCount(clipTagCounts[tag] || 0)}
@@ -347,14 +352,15 @@ export function TagBrowser({ rootPath, videos, onSelectVideo }: TagBrowserProps)
         {/* Clear Filters */}
         {isFilterActive && (
           <div className="mb-6 flex justify-end">
-            <button
+          <button
               type="button"
               onClick={() => {
                 setSelectedVideoTags([]);
                 setSelectedClipTags([]);
               }}
-              className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-white/60 transition hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/70"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-white/60 transition hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/70"
             >
+              <X className="h-3 w-3" />
               Clear filters
             </button>
           </div>

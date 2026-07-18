@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { FolderOpen, Settings as SettingsIcon, CheckCircle, AlertCircle, Unlink } from "lucide-react";
 import { ApiError, validateLibraryRoot } from "../../lib/api";
 
 const videoStorageKey = "reference-vault.library-root";
@@ -99,7 +100,8 @@ export function Settings({
         <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
           Preferences
         </p>
-        <h2 className="text-3xl font-semibold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-white to-white/60 sm:text-4xl">
+        <h2 className="text-3xl font-semibold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-white to-white/60 sm:text-4xl flex items-center gap-2.5">
+          <SettingsIcon className="h-7 w-7 text-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.2)]" />
           System Libraries
         </h2>
         <p className="max-w-xl text-sm leading-relaxed text-white/50">
@@ -113,7 +115,8 @@ export function Settings({
           <form onSubmit={handleVideoSubmit} className="space-y-4">
             <div>
               <div className="flex items-center justify-between">
-                <label htmlFor="video-root" className="text-sm font-semibold text-white/90">
+                <label htmlFor="video-root" className="text-sm font-semibold text-white/90 flex items-center gap-1.5">
+                  <FolderOpen className="h-4 w-4 text-amber-400/80" />
                   Video Library Root
                 </label>
                 {activeVideoPath && (
@@ -139,13 +142,15 @@ export function Settings({
             </div>
 
             {videoError && (
-              <p role="alert" className="rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300 leading-normal">
+              <p role="alert" className="flex items-center gap-2 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300 leading-normal">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 text-rose-400" />
                 {videoError}
               </p>
             )}
 
             {videoSuccess && (
-              <p role="alert" className="rounded-lg bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 leading-normal">
+              <p role="alert" className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 leading-normal">
+                <CheckCircle className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
                 Video library root updated successfully!
               </p>
             )}
@@ -170,8 +175,9 @@ export function Settings({
               <button
                 type="button"
                 onClick={handleForgetVideo}
-                className="self-start text-[0.68rem] font-medium text-white/40 hover:text-rose-400 transition"
+                className="inline-flex items-center gap-1.5 self-start text-[0.68rem] font-medium text-white/40 hover:text-rose-400 transition"
               >
+                <Unlink className="h-3 w-3" />
                 Forget video library path
               </button>
             </div>
@@ -183,7 +189,8 @@ export function Settings({
           <form onSubmit={handleMediaSubmit} className="space-y-4">
             <div>
               <div className="flex items-center justify-between">
-                <label htmlFor="media-root" className="text-sm font-semibold text-white/90">
+                <label htmlFor="media-root" className="text-sm font-semibold text-white/90 flex items-center gap-1.5">
+                  <FolderOpen className="h-4 w-4 text-amber-400/80" />
                   Media Library Root
                 </label>
                 {activeMediaPath && (
@@ -209,13 +216,15 @@ export function Settings({
             </div>
 
             {mediaError && (
-              <p role="alert" className="rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300 leading-normal">
+              <p role="alert" className="flex items-center gap-2 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-300 leading-normal">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 text-rose-400" />
                 {mediaError}
               </p>
             )}
 
             {mediaSuccess && (
-              <p role="alert" className="rounded-lg bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 leading-normal">
+              <p role="alert" className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 leading-normal">
+                <CheckCircle className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
                 Media library root updated successfully!
               </p>
             )}
@@ -240,8 +249,9 @@ export function Settings({
               <button
                 type="button"
                 onClick={handleForgetMedia}
-                className="self-start text-[0.68rem] font-medium text-white/40 hover:text-rose-400 transition"
+                className="inline-flex items-center gap-1.5 self-start text-[0.68rem] font-medium text-white/40 hover:text-rose-400 transition"
               >
+                <Unlink className="h-3 w-3" />
                 Forget media library path
               </button>
             </div>

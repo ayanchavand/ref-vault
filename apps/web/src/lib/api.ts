@@ -254,4 +254,56 @@ export async function deleteVideo(
   return payload as DeleteVideoResponse;
 }
 
+export function uploadMediaFile(
+  rootPath: string,
+  fileName: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<{ success: boolean }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const url = `/api/media/upload?rootPath=${encodeURIComponent(
+      rootPath,
+    )}&fileName=${encodeURIComponent(fileName)}`;
+
+    xhr.open("POST", url, true);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+
+    if (onProgress && xhr.upload) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          onProgress(percent);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const response = JSON.parse(xhr.responseText);
+          resolve(response);
+        } catch {
+          resolve({ success: true });
+        }
+      } else {
+        let errorMessage = "The media file could not be uploaded.";
+        try {
+          const error = JSON.parse(xhr.responseText) as ApiErrorResponse;
+          errorMessage = error.message || errorMessage;
+        } catch {
+          // Keep default
+        }
+        reject(new ApiError(errorMessage));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new ApiError("A network error occurred during the upload."));
+    };
+
+    xhr.send(file);
+  });
+}
+
 

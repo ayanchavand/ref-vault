@@ -762,6 +762,53 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
   );
 
   app.post<{
+    Querystring: { rootPath: string; fileName: string };
+  }>(
+    "/api/media/upload",
+    {
+      schema: {
+        querystring: {
+          type: "object",
+          required: ["rootPath", "fileName"],
+          properties: {
+            rootPath: { type: "string" },
+            fileName: { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { rootPath, fileName } = request.query;
+
+      const rootValidation = await validateLibraryRoot(rootPath);
+      if (!rootValidation.ok) {
+        return reply.status(404).send(rootValidation.error);
+      }
+
+      if (fileName.includes("/") || fileName.includes("\\") || fileName.includes("..")) {
+        return reply.status(400).send({
+          error: "INVALID_FILE_NAME",
+          message: "Filename must not contain path traversal characters.",
+        });
+      }
+
+      const targetFilePath = join(rootValidation.value.rootPath, fileName);
+      const writeStream = createWriteStream(targetFilePath);
+
+      try {
+        const bodyStream = request.body as any;
+        await pipeline(bodyStream, writeStream);
+        return { success: true };
+      } catch (err) {
+        return reply.status(500).send({
+          error: "MEDIA_WRITE_FAILED",
+          message: `Failed to stream media file to disk: ${(err as Error).message}`,
+        });
+      }
+    },
+  );
+
+  app.post<{
     Body: DeleteVideoRequest;
     Reply: DeleteVideoResponse | ApiErrorResponse;
   }>(

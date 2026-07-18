@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { List, LayoutGrid, Video, User, FileText, Film, Tag, AlertTriangle } from "lucide-react";
 import type { ScannedVideo, JsonObject } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover, useDynamicThumbnail } from "./Uselazythumbnail";
 
@@ -166,7 +167,7 @@ function VideoThumbnailCard({
 
           <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
           <span className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-md bg-black/75 px-2 py-1 font-mono text-[0.6rem] uppercase tracking-widest text-amber-300/90 backdrop-blur-sm">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-400/80" />
+            <Video className="h-3 w-3 text-amber-400" />
             {video.clips.length} clip{video.clips.length !== 1 ? "s" : ""}
           </span>
 
@@ -197,15 +198,17 @@ function VideoThumbnailCard({
                     </div>
                   )}
                   {artist && (
-                    <span className="truncate text-[0.6rem] text-white/60">
-                      by {artist}
+                    <span className="truncate text-[0.6rem] text-white/60 flex items-center gap-0.5">
+                      <User className="h-2.5 w-2.5 text-white/40" />
+                      {artist}
                     </span>
                   )}
                   {tags.slice(0, 2).map((tag, i) => (
                     <span
                       key={i}
-                      className={`inline-flex items-center rounded px-1 py-0.2 font-mono text-[0.55rem] leading-none ${getTagColorClass(tag)}`}
+                      className={`inline-flex items-center gap-0.5 rounded px-1 py-0.2 font-mono text-[0.55rem] leading-none ${getTagColorClass(tag)}`}
                     >
+                      <Tag className="h-2 w-2 opacity-55" />
                       {tag}
                     </span>
                   ))}
@@ -228,8 +231,9 @@ function VideoThumbnailCard({
                 {tags.slice(0, 4).map((tag, i) => (
                   <span
                     key={i}
-                    className={`inline-flex items-center rounded-full border px-1.5 py-0.5 font-mono text-[0.6rem] leading-none ${getTagColorClass(tag)}`}
+                    className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 font-mono text-[0.6rem] leading-none ${getTagColorClass(tag)}`}
                   >
+                    <Tag className="h-2.5 w-2.5 opacity-60" />
                     {tag}
                   </span>
                 ))}
@@ -243,8 +247,9 @@ function VideoThumbnailCard({
 
             {/* Notes Section */}
             {notes && (
-              <p className="mt-2 line-clamp-2 text-left text-[0.7rem] text-white/45 leading-relaxed bg-white/[0.02] p-2 rounded-lg border border-white/[0.03] italic">
-                {notes}
+              <p className="mt-2 line-clamp-2 text-left text-[0.7rem] text-white/45 leading-relaxed bg-white/[0.02] p-2 rounded-lg border border-white/[0.03] italic flex items-start gap-1.5">
+                <FileText className="h-3.5 w-3.5 shrink-0 mt-0.5 text-white/30" />
+                <span>{notes}</span>
               </p>
             )}
 
@@ -252,7 +257,8 @@ function VideoThumbnailCard({
             {(artist || rating > 0) && (
               <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-white/[0.02] pt-2">
                 {artist ? (
-                  <span className="truncate text-[0.68rem] text-white/60 font-medium">
+                  <span className="truncate text-[0.68rem] text-white/60 font-medium flex items-center gap-1">
+                    <User className="h-3 w-3 text-white/40" />
                     by <span className="text-white/80">{artist}</span>
                   </span>
                 ) : (
@@ -305,23 +311,25 @@ export function VideoList({
           <div className="flex rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5 mr-1 backdrop-blur-sm">
             <button
               onClick={() => setViewMode("details")}
-              className={`rounded-md px-2.5 py-1 sm:px-3 sm:py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition active:scale-[0.98] ${
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 sm:px-3 sm:py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition active:scale-[0.98] ${
                 viewMode === "details"
                   ? "bg-amber-400 font-semibold text-[#0A0B0D]"
                   : "text-white/60 hover:text-white"
               }`}
             >
-              List
+              <List className="h-3 w-3" />
+              <span>List</span>
             </button>
             <button
               onClick={() => setViewMode("moodboard")}
-              className={`rounded-md px-2.5 py-1 sm:px-3 sm:py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition active:scale-[0.98] ${
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 sm:px-3 sm:py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition active:scale-[0.98] ${
                 viewMode === "moodboard"
                   ? "bg-amber-400 font-semibold text-[#0A0B0D]"
                   : "text-white/60 hover:text-white"
               }`}
             >
-              Board
+              <LayoutGrid className="h-3 w-3" />
+              <span>Board</span>
             </button>
           </div>
         </div>
@@ -331,8 +339,9 @@ export function VideoList({
       {error && (
         <p
           role="alert"
-          className="rounded-xl border border-rose-500/20 bg-rose-500/[0.06] px-4 py-3 text-sm text-rose-300"
+          className="flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/[0.06] px-4 py-3 text-sm text-rose-300"
         >
+          <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400" />
           {error}
         </p>
       )}
@@ -348,6 +357,7 @@ export function VideoList({
           </ul>
         ) : videos.length === 0 ? (
           <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-white/10 px-4 py-10 text-center">
+            <Film className="h-8 w-8 text-white/20 mb-1" />
             <span className="font-mono text-[0.65rem] uppercase tracking-widest text-white/30">
               No entries
             </span>
