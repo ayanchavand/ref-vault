@@ -87,7 +87,7 @@ function VideoThumbnailCard({
         isOpening
           ? "border-amber-400/50"
           : "border-white/[0.06] hover:-translate-y-1 hover:border-amber-400/50 hover:shadow-[0_12px_36px_rgba(0,0,0,0.5)]"
-      } bg-[#111316]/50 backdrop-blur-md`}
+      } bg-[#111316]/50 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]`}
       onMouseEnter={() => !isTouchDevice && setIsHovering(true)}
       onMouseLeave={() => !isTouchDevice && setIsHovering(false)}
     >
@@ -172,7 +172,7 @@ export function VideoList({
   return (
 
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316] px-4 py-4 sm:px-5 sm:py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316]/50 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] px-4 py-4 sm:px-5 sm:py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 min-w-0">
           <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(232,163,61,0.7)]" />
           <div className="min-w-0">
@@ -186,7 +186,7 @@ export function VideoList({
           <div className="flex rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5 mr-1 backdrop-blur-sm">
             <button
               onClick={() => setViewMode("details")}
-              className={`rounded-md px-2.5 py-1 sm:px-3 sm:py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition ${
+              className={`rounded-md px-2.5 py-1 sm:px-3 sm:py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition active:scale-[0.98] ${
                 viewMode === "details"
                   ? "bg-amber-400 font-semibold text-[#0A0B0D]"
                   : "text-white/60 hover:text-white"
@@ -196,7 +196,7 @@ export function VideoList({
             </button>
             <button
               onClick={() => setViewMode("moodboard")}
-              className={`rounded-md px-2.5 py-1 sm:px-3 sm:py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition ${
+              className={`rounded-md px-2.5 py-1 sm:px-3 sm:py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition active:scale-[0.98] ${
                 viewMode === "moodboard"
                   ? "bg-amber-400 font-semibold text-[#0A0B0D]"
                   : "text-white/60 hover:text-white"
@@ -207,7 +207,7 @@ export function VideoList({
           </div>
           <button
             onClick={onBrowseTags}
-            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
+            className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium text-white/80 transition hover:border-white/20 hover:bg-white/[0.06] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
           >
             Browse tags
           </button>
@@ -231,18 +231,7 @@ export function VideoList({
       )}
 
       <div className="flex flex-col gap-4">
-        <div className="rounded-2xl border border-white/[0.06] bg-[#111316] p-6">
-          <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
-            02 · Browse
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-            Your library, indexed.
-          </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-white/45">
-            Pick a video to watch it in the main player. Clips appear in a side panel for quick
-            access to the best moments.
-          </p>
-        </div>
+
 
         {isInitialScan ? (
           <ul className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true">

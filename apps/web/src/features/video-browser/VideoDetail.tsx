@@ -502,7 +502,7 @@ function ClipMetadataEditor({
                   type="button"
                   onClick={() => setRatingInput(star)}
                   disabled={isSaving}
-                  className={`text-2xl transition duration-150 focus:outline-none ${
+                  className={`text-2xl transition-all duration-300 focus:outline-none hover:scale-125 active:scale-90 ${
                     star <= ratingInput
                       ? "text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.5)]"
                       : "text-white/20 hover:text-amber-400/50"
@@ -824,7 +824,7 @@ function VideoMetadataEditor({
                   type="button"
                   onClick={() => setRatingInput(star)}
                   disabled={isSaving}
-                  className={`text-2xl transition duration-150 focus:outline-none ${
+                  className={`text-2xl transition-all duration-300 focus:outline-none hover:scale-125 active:scale-90 ${
                     star <= ratingInput
                       ? "text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.5)]"
                       : "text-white/20 hover:text-amber-400/50"
@@ -1207,7 +1207,7 @@ function SegmentEditor({
                     key={star}
                     type="button"
                     onClick={() => updateSegment(index, { rating: star })}
-                    className={`text-base transition duration-150 focus:outline-none ${
+                    className={`text-base transition-all duration-300 focus:outline-none hover:scale-125 active:scale-90 ${
                       star <= (seg.rating || 0)
                         ? "text-amber-400"
                         : "text-white/20 hover:text-amber-400/50"
@@ -1483,7 +1483,10 @@ export function VideoDetail({ rootPath, video, allVideos, onBack, onUpdateVideoD
               <span>DUR {formatTimecode(duration)}</span>
             </div>
 
-            <div className="w-full h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-black aspect-video">
+            {/* Ambilight Glow */}
+            <div className="absolute inset-0 z-0 bg-amber-400/20 blur-[100px] rounded-full scale-90 mix-blend-screen opacity-50" />
+            
+            <div className="relative z-10 w-full h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-black aspect-video">
               <video
                 ref={videoRef}
                 controls

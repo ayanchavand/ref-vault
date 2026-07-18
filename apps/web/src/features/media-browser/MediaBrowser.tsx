@@ -163,11 +163,26 @@ function SkeletonCard() {
 interface MediaCardProps {
   item: ScannedMediaItem;
   rootPath: string;
-  exitDirection: "left" | "right" | null;
+  exitDirection: "up" | "down" | null;
   onAnimationEnd: () => void;
+  isMuted: boolean;
+  onToggleMute: () => void;
+  index: number;
+  onNext: () => void;
+  onPrev: () => void;
 }
 
-function MediaCard({ item, rootPath, exitDirection, onAnimationEnd }: MediaCardProps) {
+function MediaCard({
+  item,
+  rootPath,
+  exitDirection,
+  onAnimationEnd,
+  isMuted,
+  onToggleMute,
+  index,
+  onNext,
+  onPrev,
+}: MediaCardProps) {
   const url = buildMediaUrl(rootPath, item.relativePath);
   const isVideo = item.type === "video";
   const isGif = item.type === "gif";
@@ -175,17 +190,17 @@ function MediaCard({ item, rootPath, exitDirection, onAnimationEnd }: MediaCardP
   const [imgError, setImgError] = useState(false);
 
   const exitStyle: React.CSSProperties =
-    exitDirection === "left"
+    exitDirection === "up"
       ? {
-          transform: "translateX(-120%) rotate(-14deg)",
+          transform: "translateY(-120%)",
           opacity: 0,
-          transition: "transform 0.32s cubic-bezier(0.4,0,1,1), opacity 0.28s ease",
+          transition: "transform 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease",
         }
-      : exitDirection === "right"
+      : exitDirection === "down"
         ? {
-            transform: "translateX(120%) rotate(14deg)",
+            transform: "translateY(120%)",
             opacity: 0,
-            transition: "transform 0.32s cubic-bezier(0.4,0,1,1), opacity 0.28s ease",
+            transition: "transform 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease",
           }
         : {};
 
@@ -254,11 +269,17 @@ function MediaCard({ item, rootPath, exitDirection, onAnimationEnd }: MediaCardP
       <div
         style={{
           width: "100%",
-          height: "100%",
+          maxWidth: 420,
+          height: "calc(100% - 32px)",
+          position: "relative",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: 16,
+          borderRadius: 24,
+          background: "#000",
+          boxShadow: "0 24px 60px rgba(0,0,0,0.8)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          overflow: "hidden",
           opacity: loaded ? 1 : 0,
           transition: "opacity 0.25s ease",
         }}
@@ -269,16 +290,14 @@ function MediaCard({ item, rootPath, exitDirection, onAnimationEnd }: MediaCardP
             src={url}
             autoPlay
             loop
-            muted
+            muted={isMuted}
             playsInline
             onLoadedData={() => setLoaded(true)}
             onError={() => { setLoaded(false); setImgError(true); }}
             style={{
-              maxWidth: "100%",
-              maxHeight: "100%",
+              width: "100%",
+              height: "100%",
               objectFit: "contain",
-              borderRadius: 16,
-              boxShadow: "0 24px 60px rgba(0,0,0,0.65)",
             }}
           />
         ) : (
@@ -289,63 +308,255 @@ function MediaCard({ item, rootPath, exitDirection, onAnimationEnd }: MediaCardP
             onLoad={() => setLoaded(true)}
             onError={() => { setLoaded(false); setImgError(true); }}
             style={{
-              maxWidth: "100%",
-              maxHeight: "100%",
+              width: "100%",
+              height: "100%",
               objectFit: "contain",
-              borderRadius: 16,
-              boxShadow: "0 24px 60px rgba(0,0,0,0.65)",
             }}
             loading="eager"
             decoding="async"
           />
         )}
-      </div>
 
-      {/* Type badge */}
-      {isGif && (
-        <span
+        {/* Bottom-left metadata overlay inside the vertical viewport */}
+        <div
           style={{
             position: "absolute",
-            top: 24,
-            right: 24,
-            background: "rgba(232,163,61,0.15)",
-            border: "1px solid rgba(232,163,61,0.3)",
-            color: "#f0c060",
-            fontFamily: "monospace",
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.12em",
-            padding: "3px 8px",
-            borderRadius: 6,
-            backdropFilter: "blur(8px)",
-            textTransform: "uppercase",
+            bottom: 24,
+            left: 24,
+            right: 80,
+            color: "#fff",
+            zIndex: 20,
+            textShadow: "0 2px 4px rgba(0,0,0,0.8)",
+            textAlign: "left",
+            pointerEvents: "none",
           }}
         >
-          GIF
-        </span>
-      )}
-      {isVideo && (
-        <span
+          <p
+            style={{
+              fontFamily: "monospace",
+              fontSize: 12,
+              fontWeight: 600,
+              margin: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {item.relativePath.split("/").pop()}
+          </p>
+          <p
+            style={{
+              fontFamily: "monospace",
+              fontSize: 10,
+              color: "rgba(255,255,255,0.6)",
+              margin: "4px 0 0",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {item.relativePath}
+          </p>
+        </div>
+
+        {/* Right side TikTok action overlay bar */}
+        <div
           style={{
             position: "absolute",
-            top: 24,
-            right: 24,
-            background: "rgba(139,92,246,0.15)",
-            border: "1px solid rgba(139,92,246,0.3)",
-            color: "#c4b5fd",
-            fontFamily: "monospace",
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.12em",
-            padding: "3px 8px",
-            borderRadius: 6,
-            backdropFilter: "blur(8px)",
-            textTransform: "uppercase",
+            right: 16,
+            bottom: "15%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 16,
+            zIndex: 30,
           }}
         >
-          LOOP
-        </span>
-      )}
+          {/* Index Counter Badge */}
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: "rgba(255, 255, 255, 0.08)",
+              border: "1px solid rgba(255, 255, 255, 0.15)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#f0c060",
+              fontFamily: "monospace",
+              fontSize: 11,
+              fontWeight: 700,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+              backdropFilter: "blur(8px)",
+            }}
+            title="Index"
+          >
+            {index + 1}
+          </div>
+
+          {/* Mute/Unmute Toggle (videos only) */}
+          {isVideo && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleMute();
+              }}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                background: "rgba(0, 0, 0, 0.6)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#fff",
+                fontSize: 16,
+                cursor: "pointer",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+                backdropFilter: "blur(8px)",
+                transition: "transform 0.15s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.1)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              title={isMuted ? "Unmute" : "Mute"}
+            >
+              {isMuted ? "🔇" : "🔊"}
+            </button>
+          )}
+
+          {/* Copy Path */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigator.clipboard.writeText(item.relativePath);
+              alert("Copied relative path to clipboard!");
+            }}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: "rgba(0, 0, 0, 0.6)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              fontSize: 14,
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+              backdropFilter: "blur(8px)",
+              transition: "transform 0.15s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.1)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            title="Copy path"
+          >
+            📋
+          </button>
+
+          {/* Up (Previous) */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onPrev();
+            }}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: "rgba(0, 0, 0, 0.6)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              fontSize: 16,
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+              backdropFilter: "blur(8px)",
+              transition: "transform 0.15s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.1)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            title="Previous (ArrowUp)"
+          >
+            ▲
+          </button>
+
+          {/* Down (Next) */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onNext();
+            }}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: "rgba(0, 0, 0, 0.6)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              fontSize: 16,
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+              backdropFilter: "blur(8px)",
+              transition: "transform 0.15s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.1)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            title="Next (ArrowDown)"
+          >
+            ▼
+          </button>
+        </div>
+
+        {/* Type badges overlay (top-right of viewport) */}
+        <div style={{ position: "absolute", top: 20, right: 20, display: "flex", gap: 6, zIndex: 30 }}>
+          {isGif && (
+            <span
+              style={{
+                background: "rgba(232,163,61,0.15)",
+                border: "1px solid rgba(232,163,61,0.3)",
+                color: "#f0c060",
+                fontFamily: "monospace",
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                padding: "2px 6px",
+                borderRadius: 5,
+                backdropFilter: "blur(8px)",
+                textTransform: "uppercase",
+              }}
+            >
+              GIF
+            </span>
+          )}
+          {isVideo && (
+            <span
+              style={{
+                background: "rgba(139,92,246,0.15)",
+                border: "1px solid rgba(139,92,246,0.3)",
+                color: "#c4b5fd",
+                fontFamily: "monospace",
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                padding: "2px 6px",
+                borderRadius: 5,
+                backdropFilter: "blur(8px)",
+                textTransform: "uppercase",
+              }}
+            >
+              LOOP
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -775,13 +986,15 @@ export function MediaBrowser({ onBack }: MediaBrowserProps) {
   const [index, setIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [exitDir, setExitDir] = useState<"left" | "right" | null>(null);
-  const [pendingDir, setPendingDir] = useState<"left" | "right" | null>(null);
+  const [exitDir, setExitDir] = useState<"up" | "down" | null>(null);
+  const [pendingDir, setPendingDir] = useState<"up" | "down" | null>(null);
   const [showLocations, setShowLocations] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
 
   // drag state
-  const dragRef = useRef<{ startX: number; dragging: boolean } | null>(null);
+  const dragRef = useRef<{ startY: number; dragging: boolean } | null>(null);
   const [dragDelta, setDragDelta] = useState(0);
+  const stageRef = useRef<HTMLDivElement>(null);
 
   const loadMedia = useCallback(async (rootPath: string) => {
     setIsLoading(true);
@@ -817,15 +1030,40 @@ export function MediaBrowser({ onBack }: MediaBrowserProps) {
     function onKey(e: KeyboardEvent) {
       // Don't interfere with text inputs
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === "ArrowRight" || e.key === "d") advance("right");
-      if (e.key === "ArrowLeft" || e.key === "a") advance("left");
+      if (e.key === "ArrowDown" || e.key === "s") advance("up");
+      if (e.key === "ArrowUp" || e.key === "w") advance("down");
       if (e.key === "Escape") setShowLocations(false);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  function advance(dir: "left" | "right") {
+  // Wheel scroll navigation (TikTok style)
+  useEffect(() => {
+    let lastWheelTime = 0;
+    function onWheel(e: WheelEvent) {
+      if (exitDir !== null || items.length === 0) return;
+      const now = Date.now();
+      if (now - lastWheelTime < 600) return;
+      if (Math.abs(e.deltaY) > 20) {
+        lastWheelTime = now;
+        if (e.deltaY > 0) {
+          advance("up");
+        } else {
+          advance("down");
+        }
+      }
+    }
+    const container = stageRef.current;
+    if (container) {
+      container.addEventListener("wheel", onWheel, { passive: true });
+    }
+    return () => {
+      if (container) container.removeEventListener("wheel", onWheel);
+    };
+  }, [items, exitDir]);
+
+  function advance(dir: "up" | "down") {
     if (exitDir !== null || items.length === 0) return;
     setPendingDir(dir);
     setExitDir(dir);
@@ -836,28 +1074,28 @@ export function MediaBrowser({ onBack }: MediaBrowserProps) {
     setExitDir(null);
     if (pendingDir !== null) {
       setIndex((i) =>
-        pendingDir === "right" ? (i + 1) % items.length : (i - 1 + items.length) % items.length,
+        pendingDir === "up" ? (i + 1) % items.length : (i - 1 + items.length) % items.length,
       );
       setPendingDir(null);
     }
   }
 
   function onPointerDown(e: React.PointerEvent) {
-    dragRef.current = { startX: e.clientX, dragging: true };
+    dragRef.current = { startY: e.clientY, dragging: true };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }
 
   function onPointerMove(e: React.PointerEvent) {
     if (!dragRef.current?.dragging) return;
-    setDragDelta(e.clientX - dragRef.current.startX);
+    setDragDelta(e.clientY - dragRef.current.startY);
   }
 
   function onPointerUp(e: React.PointerEvent) {
     if (!dragRef.current) return;
-    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
     dragRef.current = null;
     setDragDelta(0);
-    if (Math.abs(dx) > 72) advance(dx > 0 ? "right" : "left");
+    if (Math.abs(dy) > 72) advance(dy > 0 ? "down" : "up");
   }
 
   function handleRemoveLocation(path: string) {
@@ -1039,7 +1277,7 @@ export function MediaBrowser({ onBack }: MediaBrowserProps) {
       </div>
 
       {/* Stage */}
-      <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+      <div ref={stageRef} style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {showSkeleton && <SkeletonCard />}
 
         {error && (
@@ -1119,7 +1357,8 @@ export function MediaBrowser({ onBack }: MediaBrowserProps) {
                   pointerEvents: "none",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: dragDelta > 0 ? "flex-start" : "flex-end",
+                  justifyContent: "center",
+                  flexDirection: "column",
                   padding: 32,
                 }}
               >
@@ -1131,23 +1370,23 @@ export function MediaBrowser({ onBack }: MediaBrowserProps) {
                     fontSize: 20,
                     background:
                       dragDelta > 72
-                        ? "rgba(74,222,128,0.2)"
+                        ? "rgba(248,113,113,0.2)"
                         : dragDelta < -72
-                          ? "rgba(248,113,113,0.2)"
+                          ? "rgba(74,222,128,0.2)"
                           : "rgba(255,255,255,0.06)",
                     border:
                       dragDelta > 72
-                        ? "2px solid rgba(74,222,128,0.5)"
+                        ? "2px solid rgba(248,113,113,0.5)"
                         : dragDelta < -72
-                          ? "2px solid rgba(248,113,113,0.5)"
+                          ? "2px solid rgba(74,222,128,0.5)"
                           : "2px solid rgba(255,255,255,0.08)",
                     color:
-                      dragDelta > 72 ? "#4ade80" : dragDelta < -72 ? "#f87171" : "rgba(255,255,255,0.3)",
+                      dragDelta > 72 ? "#f87171" : dragDelta < -72 ? "#4ade80" : "rgba(255,255,255,0.3)",
                     backdropFilter: "blur(8px)",
                     transition: "all 0.08s",
                   }}
                 >
-                  {dragDelta > 0 ? "→" : "←"}
+                  {dragDelta > 0 ? "↓" : "↑"}
                 </div>
               </div>
             )}
@@ -1159,7 +1398,7 @@ export function MediaBrowser({ onBack }: MediaBrowserProps) {
                 inset: 0,
                 cursor: exitDir ? "default" : "grab",
                 transform: dragDelta
-                  ? `translateX(${dragDelta * 0.14}px) rotate(${dragDelta * 0.018}deg)`
+                  ? `translateY(${dragDelta * 0.18}px)`
                   : undefined,
                 transition: dragDelta ? "none" : "transform 0.12s ease-out",
                 animation: "mb-fadein 0.3s ease",
@@ -1175,13 +1414,18 @@ export function MediaBrowser({ onBack }: MediaBrowserProps) {
                 rootPath={mediaRoot}
                 exitDirection={exitDir}
                 onAnimationEnd={handleAnimationEnd}
+                isMuted={isMuted}
+                onToggleMute={() => setIsMuted((m) => !m)}
+                index={index}
+                onNext={() => advance("up")}
+                onPrev={() => advance("down")}
               />
             </div>
           </>
         )}
       </div>
 
-      {/* Bottom controls */}
+      {/* Bottom controls tip */}
       {!isLoading && !error && items.length > 0 && (
         <div
           style={{
@@ -1189,101 +1433,22 @@ export function MediaBrowser({ onBack }: MediaBrowserProps) {
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            gap: 20,
-            paddingTop: 18,
+            padding: "8px 0",
             animation: "mb-fadein 0.4s ease",
           }}
         >
-          <button
-            onClick={() => advance("left")}
-            title="Previous (← / A)"
+          <p
             style={{
-              width: 50,
-              height: 50,
-              borderRadius: "50%",
-              background: "rgba(248,113,113,0.08)",
-              border: "1px solid rgba(248,113,113,0.2)",
-              color: "#f87171",
-              fontSize: 22,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "background 0.15s, transform 0.1s",
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget;
-              el.style.background = "rgba(248,113,113,0.18)";
-              el.style.transform = "scale(1.1)";
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget;
-              el.style.background = "rgba(248,113,113,0.08)";
-              el.style.transform = "scale(1)";
+              fontFamily: "monospace",
+              fontSize: 10,
+              color: "rgba(255,255,255,0.2)",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              margin: 0,
             }}
           >
-            ‹
-          </button>
-
-          <div style={{ textAlign: "center", minWidth: 140 }}>
-            <p
-              style={{
-                fontFamily: "monospace",
-                fontSize: 10,
-                color: "rgba(255,255,255,0.18)",
-                letterSpacing: "0.15em",
-                textTransform: "uppercase",
-                margin: 0,
-              }}
-            >
-              Swipe or ← →
-            </p>
-            <p
-              style={{
-                fontFamily: "monospace",
-                fontSize: 10,
-                color: "rgba(255,255,255,0.1)",
-                margin: "4px 0 0",
-                maxWidth: 200,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {currentItem?.relativePath.split("/").pop()}
-            </p>
-          </div>
-
-          <button
-            onClick={() => advance("right")}
-            title="Next (→ / D)"
-            style={{
-              width: 50,
-              height: 50,
-              borderRadius: "50%",
-              background: "rgba(74,222,128,0.08)",
-              border: "1px solid rgba(74,222,128,0.2)",
-              color: "#4ade80",
-              fontSize: 22,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "background 0.15s, transform 0.1s",
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget;
-              el.style.background = "rgba(74,222,128,0.18)";
-              el.style.transform = "scale(1.1)";
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget;
-              el.style.background = "rgba(74,222,128,0.08)";
-              el.style.transform = "scale(1)";
-            }}
-          >
-            ›
-          </button>
+            Drag vertical or use wheel / Up & Down keys to browse
+          </p>
         </div>
       )}
     </div>

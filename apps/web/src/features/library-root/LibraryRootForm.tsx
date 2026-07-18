@@ -44,7 +44,7 @@ export function LibraryRootForm({
   }
 
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-[#111316]/50 backdrop-blur-md p-4 sm:p-6 shadow-2xl shadow-black/40">
+    <div className="rounded-2xl border border-white/[0.08] bg-[#111316]/50 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] shadow-black/40 p-4 sm:p-6 shadow-2xl">
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label htmlFor="library-root" className="text-sm font-medium text-white/80">
@@ -75,7 +75,7 @@ export function LibraryRootForm({
         <button
           type="submit"
           disabled={isSubmitting || rootPath.trim().length === 0}
-          className="w-full rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-[#0A0B0D] transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40"
+          className="w-full rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-[#0A0B0D] transition active:scale-[0.98] hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
         >
           {isSubmitting ? "Checking folder…" : "Open library"}
         </button>

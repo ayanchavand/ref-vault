@@ -68,7 +68,7 @@ function VideoListPagination({
         type="button"
         onClick={onPrevPage}
         disabled={currentPage === 1}
-        className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 font-mono text-[0.7rem] uppercase tracking-widest text-white/70 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-30"
+        className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 font-mono text-[0.7rem] uppercase tracking-widest text-white/70 transition hover:bg-white/[0.06] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:active:scale-100"
       >
         Prev
       </button>
@@ -79,7 +79,7 @@ function VideoListPagination({
         type="button"
         onClick={onNextPage}
         disabled={currentPage === totalPages}
-        className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 font-mono text-[0.7rem] uppercase tracking-widest text-white/70 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-30"
+        className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 font-mono text-[0.7rem] uppercase tracking-widest text-white/70 transition hover:bg-white/[0.06] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:active:scale-100"
       >
         Next
       </button>
@@ -291,7 +291,7 @@ export function App() {
               <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
                 Local-first reference library
               </p>
-              <h1 className="mt-1.5 text-xl font-semibold tracking-tight text-white sm:text-2xl">
+              <h1 className="mt-1.5 text-xl font-semibold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-white to-white/50 sm:text-2xl">
                 Reference Vault
               </h1>
             </div>
@@ -300,7 +300,7 @@ export function App() {
             <button
               type="button"
               onClick={handleBrowseMedia}
-              className="rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest text-white/50 transition hover:bg-white/[0.06] hover:text-white/80"
+              className="rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest text-white/50 transition hover:bg-white/[0.06] hover:text-white/80 active:scale-[0.98]"
             >
               Media
             </button>
@@ -318,7 +318,7 @@ export function App() {
                   <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
                     01 · Open a library
                   </p>
-                  <h2 className="mt-4 max-w-lg text-4xl font-semibold leading-[1.1] tracking-tight text-white sm:text-5xl">
+                  <h2 className="mt-4 max-w-lg text-4xl font-semibold leading-[1.1] tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-white to-white/50 sm:text-5xl">
                     Your reference files stay exactly where you put them.
                   </h2>
                   <p className="mt-5 max-w-xl text-base leading-7 text-white/50">
