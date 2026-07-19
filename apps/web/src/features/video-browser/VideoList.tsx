@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, memo } from "react";
 import { List, LayoutGrid, Video, User, FileText, Film, Tag, AlertTriangle } from "lucide-react";
 import type { ScannedVideo, JsonObject, LibraryConfig, LibraryConfigField } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover, useDynamicThumbnail } from "./Uselazythumbnail";
+import { showTitleInListKey, showTitleInBoardKey } from "../settings/Settings";
 
 function getTagColorClass(tag: string): string {
   const clean = tag.toLowerCase().trim();
@@ -82,6 +83,8 @@ const VideoThumbnailCard = memo(function VideoThumbnailCard({
   viewMode = "details",
   cardIndex = 0,
   libraryConfig,
+  showTitleInList = true,
+  showTitleInBoard = true,
 }: {
   rootPath: string;
   video: ScannedVideo;
@@ -91,6 +94,8 @@ const VideoThumbnailCard = memo(function VideoThumbnailCard({
   viewMode?: "details" | "moodboard";
   cardIndex?: number;
   libraryConfig?: LibraryConfig;
+  showTitleInList?: boolean;
+  showTitleInBoard?: boolean;
 }) {
   const artist = video.metadata?.artist ? String(video.metadata.artist) : null;
   const rating = video.metadata?.rating ? Number(video.metadata.rating) : 0;
@@ -203,9 +208,11 @@ const VideoThumbnailCard = memo(function VideoThumbnailCard({
 
           {isMoodboard && (
             <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/95 via-black/85 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 flex flex-col gap-1.5">
-              <div>
-                <p className="truncate font-semibold text-white text-xs">{video.relativePath}</p>
-              </div>
+              {showTitleInBoard && (
+                <div>
+                  <p className="truncate font-semibold text-white text-xs">{video.relativePath}</p>
+                </div>
+              )}
 
               {(artist || rating > 0 || tags.length > 0 || customFields.length > 0 || configuredVideoFields.some((f) => video.metadata?.[f.name])) && (
                 <div className="flex flex-wrap items-center gap-1.5 border-t border-white/10 pt-1.5 mt-0.5">
@@ -274,7 +281,9 @@ const VideoThumbnailCard = memo(function VideoThumbnailCard({
 
         {!isMoodboard && (
           <div className="w-full p-4 border-t border-white/[0.02] flex flex-col gap-1">
-            <p className="truncate font-semibold text-white/95">{video.relativePath}</p>
+            {showTitleInList && (
+              <p className="truncate font-semibold text-white/95">{video.relativePath}</p>
+            )}
 
             {/* Tags section */}
             {tags.length > 0 && (
@@ -386,6 +395,26 @@ export function VideoList({
   const [viewMode, setViewMode] = useState<"details" | "moodboard">("details");
   const isInitialScan = isLoading && videos.length === 0;
 
+  const [showTitleInList, setShowTitleInList] = useState(
+    () => localStorage.getItem(showTitleInListKey) !== "false"
+  );
+  const [showTitleInBoard, setShowTitleInBoard] = useState(
+    () => localStorage.getItem(showTitleInBoardKey) !== "false"
+  );
+
+  useEffect(() => {
+    function onStorage(e: StorageEvent) {
+      if (e.key === showTitleInListKey) {
+        setShowTitleInList(e.newValue !== "false");
+      }
+      if (e.key === showTitleInBoardKey) {
+        setShowTitleInBoard(e.newValue !== "false");
+      }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   return (
 
     <div className="flex flex-col gap-5">
@@ -473,6 +502,8 @@ export function VideoList({
                 disabled={openingVideoPath !== null}
                 onSelect={onSelectVideo}
                 libraryConfig={libraryConfig}
+                showTitleInList={showTitleInList}
+                showTitleInBoard={showTitleInBoard}
               />
             ))}
           </ul>

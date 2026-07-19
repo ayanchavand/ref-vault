@@ -4,6 +4,8 @@ import { ApiError, validateLibraryRoot, initLibrary, putLibraryConfig } from "..
 import type { LibraryConfig, LibraryConfigField } from "@reference-vault/shared";
 
 const videoStorageKey = "reference-vault.library-root";
+export const showTitleInListKey = "reference-vault.show-title-in-list";
+export const showTitleInBoardKey = "reference-vault.show-title-in-board";
 const mediaStorageKey = "reference-vault.media-root";
 
 interface SettingsProps {
@@ -280,6 +282,26 @@ export function Settings({
     } finally {
       setIsInitializing(false);
     }
+  }
+
+  // Library display preferences
+  const [showTitleInList, setShowTitleInList] = useState(
+    () => localStorage.getItem(showTitleInListKey) !== "false"
+  );
+  const [showTitleInBoard, setShowTitleInBoard] = useState(
+    () => localStorage.getItem(showTitleInBoardKey) !== "false"
+  );
+
+  function handleToggleTitleInList(): void {
+    const next = !showTitleInList;
+    setShowTitleInList(next);
+    localStorage.setItem(showTitleInListKey, String(next));
+  }
+
+  function handleToggleTitleInBoard(): void {
+    const next = !showTitleInBoard;
+    setShowTitleInBoard(next);
+    localStorage.setItem(showTitleInBoardKey, String(next));
   }
 
   return (
@@ -719,6 +741,79 @@ export function Settings({
             )}
           </div>
         )}
+      </div>
+
+      {/* Library Display Section */}
+      <div className="rounded-2xl border border-white/[0.06] bg-[#111316]/50 backdrop-blur-xl shadow-2xl p-5 sm:p-6 space-y-5">
+        <div className="border-b border-white/[0.06] pb-4">
+          <h3 className="text-lg font-semibold text-white/90 flex items-center gap-1.5">
+            <SettingsIcon className="h-5 w-5 text-amber-400" />
+            Library Display
+          </h3>
+          <p className="mt-1 text-xs text-white/40">
+            Control which elements are visible on library cards.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          {/* Show title in List view */}
+          <div className="flex items-center justify-between gap-4 py-1">
+            <div className="space-y-0.5 min-w-0">
+              <p className="text-sm font-medium text-white/85">Show title in List view</p>
+              <p className="text-xs text-white/40">Display the video folder name beneath the thumbnail in the List layout.</p>
+            </div>
+            <button
+              id="toggle-title-in-list"
+              type="button"
+              role="switch"
+              aria-checked={showTitleInList}
+              onClick={handleToggleTitleInList}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0B0D] ${
+                showTitleInList
+                  ? "border-amber-400/70 bg-amber-400/20"
+                  : "border-white/[0.12] bg-white/[0.05]"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-lg transition-all duration-200 ease-in-out ${
+                  showTitleInList
+                    ? "translate-x-5 bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"
+                    : "translate-x-0 bg-white/30"
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="border-t border-white/[0.04]" />
+
+          {/* Show title in Board view */}
+          <div className="flex items-center justify-between gap-4 py-1">
+            <div className="space-y-0.5 min-w-0">
+              <p className="text-sm font-medium text-white/85">Show title in Board view</p>
+              <p className="text-xs text-white/40">Display the video folder name in the hover overlay of Board (moodboard) cards.</p>
+            </div>
+            <button
+              id="toggle-title-in-board"
+              type="button"
+              role="switch"
+              aria-checked={showTitleInBoard}
+              onClick={handleToggleTitleInBoard}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0B0D] ${
+                showTitleInBoard
+                  ? "border-amber-400/70 bg-amber-400/20"
+                  : "border-white/[0.12] bg-white/[0.05]"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-lg transition-all duration-200 ease-in-out ${
+                  showTitleInBoard
+                    ? "translate-x-5 bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"
+                    : "translate-x-0 bg-white/30"
+                }`}
+              />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
