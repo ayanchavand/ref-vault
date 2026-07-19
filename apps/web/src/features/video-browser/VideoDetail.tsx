@@ -1396,6 +1396,7 @@ interface SegmentEditorProps {
   video: VideoDetailType;
   globalTags: string[];
   currentTime: number;
+  videoRef?: React.RefObject<HTMLVideoElement | null>;
   onSaveSuccess(): void;
   onCancel(): void;
 }
@@ -1405,6 +1406,7 @@ function SegmentEditor({
   video,
   globalTags,
   currentTime,
+  videoRef,
   onSaveSuccess,
   onCancel,
 }: SegmentEditorProps) {
@@ -1412,6 +1414,13 @@ function SegmentEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  function getLiveTime(): number {
+    if (videoRef?.current && !isNaN(videoRef.current.currentTime)) {
+      return videoRef.current.currentTime;
+    }
+    return currentTime;
+  }
 
   const allLibraryTags = useMemo(() => {
     const set = new Set<string>();
@@ -1449,17 +1458,18 @@ function SegmentEditor({
       if (isTyping) return;
 
       const key = e.key.toLowerCase();
+      const liveTime = getLiveTime();
       if (key === "m") {
         e.preventDefault();
-        addSegment();
+        addSegment(liveTime);
       } else if (key === "i") {
         e.preventDefault();
         setSegments((prev) => {
           if (prev.length === 0) {
             return [
               {
-                start: Math.round(currentTime * 100) / 100,
-                end: Math.round((currentTime + 5) * 100) / 100,
+                start: Math.round(liveTime * 100) / 100,
+                end: Math.round((liveTime + 5) * 100) / 100,
                 tags: [],
                 notes: "",
                 rating: 0,
@@ -1468,7 +1478,7 @@ function SegmentEditor({
           }
           return prev.map((seg, idx) =>
             idx === prev.length - 1
-              ? { ...seg, start: Math.round(currentTime * 100) / 100 }
+              ? { ...seg, start: Math.round(liveTime * 100) / 100 }
               : seg
           );
         });
@@ -1478,8 +1488,8 @@ function SegmentEditor({
           if (prev.length === 0) {
             return [
               {
-                start: Math.max(0, Math.round((currentTime - 5) * 100) / 100),
-                end: Math.round(currentTime * 100) / 100,
+                start: Math.max(0, Math.round((liveTime - 5) * 100) / 100),
+                end: Math.round(liveTime * 100) / 100,
                 tags: [],
                 notes: "",
                 rating: 0,
@@ -1488,7 +1498,7 @@ function SegmentEditor({
           }
           return prev.map((seg, idx) =>
             idx === prev.length - 1
-              ? { ...seg, end: Math.round(currentTime * 100) / 100 }
+              ? { ...seg, end: Math.round(liveTime * 100) / 100 }
               : seg
           );
         });
@@ -1497,14 +1507,15 @@ function SegmentEditor({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentTime]);
+  }, [currentTime, videoRef]);
 
-  function addSegment() {
+  function addSegment(overrideTime?: number | React.MouseEvent) {
+    const t = typeof overrideTime === "number" ? overrideTime : getLiveTime();
     setSegments((prev) => [
       ...prev,
       {
-        start: Math.round(currentTime * 100) / 100,
-        end: Math.round((currentTime + 5) * 100) / 100,
+        start: Math.round(t * 100) / 100,
+        end: Math.round((t + 5) * 100) / 100,
         tags: [],
         notes: "",
         rating: 0,
@@ -1631,7 +1642,7 @@ function SegmentEditor({
                     <button
                       type="button"
                       onClick={() =>
-                        updateSegment(index, { start: Math.round(currentTime * 100) / 100 })
+                        updateSegment(index, { start: Math.round(getLiveTime() * 100) / 100 })
                       }
                       title="Set to current time"
                       className="rounded bg-white/[0.08] border border-white/[0.08] px-1.5 text-xs text-amber-300 hover:bg-white/[0.12]"
@@ -1653,12 +1664,12 @@ function SegmentEditor({
                       onChange={(e) =>
                         updateSegment(index, { end: parseFloat(e.target.value) || 0 })
                       }
-                      className="w-full rounded bg-white/[0.03] border border-white/[0.08] px-2 py-1 text-xs text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-full rounded bg-[#111316] border border-white/[0.08] px-2 py-1 text-xs text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                     <button
                       type="button"
                       onClick={() =>
-                        updateSegment(index, { end: Math.round(currentTime * 100) / 100 })
+                        updateSegment(index, { end: Math.round(getLiveTime() * 100) / 100 })
                       }
                       title="Set to current time"
                       className="rounded bg-white/[0.08] border border-white/[0.08] px-1.5 text-xs text-amber-300 hover:bg-white/[0.12]"
@@ -1920,25 +1931,33 @@ export function VideoDetail({
 
   function skipForward(seconds = 10) {
     if (videoRef.current) {
-      videoRef.current.currentTime = Math.min(videoRef.current.duration || 0, videoRef.current.currentTime + seconds);
+      const newTime = Math.min(videoRef.current.duration || 0, videoRef.current.currentTime + seconds);
+      videoRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
     }
   }
 
   function skipBackward(seconds = 10) {
     if (videoRef.current) {
-      videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - seconds);
+      const newTime = Math.max(0, videoRef.current.currentTime - seconds);
+      videoRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
     }
   }
 
   function stepFrameForward() {
     if (videoRef.current) {
-      videoRef.current.currentTime += 0.04;
+      const newTime = videoRef.current.currentTime + 0.04;
+      videoRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
     }
   }
 
   function stepFrameBackward() {
     if (videoRef.current) {
-      videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 0.04);
+      const newTime = Math.max(0, videoRef.current.currentTime - 0.04);
+      videoRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
     }
   }
 
@@ -2053,9 +2072,19 @@ export function VideoDetail({
               src={mediaUrl}
               poster={posterUrl}
               preload="metadata"
-              onPlay={() => setIsPaused(false)}
-              onPause={() => setIsPaused(true)}
-              onSeeked={(e) => setIsPaused(e.currentTarget.paused)}
+              onPlay={(e) => {
+                setIsPaused(false);
+                setCurrentTime(e.currentTarget.currentTime);
+              }}
+              onPause={(e) => {
+                setIsPaused(true);
+                setCurrentTime(e.currentTarget.currentTime);
+              }}
+              onSeeking={(e) => setCurrentTime(e.currentTarget.currentTime)}
+              onSeeked={(e) => {
+                setIsPaused(e.currentTarget.paused);
+                setCurrentTime(e.currentTarget.currentTime);
+              }}
               onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
               onLoadedMetadata={(e) => {
                 setDuration(e.currentTarget.duration);
@@ -2295,6 +2324,7 @@ export function VideoDetail({
               video={video}
               globalTags={globalTags}
               currentTime={currentTime}
+              videoRef={videoRef}
               onSaveSuccess={async () => {
                 try {
                   const result = await getVideoDetail({
