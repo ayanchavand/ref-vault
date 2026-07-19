@@ -1165,7 +1165,8 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
 
   // Decide what the stage shows
   const showSkeleton = isLoading;
-  const showPicker = !isLoading && (!hasSavedRoot || items.length === 0) && !error;
+  const showPicker = !isLoading && !hasSavedRoot && !error;
+  const showEmptyFolder = !isLoading && hasSavedRoot && items.length === 0 && !error;
   const showEmptyFilter = !isLoading && !error && hasSavedRoot && items.length > 0 && filteredItems.length === 0;
   const showCard = !isLoading && !error && !!currentItem;
 
@@ -1411,6 +1412,28 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
               className="mt-2 rounded-lg bg-amber-400 px-5 py-2.5 text-xs font-semibold text-[#0A0B0D] hover:bg-amber-300 transition active:scale-[0.98]"
             >
               Go to Settings
+            </button>
+          </div>
+        )}
+
+        {showEmptyFolder && (
+          <div className="flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto gap-4" style={{ animation: "mb-fadein 0.3s ease" }}>
+            <span className="text-4xl">📂</span>
+            <h3 className="text-xl font-semibold text-white">Media library is empty</h3>
+            <p className="text-sm text-white/50 leading-relaxed">
+              We couldn't find any supported media files (.jpg, .png, .gif, .mp4, etc.) in your media folder:
+            </p>
+            <code className="px-2.5 py-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] text-xs text-amber-300 font-mono break-all max-w-full">
+              {mediaRoot}
+            </code>
+            <p className="text-xs text-white/40">
+              Add some images, GIFs, or videos to this folder, then click refresh or re-scan.
+            </p>
+            <button
+              onClick={() => loadMedia(mediaRoot)}
+              className="mt-2 rounded-lg bg-amber-400 px-5 py-2.5 text-xs font-semibold text-[#0A0B0D] hover:bg-amber-300 transition active:scale-[0.98]"
+            >
+              Scan Folder Again
             </button>
           </div>
         )}

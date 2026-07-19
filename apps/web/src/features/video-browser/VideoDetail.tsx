@@ -2254,7 +2254,7 @@ export function VideoDetail({
 
 
         {/* Clip rail (YouTube recommended videos style) */}
-        <aside className="flex flex-col gap-4 rounded-none sm:rounded-2xl border-0 sm:border border-white/[0.06] bg-transparent sm:bg-[#111316] p-0 sm:p-4 max-h-none xl:max-h-[80vh] overflow-y-visible xl:overflow-y-auto no-scrollbar xl:col-start-2 xl:col-end-3 xl:row-start-1 xl:row-span-2">
+        <aside className="flex flex-col gap-4 rounded-none sm:rounded-2xl border-0 sm:border border-white/[0.06] bg-transparent sm:bg-[#111316] p-4 max-h-none xl:max-h-[80vh] overflow-y-visible xl:overflow-y-auto no-scrollbar xl:col-start-2 xl:col-end-3 xl:row-start-1 xl:row-span-2">
           <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] pb-3">
             <div>
               <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">

@@ -401,7 +401,7 @@ export function App() {
       )}
 
       <div className="flex h-screen w-full flex-col px-2 pt-0 pb-6 sm:px-10 sm:pt-8 sm:pb-8">
-        <header className="relative flex flex-col gap-4 border-b border-white/[0.06] pb-0 sm:pb-6 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-0">
+        <header className="relative flex flex-col gap-4 border-b border-white/[0.06] pt-2.5 pb-2.5 sm:pt-0 sm:pb-6 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-0">
           <div className="flex items-center gap-3">
             <span
               className={`h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400 shadow-[0_0_10px_rgba(232,163,61,0.8)] ${
@@ -591,7 +591,7 @@ export function App() {
             )}
 
             {activeRoute.view === "BROWSE_MEDIA" && (
-              <div className="animate-[rv-fade-up_0.35s_ease-out_both] px-2 sm:px-0">
+              <div className="animate-[rv-fade-up_0.35s_ease-out_both] px-2 sm:px-0 flex flex-col flex-1 min-h-0 h-full">
                 <MediaBrowser onGoToSettings={() => navigate({ view: "SETTINGS" })} />
               </div>
             )}
