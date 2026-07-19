@@ -29,6 +29,9 @@ const MediaBrowser = lazy(() =>
 const VideoImport = lazy(() =>
   import("./features/video-import/VideoImport").then((m) => ({ default: m.VideoImport }))
 );
+const Onboarding = lazy(() =>
+  import("./features/onboarding/Onboarding").then((m) => ({ default: m.Onboarding }))
+);
 
 import { scanLibrary, getVideoDetail, ApiError, getLibraryConfig } from "./lib/api";
 import { useHashRouter, navigate } from "./lib/router";
@@ -389,6 +392,31 @@ export function App() {
       )
     : [];
 
+  // Render onboarding fullscreen — no header or nav
+  if (activeRoute.view === "SELECT_LIBRARY") {
+    return (
+      <main className="m-0 min-h-screen bg-[#0A0B0D] text-white">
+        <GlobalMotionStyles />
+        <Suspense fallback={
+          <div className="flex min-h-screen items-center justify-center text-sm font-mono uppercase tracking-widest text-white/30">
+            Loading…
+          </div>
+        }>
+          <Onboarding
+            onComplete={async (videoPath, mediaPath) => {
+              if (mediaPath) {
+                window.localStorage.setItem("reference-vault.media-root", mediaPath);
+                setActiveMediaRoot(mediaPath);
+              }
+              await handleVideoRootChange(videoPath);
+              navigate({ view: "BROWSE_LIBRARY" });
+            }}
+          />
+        </Suspense>
+      </main>
+    );
+  }
+
   return (
     <main className="m-0 min-h-screen bg-[#0A0B0D] text-white">
       <GlobalMotionStyles />
@@ -480,31 +508,6 @@ export function App() {
               Loading view…
             </div>
           }>
-            {activeRoute.view === "SELECT_LIBRARY" && (
-              <div className="flex flex-1 items-center justify-center py-10 animate-[rv-fade-up_0.4s_ease-out_both] px-2 sm:px-0">
-                <div className="max-w-xl text-center space-y-6">
-                  <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-400 font-mono text-3xl font-bold text-[#0A0B0D] shadow-[0_0_30px_rgba(232,163,61,0.3)] mx-auto">
-                    RV
-                  </span>
-                  <div className="space-y-2">
-                    <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-                      Welcome to Reference Vault
-                    </h2>
-                    <p className="text-sm text-white/50 leading-relaxed">
-                      To start pairing video references and managing clips, please configure your source libraries. Your reference files stay exactly where they are on your local drive.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => navigate({ view: "SETTINGS" })}
-                    className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-6 py-3 text-sm font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_6px_24px_rgba(251,191,36,0.45)] active:translate-y-px active:shadow-none active:scale-[0.97]"
-                  >
-                    <SettingsIcon className="h-4 w-4" />
-                    Configure System Libraries
-                  </button>
-                </div>
-              </div>
-            )}
 
             {activeRoute.view === "BROWSE_LIBRARY" && scanResult && (
               <div className="animate-[rv-fade-up_0.35s_ease-out_both] px-2 sm:px-0">
