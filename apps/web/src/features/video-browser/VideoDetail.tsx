@@ -8,7 +8,7 @@ import { Save, RotateCcw, Trash2, Repeat, Gauge, Scissors, PlayCircle, Film, Plu
 interface VideoDetailProps {
   rootPath: string;
   video: VideoDetailType;
-  allVideos: ScannedVideo[];
+  globalTags: string[];
   onUpdateVideoDetail(updatedVideo: VideoDetailType): void;
   onDeleteVideo(): void;
   libraryConfig?: LibraryConfig;
@@ -1817,7 +1817,7 @@ function SegmentEditor({
 export function VideoDetail({
   rootPath,
   video,
-  allVideos,
+  globalTags,
   onUpdateVideoDetail,
   onDeleteVideo,
   libraryConfig,
@@ -1871,20 +1871,7 @@ export function VideoDetail({
     }
   }
 
-  const [globalTags, setGlobalTags] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (!allVideos || allVideos.length === 0) return;
-    
-    const set = new Set<string>();
-    allVideos.forEach((v) => {
-      extractTags(v.metadata).forEach((t) => set.add(t));
-      v.clips.forEach((c) => {
-        extractTags(c.metadata).forEach((t) => set.add(t));
-      });
-    });
-    setGlobalTags(Array.from(set).sort());
-  }, [allVideos]);
+  // globalTags are now passed down directly as a prop
 
 
   const mediaUrl = useMemo(() => {

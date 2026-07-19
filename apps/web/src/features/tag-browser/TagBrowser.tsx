@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
 import type {
   JsonObject,
   ScannedVideo,
@@ -77,14 +77,16 @@ function getTagColorClass(tag: string): string {
   return "border-white/[0.08] bg-white/[0.02] text-white/70";
 }
 
-function TagBrowserClipCard({
+const TagBrowserClipCard = memo(function TagBrowserClipCard({
   rootPath,
   entry,
-  onClick,
+  video,
+  onSelect,
 }: {
   rootPath: string;
   entry: TaggedClip;
-  onClick(): void;
+  video?: ScannedVideo;
+  onSelect(video: ScannedVideo): void;
 }) {
   const mediaUrl = `/api/media?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
     entry.clip.mediaPath,
@@ -98,7 +100,11 @@ function TagBrowserClipCard({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        if (video) {
+          onSelect(video);
+        }
+      }}
       {...prefetchHandlers}
       className="group flex flex-col text-left overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111316] hover:-translate-y-1 hover:border-amber-400/50 hover:shadow-[0_12px_36px_rgba(0,0,0,0.5)] transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0B0D] w-full"
     >
@@ -154,9 +160,13 @@ function TagBrowserClipCard({
       </div>
     </button>
   );
-}
+});
 
 export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: TagBrowserProps) {
+  const videoMap = useMemo(() => {
+    return new Map(videos.map((v) => [v.relativePath, v]));
+  }, [videos]);
+
   const [videoDetails, setVideoDetails] = useState<VideoDetailType[]>([]);
   const [selectedVideoTags, setSelectedVideoTags] = useState<string[]>([]);
   const [selectedClipTags, setSelectedClipTags] = useState<string[]>([]);
@@ -842,17 +852,14 @@ export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: T
           ) : (
             <div className="grid grid-cols-1 min-[450px]:grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {matchedClips.map((entry) => {
-                const scannedVideo = videos.find((v) => v.relativePath === entry.video.relativePath);
+                const scannedVideo = videoMap.get(entry.video.relativePath);
                 return (
                   <TagBrowserClipCard
                     key={`${entry.video.relativePath}:${entry.clip.mediaPath}`}
                     rootPath={rootPath}
                     entry={entry}
-                    onClick={() => {
-                      if (scannedVideo) {
-                        onSelectVideo(scannedVideo);
-                      }
-                    }}
+                    video={scannedVideo}
+                    onSelect={onSelectVideo}
                   />
                 );
               })}

@@ -1,19 +1,35 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense, useMemo, useCallback } from "react";
 
 import type {
   ScanLibraryResponse,
   ScannedVideo,
   VideoDetail as VideoDetailType,
   LibraryConfig,
+  JsonObject,
 } from "@reference-vault/shared";
 
 import { Library, Tag, Upload, Image, Settings as SettingsIcon, ChevronLeft, ChevronRight } from "lucide-react";
-import { Settings } from "./features/settings/Settings";
-import { TagBrowser } from "./features/tag-browser/TagBrowser";
-import { VideoList } from "./features/video-browser/VideoList";
-import { VideoDetail } from "./features/video-browser/VideoDetail";
-import { MediaBrowser } from "./features/media-browser/MediaBrowser";
-import { VideoImport } from "./features/video-import/VideoImport";
+
+// Lazy-loaded components mapped from named exports to defaults
+const Settings = lazy(() =>
+  import("./features/settings/Settings").then((m) => ({ default: m.Settings }))
+);
+const TagBrowser = lazy(() =>
+  import("./features/tag-browser/TagBrowser").then((m) => ({ default: m.TagBrowser }))
+);
+const VideoList = lazy(() =>
+  import("./features/video-browser/VideoList").then((m) => ({ default: m.VideoList }))
+);
+const VideoDetail = lazy(() =>
+  import("./features/video-browser/VideoDetail").then((m) => ({ default: m.VideoDetail }))
+);
+const MediaBrowser = lazy(() =>
+  import("./features/media-browser/MediaBrowser").then((m) => ({ default: m.MediaBrowser }))
+);
+const VideoImport = lazy(() =>
+  import("./features/video-import/VideoImport").then((m) => ({ default: m.VideoImport }))
+);
+
 import { scanLibrary, getVideoDetail, ApiError, getLibraryConfig } from "./lib/api";
 import { useHashRouter, navigate } from "./lib/router";
 
@@ -153,6 +169,20 @@ function VideoListPagination({
   );
 }
 
+function extractTags(metadata?: JsonObject): string[] {
+  if (!metadata) {
+    return [];
+  }
+  const tags = metadata.tags;
+  if (typeof tags === "string") {
+    return [tags];
+  }
+  if (!Array.isArray(tags)) {
+    return [];
+  }
+  return tags.filter((item): item is string => typeof item === "string");
+}
+
 export function App() {
   const [savedRootPath, setSavedRootPath] = useState(loadSavedLibraryRoot);
   const [activeRootPath, setActiveRootPath] = useState<string | null>(null);
@@ -168,6 +198,18 @@ export function App() {
   // or the tag browser so the user doesn't lose their place.
   const [videoPage, setVideoPage] = useState(1);
   const [libraryConfig, setLibraryConfig] = useState<LibraryConfig>({ fields: [] });
+
+  const globalTags = useMemo(() => {
+    if (!scanResult) return [];
+    const set = new Set<string>();
+    scanResult.videos.forEach((v) => {
+      extractTags(v.metadata).forEach((t) => set.add(t));
+      v.clips.forEach((c) => {
+        extractTags(c.metadata).forEach((t) => set.add(t));
+      });
+    });
+    return Array.from(set).sort();
+  }, [scanResult?.videos]);
 
   // Auto-load saved library on mount
   useEffect(() => {
@@ -278,10 +320,10 @@ export function App() {
     setActiveMediaRoot("");
   }
 
-  function handleSelectVideo(video: ScannedVideo): void {
+  const handleSelectVideo = useCallback((video: ScannedVideo): void => {
     setSelectedVideo(video);
     navigate({ view: "VIEW_VIDEO", path: video.relativePath });
-  }
+  }, []);
 
   function handleBrowseTags(): void {
     setSelectedVideo(null);
@@ -431,133 +473,139 @@ export function App() {
         </header>
 
         <section className="flex flex-col flex-1 min-h-0 overflow-y-auto pt-6 pb-24 sm:py-12">
-          {activeRoute.view === "SELECT_LIBRARY" && (
-            <div className="flex flex-1 items-center justify-center py-10 animate-[rv-fade-up_0.4s_ease-out_both]">
-              <div className="max-w-xl text-center space-y-6">
-                <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-400 font-mono text-3xl font-bold text-[#0A0B0D] shadow-[0_0_30px_rgba(232,163,61,0.3)] mx-auto">
-                  RV
-                </span>
-                <div className="space-y-2">
-                  <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-                    Welcome to Reference Vault
-                  </h2>
-                  <p className="text-sm text-white/50 leading-relaxed">
-                    To start pairing video references and managing clips, please configure your source libraries. Your reference files stay exactly where they are on your local drive.
-                  </p>
+          <Suspense fallback={
+            <div className="flex flex-1 items-center justify-center p-8 text-sm font-mono uppercase tracking-widest text-white/30">
+              Loading view…
+            </div>
+          }>
+            {activeRoute.view === "SELECT_LIBRARY" && (
+              <div className="flex flex-1 items-center justify-center py-10 animate-[rv-fade-up_0.4s_ease-out_both]">
+                <div className="max-w-xl text-center space-y-6">
+                  <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-400 font-mono text-3xl font-bold text-[#0A0B0D] shadow-[0_0_30px_rgba(232,163,61,0.3)] mx-auto">
+                    RV
+                  </span>
+                  <div className="space-y-2">
+                    <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                      Welcome to Reference Vault
+                    </h2>
+                    <p className="text-sm text-white/50 leading-relaxed">
+                      To start pairing video references and managing clips, please configure your source libraries. Your reference files stay exactly where they are on your local drive.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate({ view: "SETTINGS" })}
+                    className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-6 py-3 text-sm font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_6px_24px_rgba(251,191,36,0.45)] active:translate-y-px active:shadow-none active:scale-[0.97]"
+                  >
+                    <SettingsIcon className="h-4 w-4" />
+                    Configure System Libraries
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => navigate({ view: "SETTINGS" })}
-                  className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-6 py-3 text-sm font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_6px_24px_rgba(251,191,36,0.45)] active:translate-y-px active:shadow-none active:scale-[0.97]"
-                >
-                  <SettingsIcon className="h-4 w-4" />
-                  Configure System Libraries
-                </button>
               </div>
-            </div>
-          )}
+            )}
 
-          {activeRoute.view === "BROWSE_LIBRARY" && scanResult && (
-            <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
-              <VideoList
-                rootPath={activeRootPath!}
-                videos={paginatedVideos}
-                onSelectVideo={handleSelectVideo}
-                isLoading={isLoading}
-                openingVideoPath={openingVideoPath}
-                error={error}
-              />
-              <VideoListPagination
-                currentPage={clampedVideoPage}
-                totalPages={totalVideoPages}
-                onPrevPage={handlePrevVideoPage}
-                onNextPage={handleNextVideoPage}
-              />
-            </div>
-          )}
+            {activeRoute.view === "BROWSE_LIBRARY" && scanResult && (
+              <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
+                <VideoList
+                  rootPath={activeRootPath!}
+                  videos={paginatedVideos}
+                  onSelectVideo={handleSelectVideo}
+                  isLoading={isLoading}
+                  openingVideoPath={openingVideoPath}
+                  error={error}
+                />
+                <VideoListPagination
+                  currentPage={clampedVideoPage}
+                  totalPages={totalVideoPages}
+                  onPrevPage={handlePrevVideoPage}
+                  onNextPage={handleNextVideoPage}
+                />
+              </div>
+            )}
 
-          {activeRoute.view === "IMPORT_VIDEO" && (
-            <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
-              <VideoImport
-                rootPath={activeRootPath!}
-                libraryConfig={libraryConfig}
-                onImportSuccess={async () => {
-                  setIsLoading(true);
-                  try {
-                    const result = await scanLibrary(activeRootPath!);
-                    setScanResult(result);
-                    setVideoPage(1);
+            {activeRoute.view === "IMPORT_VIDEO" && (
+              <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
+                <VideoImport
+                  rootPath={activeRootPath!}
+                  libraryConfig={libraryConfig}
+                  onImportSuccess={async () => {
+                    setIsLoading(true);
+                    try {
+                      const result = await scanLibrary(activeRootPath!);
+                      setScanResult(result);
+                      setVideoPage(1);
+                      navigate({ view: "BROWSE_LIBRARY" });
+                    } catch (cause) {
+                      setError(cause instanceof ApiError ? cause.message : "Failed to scan library.");
+                      navigate({ view: "BROWSE_LIBRARY" });
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
+                  onBack={() => {
                     navigate({ view: "BROWSE_LIBRARY" });
-                  } catch (cause) {
-                    setError(cause instanceof ApiError ? cause.message : "Failed to scan library.");
-                    navigate({ view: "BROWSE_LIBRARY" });
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-                onBack={() => {
-                  navigate({ view: "BROWSE_LIBRARY" });
-                }}
-              />
-            </div>
-          )}
+                  }}
+                />
+              </div>
+            )}
 
-          {activeRoute.view === "BROWSE_TAGS" && scanResult && (
-            <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
-              <TagBrowser
-                rootPath={activeRootPath!}
-                videos={scanResult.videos}
-                onSelectVideo={handleSelectVideo}
-                libraryConfig={libraryConfig}
-              />
-            </div>
-          )}
+            {activeRoute.view === "BROWSE_TAGS" && scanResult && (
+              <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
+                <TagBrowser
+                  rootPath={activeRootPath!}
+                  videos={scanResult.videos}
+                  onSelectVideo={handleSelectVideo}
+                  libraryConfig={libraryConfig}
+                />
+              </div>
+            )}
 
-          {activeRoute.view === "VIEW_VIDEO" && videoDetail && (
-            <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
-              <VideoDetail
-                rootPath={activeRootPath!}
-                video={videoDetail}
-                allVideos={scanResult?.videos || []}
-                onUpdateVideoDetail={handleUpdateVideoDetail}
-                onDeleteVideo={async () => {
-                  setIsLoading(true);
-                  setSelectedVideo(null);
-                  setVideoDetail(null);
-                  try {
-                    const result = await scanLibrary(activeRootPath!);
-                    setScanResult(result);
-                    setVideoPage(1);
-                    navigate({ view: "BROWSE_LIBRARY" });
-                  } catch (cause) {
-                    setError(cause instanceof ApiError ? cause.message : "Failed to scan library.");
-                    navigate({ view: "BROWSE_LIBRARY" });
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-                libraryConfig={libraryConfig}
-              />
-            </div>
-          )}
+            {activeRoute.view === "VIEW_VIDEO" && videoDetail && (
+              <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
+                <VideoDetail
+                  rootPath={activeRootPath!}
+                  video={videoDetail}
+                  globalTags={globalTags}
+                  onUpdateVideoDetail={handleUpdateVideoDetail}
+                  onDeleteVideo={async () => {
+                    setIsLoading(true);
+                    setSelectedVideo(null);
+                    setVideoDetail(null);
+                    try {
+                      const result = await scanLibrary(activeRootPath!);
+                      setScanResult(result);
+                      setVideoPage(1);
+                      navigate({ view: "BROWSE_LIBRARY" });
+                    } catch (cause) {
+                      setError(cause instanceof ApiError ? cause.message : "Failed to scan library.");
+                      navigate({ view: "BROWSE_LIBRARY" });
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
+                  libraryConfig={libraryConfig}
+                />
+              </div>
+            )}
 
-          {activeRoute.view === "BROWSE_MEDIA" && (
-            <MediaBrowser onGoToSettings={() => navigate({ view: "SETTINGS" })} />
-          )}
+            {activeRoute.view === "BROWSE_MEDIA" && (
+              <MediaBrowser onGoToSettings={() => navigate({ view: "SETTINGS" })} />
+            )}
 
-          {activeRoute.view === "SETTINGS" && (
-            <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
-              <Settings
-                onVideoLibraryChange={handleVideoRootChange}
-                onForgetVideoLibrary={handleVideoRootForget}
-                onMediaLibraryChange={handleMediaRootChange}
-                onForgetMediaLibrary={handleMediaRootForget}
-                videoLibraryPath={activeRootPath ?? ""}
-                libraryConfig={libraryConfig}
-                onUpdateLibraryConfig={setLibraryConfig}
-              />
-            </div>
-          )}
+            {activeRoute.view === "SETTINGS" && (
+              <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
+                <Settings
+                  onVideoLibraryChange={handleVideoRootChange}
+                  onForgetVideoLibrary={handleVideoRootForget}
+                  onMediaLibraryChange={handleMediaRootChange}
+                  onForgetMediaLibrary={handleMediaRootForget}
+                  videoLibraryPath={activeRootPath ?? ""}
+                  libraryConfig={libraryConfig}
+                  onUpdateLibraryConfig={setLibraryConfig}
+                />
+              </div>
+            )}
+          </Suspense>
         </section>
       </div>
 

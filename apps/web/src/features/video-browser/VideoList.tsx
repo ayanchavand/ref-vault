@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, memo } from "react";
 import { List, LayoutGrid, Video, User, FileText, Film, Tag, AlertTriangle } from "lucide-react";
 import type { ScannedVideo, JsonObject } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover, useDynamicThumbnail } from "./Uselazythumbnail";
@@ -72,7 +72,7 @@ function SkeletonCard() {
   );
 }
 
-function VideoThumbnailCard({
+const VideoThumbnailCard = memo(function VideoThumbnailCard({
   rootPath,
   video,
   isOpening,
@@ -85,7 +85,7 @@ function VideoThumbnailCard({
   video: ScannedVideo;
   isOpening: boolean;
   disabled: boolean;
-  onSelect(): void;
+  onSelect(video: ScannedVideo): void;
   viewMode?: "details" | "moodboard";
   cardIndex?: number;
 }) {
@@ -147,7 +147,7 @@ function VideoThumbnailCard({
     >
       <button
         type="button"
-        onClick={onSelect}
+        onClick={() => onSelect(video)}
         disabled={disabled}
         aria-busy={isOpening}
         {...prefetchHandlers}
@@ -286,7 +286,7 @@ function VideoThumbnailCard({
       </button>
     </li>
   );
-}
+});
 
 
 export function VideoList({
@@ -385,7 +385,7 @@ export function VideoList({
                 cardIndex={index}
                 isOpening={openingVideoPath === video.relativePath}
                 disabled={openingVideoPath !== null}
-                onSelect={() => onSelectVideo(video)}
+                onSelect={onSelectVideo}
               />
             ))}
           </ul>
