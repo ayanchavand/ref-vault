@@ -197,6 +197,15 @@ export interface DeleteVideoResponse {
   success: boolean;
 }
 
+export interface DeleteMediaRequest {
+  rootPath: string;
+  mediaRelativePath: string;
+}
+
+export interface DeleteMediaResponse {
+  success: boolean;
+}
+
 export interface CaptureFrameRequest {
   rootPath: string;
   mediaPath: string;

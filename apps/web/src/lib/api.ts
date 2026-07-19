@@ -17,6 +17,8 @@ import type {
   CreateVideoPlaceholderResponse,
   DeleteVideoRequest,
   DeleteVideoResponse,
+  DeleteMediaRequest,
+  DeleteMediaResponse,
   CaptureFrameRequest,
   CaptureFrameResponse,
   InitLibraryRequest,
@@ -260,6 +262,24 @@ export async function deleteVideo(
   }
 
   return payload as DeleteVideoResponse;
+}
+
+export async function deleteMedia(
+  request: DeleteMediaRequest,
+): Promise<DeleteMediaResponse> {
+  const response = await fetch("/api/media/delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const payload: unknown = await response.json();
+
+  if (!response.ok) {
+    const error = payload as ApiErrorResponse;
+    throw new ApiError(error.message || "The media asset could not be deleted.");
+  }
+
+  return payload as DeleteMediaResponse;
 }
 
 export function uploadMediaFile(

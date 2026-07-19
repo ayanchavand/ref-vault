@@ -621,6 +621,59 @@ test("handles library config read and write operations", async () => {
   }
 });
 
+test("deletes a media file successfully and rejects path traversal", async () => {
+  const library = await mkdtemp(join(tmpdir(), "reference-vault-"));
+  const app = await buildApp();
+
+  try {
+    const imagesDir = join(library, "images");
+    await mkdir(imagesDir, { recursive: true });
+
+    const mediaFile = join(imagesDir, "test-media.png");
+    await writeFile(mediaFile, "test-image-content");
+
+    // Verify file exists
+    assert.ok(await stat(mediaFile));
+
+    // Delete request
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/media/delete",
+      payload: {
+        rootPath: library,
+        mediaRelativePath: "images/test-media.png",
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), { success: true });
+
+    // Verify file is gone
+    let fileExists = true;
+    try {
+      await stat(mediaFile);
+    } catch {
+      fileExists = false;
+    }
+    assert.ok(!fileExists, "File should have been deleted");
+
+    // Path traversal attempt should fail
+    const responseTraversal = await app.inject({
+      method: "POST",
+      url: "/api/media/delete",
+      payload: {
+        rootPath: library,
+        mediaRelativePath: "../outside-file.png",
+      },
+    });
+    assert.equal(responseTraversal.statusCode, 400);
+
+  } finally {
+    await app.close();
+    await rm(library, { force: true, recursive: true });
+  }
+});
+
 
 
 

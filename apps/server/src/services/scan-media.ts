@@ -1,4 +1,4 @@
-import { readdir, stat } from "node:fs/promises";
+import { readdir, stat, rm } from "node:fs/promises";
 import { extname, join, relative, sep } from "node:path";
 
 import type {
@@ -6,6 +6,7 @@ import type {
   ScannedMediaItem,
   ScannedMediaType,
   ScanMediaResponse,
+  DeleteMediaResponse,
 } from "@reference-vault/shared";
 
 import { validateLibraryRoot } from "./validate-library-root.js";
@@ -116,6 +117,56 @@ export async function scanMedia(rootPath: string): Promise<ScanMediaResult> {
       error: {
         error: "MEDIA_SCAN_FAILED",
         message: "The media folder could not be scanned.",
+      },
+    };
+  }
+}
+
+export type DeleteMediaResult =
+  | { ok: true; value: DeleteMediaResponse }
+  | { ok: false; error: ApiErrorResponse };
+
+export async function deleteMediaItem(
+  rootPath: string,
+  mediaRelativePath: string,
+): Promise<DeleteMediaResult> {
+  const rootValidation = await validateLibraryRoot(rootPath);
+
+  if (!rootValidation.ok) {
+    return rootValidation;
+  }
+
+  const libraryRootPath = rootValidation.value.rootPath;
+  const targetFilePath = join(libraryRootPath, mediaRelativePath);
+
+  // Containment check to prevent path traversal
+  const pathFromParent = relative(libraryRootPath, targetFilePath);
+  const isContained =
+    pathFromParent === "" ||
+    (!pathFromParent.startsWith(`..${sep}`) && pathFromParent !== "..");
+
+  if (!isContained) {
+    return {
+      ok: false,
+      error: {
+        error: "INVALID_VIDEO_PATH", // Reuses existing validation code or error type
+        message: "Media file path must stay within the library root.",
+      },
+    };
+  }
+
+  try {
+    await rm(targetFilePath, { force: true });
+    return {
+      ok: true,
+      value: { success: true },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        error: "METADATA_WRITE_FAILED",
+        message: `Failed to delete media file: ${(error as Error).message}`,
       },
     };
   }

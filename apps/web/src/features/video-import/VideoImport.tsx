@@ -30,7 +30,9 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
   const [importType, setImportType] = useState<"video" | "media">("video");
   const mediaRoot = useMemo(() => window.localStorage.getItem("reference-vault.media-root") || "", []);
 
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploadingFileName, setUploadingFileName] = useState("");
+  const [uploadingFileIndex, setUploadingFileIndex] = useState(0);
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
   const [tagsInput, setTagsInput] = useState("");
@@ -68,10 +70,13 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
     };
   }, [videoPreviewUrl]);
 
-  const handleFileChange = async (selectedFile: File) => {
+  const handleFilesChange = async (selectedFiles: File[]) => {
     setErrorMessage(null);
 
     if (importType === "video") {
+      const selectedFile = selectedFiles[0];
+      if (!selectedFile) return;
+
       if (!selectedFile.type.startsWith("video/")) {
         setErrorMessage("Only video files (mp4, webm, etc.) are supported.");
         return;
@@ -84,7 +89,7 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
         return;
       }
 
-      setFile(selectedFile);
+      setFiles([selectedFile]);
 
       // Auto-fill title from filename (minus extension)
       const lastDotIndex = selectedFile.name.lastIndexOf(".");
@@ -101,26 +106,62 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
       setVideoPreviewUrl(URL.createObjectURL(selectedFile));
     } else {
       // Media Asset import supporting gif, video, images
-      const ext = selectedFile.name.substring(selectedFile.name.lastIndexOf(".")).toLowerCase();
-      const isSupported = [
-        ".gif",
-        ".mp4", ".webm", ".mov",
-        ".jpg", ".jpeg", ".png", ".webp", ".avif"
-      ].includes(ext);
+      const validFiles: File[] = [];
+      const invalidNames: string[] = [];
 
-      if (!isSupported) {
-        setErrorMessage("Unsupported file type. Supported types: GIF, Video (MP4, WebM, MOV), Image (JPG, PNG, WebP, AVIF).");
-        return;
+      for (const f of selectedFiles) {
+        const ext = f.name.substring(f.name.lastIndexOf(".")).toLowerCase();
+        const isSupported = [
+          ".gif",
+          ".mp4", ".webm", ".mov",
+          ".jpg", ".jpeg", ".png", ".webp", ".avif"
+        ].includes(ext);
+
+        if (isSupported) {
+          validFiles.push(f);
+        } else {
+          invalidNames.push(f.name);
+        }
       }
 
-      setFile(selectedFile);
-      setTitle(selectedFile.name);
-
-      if (videoPreviewUrl) {
-        URL.revokeObjectURL(videoPreviewUrl);
+      if (invalidNames.length > 0) {
+        setErrorMessage(`Some files were skipped (unsupported type): ${invalidNames.join(", ")}`);
       }
-      setVideoPreviewUrl(URL.createObjectURL(selectedFile));
+
+      if (validFiles.length > 0) {
+        setFiles((prev) => {
+          const existingNames = new Set(prev.map((x) => x.name));
+          const newFiles = validFiles.filter((x) => !existingNames.has(x.name));
+          const updated = [...prev, ...newFiles];
+
+          if (updated.length === 1) {
+            if (videoPreviewUrl) {
+              URL.revokeObjectURL(videoPreviewUrl);
+            }
+            setVideoPreviewUrl(URL.createObjectURL(updated[0]!));
+          }
+          return updated;
+        });
+      }
     }
+  };
+
+  const handleRemoveFileAtIndex = (indexToRemove: number) => {
+    setFiles((prev) => {
+      const updated = prev.filter((_, idx) => idx !== indexToRemove);
+      if (updated.length === 1) {
+        if (videoPreviewUrl) {
+          URL.revokeObjectURL(videoPreviewUrl);
+        }
+        setVideoPreviewUrl(URL.createObjectURL(updated[0]!));
+      } else if (updated.length === 0) {
+        if (videoPreviewUrl) {
+          URL.revokeObjectURL(videoPreviewUrl);
+          setVideoPreviewUrl(null);
+        }
+      }
+      return updated;
+    });
   };
 
   const onDragOverHandler = useCallback((e: React.DragEvent) => {
@@ -136,9 +177,10 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
     e.preventDefault();
     setIsDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFileChange(e.dataTransfer.files[0]!);
+      const selectedFiles = Array.from(e.dataTransfer.files);
+      handleFilesChange(selectedFiles);
     }
-  }, [videoPreviewUrl, importType]);
+  }, [videoPreviewUrl, importType, files]);
 
   const handleAreaClick = () => {
     fileInputRef.current?.click();
@@ -146,13 +188,14 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      handleFileChange(e.target.files[0]!);
+      const selectedFiles = Array.from(e.target.files);
+      handleFilesChange(selectedFiles);
     }
   };
 
   const handleClearVideo = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setFile(null);
+    setFiles([]);
     setTitle("");
     setVideoPreviewUrl(null);
     setErrorMessage(null);
@@ -163,7 +206,7 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) {
+    if (files.length === 0) {
       setErrorMessage("Please drop or select a file first.");
       return;
     }
@@ -180,14 +223,21 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
       setImportStep("uploading_video");
 
       try {
-        await uploadMediaFile(
-          mediaRoot,
-          file.name,
-          file,
-          (percent) => {
-            setUploadPercent(percent);
-          }
-        );
+        for (let i = 0; i < files.length; i++) {
+          const currentFile = files[i]!;
+          setUploadingFileName(currentFile.name);
+          setUploadingFileIndex(i);
+
+          await uploadMediaFile(
+            mediaRoot,
+            currentFile.name,
+            currentFile,
+            (percent) => {
+              const overallPercent = Math.round(((i + percent / 100) / files.length) * 100);
+              setUploadPercent(overallPercent);
+            }
+          );
+        }
 
         setImportStep("done");
         setTimeout(() => {
@@ -266,7 +316,7 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
       await uploadVideo(
         rootPath,
         placeholder.videoRelativePath,
-        file,
+        files[0]!,
         (percent) => {
           setUploadPercent(percent);
         }
@@ -284,19 +334,19 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
   };
 
   const formattedFileSize = useMemo(() => {
-    if (!file) return "";
-    const size = file.size;
+    if (files.length === 0) return "";
+    const size = files[0]!.size;
     if (size < 1024 * 1024) {
       return `${(size / 1024).toFixed(1)} KB`;
     }
     return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-  }, [file]);
+  }, [files]);
 
   const isImageOrGif = useMemo(() => {
-    if (!file) return false;
-    const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
+    if (files.length === 0) return false;
+    const ext = files[0]!.name.substring(files[0]!.name.lastIndexOf(".")).toLowerCase();
     return [".gif", ".jpg", ".jpeg", ".png", ".webp", ".avif"].includes(ext);
-  }, [file]);
+  }, [files]);
 
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full relative">
@@ -319,7 +369,7 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
             type="button"
             onClick={() => {
               setImportType("video");
-              setFile(null);
+              setFiles([]);
               setVideoPreviewUrl(null);
               setErrorMessage(null);
             }}
@@ -335,7 +385,7 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
             type="button"
             onClick={() => {
               setImportType("media");
-              setFile(null);
+              setFiles([]);
               setVideoPreviewUrl(null);
               setErrorMessage(null);
             }}
@@ -369,7 +419,7 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
         {/* Left Side: Drag & Drop Zone */}
         <div className="flex flex-col gap-3">
           <label className="block font-mono text-[0.65rem] uppercase tracking-wider text-white/50">
-            {importType === "video" ? "Reference Video File" : "Media Asset File"}
+            {importType === "video" ? "Reference Video File" : "Media Asset Files"}
           </label>
           <input
             id="video-file-picker"
@@ -378,56 +428,125 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
             onChange={handleFileInputChange}
             accept={importType === "video" ? "video/*" : "image/*,video/*,.gif"}
             className="hidden"
+            multiple={importType === "media"}
             disabled={isImporting || (importType === "media" && !mediaRoot)}
           />
           <div
             onDragOver={onDragOverHandler}
             onDragLeave={onDragLeaveHandler}
             onDrop={onDropHandler}
-            onClick={!file && !isImporting && (importType === "video" || mediaRoot) ? handleAreaClick : undefined}
+            onClick={files.length === 0 && !isImporting && (importType === "video" || mediaRoot) ? handleAreaClick : undefined}
             className={`relative flex flex-col items-center justify-center min-h-[350px] rounded-2xl border transition-all duration-300 ${
-              file ? "border-white/[0.08] bg-[#111316]/20" : "border-dashed border-white/20 bg-[#111316]/40 hover:border-amber-400/50 hover:bg-[#111316]/60 cursor-pointer"
+              files.length > 0 ? "border-white/[0.08] bg-[#111316]/20" : "border-dashed border-white/20 bg-[#111316]/40 hover:border-amber-400/50 hover:bg-[#111316]/60 cursor-pointer"
             } ${isDragOver ? "border-amber-400 bg-amber-400/[0.02] scale-[0.99]" : ""} ${importType === "media" && !mediaRoot ? "opacity-30 cursor-not-allowed pointer-events-none" : ""}`}
           >
-            {file ? (
-              <div className="w-full h-full flex flex-col p-4">
-                {videoPreviewUrl ? (
-                  <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black border border-white/[0.04] flex items-center justify-center">
-                    {isImageOrGif ? (
-                      <img
-                        src={videoPreviewUrl}
-                        alt="Preview"
-                        className="w-full h-full object-contain"
-                      />
+            {files.length > 0 ? (
+              <div className="w-full h-full flex flex-col p-4 gap-4">
+                {files.length === 1 ? (
+                  <>
+                    {videoPreviewUrl ? (
+                      <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black border border-white/[0.04] flex items-center justify-center">
+                        {isImageOrGif ? (
+                          <img
+                            src={videoPreviewUrl}
+                            alt="Preview"
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <video
+                            src={videoPreviewUrl}
+                            controls
+                            className="w-full h-full object-contain"
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleClearVideo}
+                          disabled={isImporting}
+                          className="absolute top-3 right-3 rounded-full bg-black/70 hover:bg-black p-2 text-white/70 hover:text-white transition duration-200"
+                          title="Remove preview"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     ) : (
-                      <video
-                        src={videoPreviewUrl}
-                        controls
-                        className="w-full h-full object-contain"
-                      />
+                      <div className="aspect-video w-full flex items-center justify-center bg-black/40 rounded-xl">
+                        <span className="font-mono text-xs text-white/40">Loading preview…</span>
+                      </div>
                     )}
-                    <button
-                      type="button"
-                      onClick={handleClearVideo}
-                      disabled={isImporting}
-                      className="absolute top-3 right-3 rounded-full bg-black/70 hover:bg-black p-2 text-white/70 hover:text-white transition duration-200"
-                      title="Remove preview"
-                    >
-                      ✕
-                    </button>
-                  </div>
+                    <div className="mt-4 flex flex-col gap-1 border-t border-white/[0.04] pt-3">
+                      <p className="truncate font-semibold text-white/90 text-sm">{files[0]!.name}</p>
+                      <div className="flex justify-between font-mono text-[0.65rem] text-white/40">
+                        <span>{formattedFileSize}</span>
+                        <span>{files[0]!.type || "file"}</span>
+                      </div>
+                    </div>
+                  </>
                 ) : (
-                  <div className="aspect-video w-full flex items-center justify-center bg-black/40 rounded-xl">
-                    <span className="font-mono text-xs text-white/40">Loading preview…</span>
+                  <div className="flex flex-col flex-1 w-full min-h-[250px] max-h-[400px]">
+                    <div className="flex items-center justify-between border-b border-white/[0.06] pb-2 mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-white/50 uppercase tracking-wider">
+                          Selected Files ({files.length})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleAreaClick}
+                          disabled={isImporting}
+                          className="text-xs text-amber-400 hover:text-amber-300 transition font-semibold"
+                        >
+                          + Add More
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleClearVideo}
+                        disabled={isImporting}
+                        className="text-xs text-rose-400 hover:text-rose-300 transition"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-2 overflow-y-auto pr-1 flex-1 no-scrollbar">
+                      {files.map((f, idx) => {
+                        const sizeStr = f.size < 1024 * 1024
+                          ? `${(f.size / 1024).toFixed(1)} KB`
+                          : `${(f.size / (1024 * 1024)).toFixed(1)} MB`;
+                        const ext = f.name.substring(f.name.lastIndexOf(".")).toLowerCase();
+                        const isImg = [".gif", ".jpg", ".jpeg", ".png", ".webp", ".avif"].includes(ext);
+
+                        return (
+                          <div
+                            key={`${f.name}-${idx}`}
+                            className="flex items-center justify-between rounded-xl border border-white/[0.04] bg-white/[0.02] px-3 py-2.5 transition hover:bg-white/[0.04]"
+                          >
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <span className="text-lg shrink-0">
+                                {ext === ".gif" ? "🎞️" : isImg ? "🖼️" : "🎥"}
+                              </span>
+                              <div className="flex flex-col overflow-hidden">
+                                <span className="truncate text-xs font-semibold text-white/80">{f.name}</span>
+                                <span className="font-mono text-[0.6rem] text-white/30">{sizeStr}</span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={isImporting}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveFileAtIndex(idx);
+                              }}
+                              className="text-white/40 hover:text-rose-400 p-1.5 transition rounded-lg hover:bg-white/[0.04]"
+                              title="Remove file"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
-                <div className="mt-4 flex flex-col gap-1 border-t border-white/[0.04] pt-3">
-                  <p className="truncate font-semibold text-white/90 text-sm">{file.name}</p>
-                  <div className="flex justify-between font-mono text-[0.65rem] text-white/40">
-                    <span>{formattedFileSize}</span>
-                    <span>{file.type || "file"}</span>
-                  </div>
-                </div>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-3 p-8 text-center pointer-events-none">
@@ -614,7 +733,7 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
 
             <button
               type="submit"
-              disabled={!file || !title.trim() || isImporting}
+              disabled={files.length === 0 || !title.trim() || isImporting}
               className="w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-[#0A0B0D] shadow-[0_4px_12px_rgba(251,191,36,0.3)] transition duration-300 hover:bg-amber-300 hover:shadow-[0_6px_20px_rgba(251,191,36,0.4)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-amber-400 disabled:shadow-none disabled:active:scale-100"
             >
               Import Reference
@@ -623,10 +742,10 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
         ) : (
           <button
             type="submit"
-            disabled={!file || isImporting || !mediaRoot}
+            disabled={files.length === 0 || isImporting || !mediaRoot}
             className="w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-[#0A0B0D] shadow-[0_4px_12px_rgba(251,191,36,0.3)] transition duration-300 hover:bg-amber-300 hover:shadow-[0_6px_20px_rgba(251,191,36,0.4)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-amber-400 disabled:shadow-none disabled:active:scale-100 mt-2"
           >
-            Upload Asset to Media Library
+            {files.length > 1 ? "Upload Assets to Media Library" : "Upload Asset to Media Library"}
           </button>
         )}
       </form>
@@ -636,24 +755,36 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
           <div className="w-[90%] max-w-md rounded-2xl border border-white/10 bg-[#111316] p-6 shadow-2xl flex flex-col items-center gap-4 text-center">
             <span className="h-8 w-8 animate-spin rounded-full border-3 border-amber-400/30 border-t-amber-400" />
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 w-full">
               <h4 className="text-md font-semibold text-white">
-                {importStep === "creating_folders"
-                  ? "Initializing directory structure"
-                  : importStep === "uploading_video"
-                    ? "Uploading reference video"
-                    : "Finalizing import"}
+                {importType === "video" ? (
+                  importStep === "creating_folders"
+                    ? "Initializing directory structure"
+                    : importStep === "uploading_video"
+                      ? "Uploading reference video"
+                      : "Finalizing import"
+                ) : (
+                  files.length > 1
+                    ? `Uploading media assets (${uploadingFileIndex + 1}/${files.length})`
+                    : "Uploading media asset"
+                )}
               </h4>
-              <p className="text-xs text-white/50">
-                {importStep === "creating_folders"
-                  ? "Creating folders and writing metadata.json..."
-                  : importStep === "uploading_video"
-                    ? `Piping media stream... ${uploadPercent}%`
-                    : "Import completed successfully!"}
+              <p className="text-xs text-white/50 truncate w-full px-2">
+                {importType === "video" ? (
+                  importStep === "creating_folders"
+                    ? "Creating folders and writing metadata.json..."
+                    : importStep === "uploading_video"
+                      ? `Piping media stream... ${uploadPercent}%`
+                      : "Import completed successfully!"
+                ) : (
+                  importStep === "done"
+                    ? "Upload completed successfully!"
+                    : `Uploading: ${uploadingFileName}`
+                )}
               </p>
             </div>
 
-            {importStep === "uploading_video" && (
+            {uploadPercent > 0 && (
               <div className="w-full space-y-2 mt-2">
                 {/* Horizontal Progress Bar */}
                 <div className="w-full bg-white/[0.06] rounded-full h-1.5 overflow-hidden">

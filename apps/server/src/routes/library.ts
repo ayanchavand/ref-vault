@@ -24,6 +24,8 @@ import type {
   CreateVideoPlaceholderResponse,
   DeleteVideoRequest,
   DeleteVideoResponse,
+  DeleteMediaRequest,
+  DeleteMediaResponse,
   CaptureFrameRequest,
   CaptureFrameResponse,
   InitLibraryRequest,
@@ -36,7 +38,7 @@ import type {
 
 import { validateLibraryRoot } from "../services/validate-library-root.js";
 import { scanLibrary } from "../services/scan-library.js";
-import { scanMedia } from "../services/scan-media.js";
+import { scanMedia, deleteMediaItem } from "../services/scan-media.js";
 import { readVideoDetail } from "../services/read-video-detail.js";
 import { writeClipMetadata, deleteClip } from "../services/write-clip-metadata.js";
 import { writeVideoMetadata } from "../services/write-video-metadata.js";
@@ -900,6 +902,43 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
         const statusCode =
           result.error.error === "LIBRARY_ROOT_NOT_FOUND" ||
           result.error.error === "VIDEO_NOT_FOUND"
+            ? 404
+            : 400;
+        return reply.status(statusCode).send(result.error);
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  );
+
+  app.post<{
+    Body: DeleteMediaRequest;
+    Reply: DeleteMediaResponse | ApiErrorResponse;
+  }>(
+    "/api/media/delete",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["rootPath", "mediaRelativePath"],
+          additionalProperties: false,
+          properties: {
+            rootPath: { type: "string" },
+            mediaRelativePath: { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await deleteMediaItem(
+        request.body.rootPath,
+        request.body.mediaRelativePath,
+      );
+
+      if (!result.ok) {
+        const statusCode =
+          result.error.error === "LIBRARY_ROOT_NOT_FOUND" ||
+          result.error.error === "MEDIA_NOT_FOUND"
             ? 404
             : 400;
         return reply.status(statusCode).send(result.error);

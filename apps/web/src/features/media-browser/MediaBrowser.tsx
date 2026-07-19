@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { ScannedMediaItem } from "@reference-vault/shared";
-import { scanMedia, ApiError } from "../../lib/api";
+import { scanMedia, deleteMedia, ApiError } from "../../lib/api";
 
 // ─── Storage keys ─────────────────────────────────────────────────────────────
 const MEDIA_ROOT_KEY = "reference-vault.media-root";
@@ -153,6 +153,7 @@ interface MediaCardProps {
   index: number;
   onNext: () => void;
   onPrev: () => void;
+  onDelete: () => void;
 }
 
 function MediaCard({
@@ -165,6 +166,7 @@ function MediaCard({
   index,
   onNext,
   onPrev,
+  onDelete,
 }: MediaCardProps) {
   const url = buildMediaUrl(rootPath, item.relativePath);
   const isVideo = item.type === "video";
@@ -238,7 +240,11 @@ function MediaCard({
       style={{
         ...exitStyle,
       }}
-      onTransitionEnd={exitDirection !== null ? onAnimationEnd : undefined}
+      onTransitionEnd={(e) => {
+        if (e.target === e.currentTarget && exitDirection !== null && e.propertyName === "transform") {
+          onAnimationEnd();
+        }
+      }}
     >
       {/* Skeleton behind the real media until it loads */}
       {!loaded && !imgError && (
@@ -482,6 +488,41 @@ function MediaCard({
             title="Copy path"
           >
             📋
+          </button>
+
+          {/* Delete Asset */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: "rgba(239, 68, 68, 0.25)",
+              border: "1px solid rgba(239, 68, 68, 0.45)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#f87171",
+              fontSize: 14,
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+              backdropFilter: "blur(8px)",
+              transition: "transform 0.15s, background-color 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "scale(1.1)";
+              e.currentTarget.style.background = "rgba(239, 68, 68, 0.45)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1)";
+              e.currentTarget.style.background = "rgba(239, 68, 68, 0.25)";
+            }}
+            title="Delete media asset"
+          >
+            🗑️
           </button>
 
           {/* Up (Previous) */}
@@ -1022,7 +1063,7 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
   const [isMobileLayout, setIsMobileLayout] = useState(() => typeof window !== "undefined" ? window.innerWidth <= 640 : false);
 
   // drag state
-  const dragRef = useRef<{ startY: number; dragging: boolean } | null>(null);
+  const dragRef = useRef<{ startY: number; lastY: number; dragging: boolean } | null>(null);
   const [dragDelta, setDragDelta] = useState(0);
   const stageRef = useRef<HTMLDivElement>(null);
 
@@ -1146,21 +1187,27 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
 
   // drag state handlers
   function onPointerDown(e: React.PointerEvent) {
-    dragRef.current = { startY: e.clientY, dragging: true };
+    dragRef.current = { startY: e.clientY, lastY: e.clientY, dragging: true };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }
 
   function onPointerMove(e: React.PointerEvent) {
     if (!dragRef.current?.dragging) return;
+    dragRef.current.lastY = e.clientY;
     setDragDelta(e.clientY - dragRef.current.startY);
   }
 
   function onPointerUp(e: React.PointerEvent) {
     if (!dragRef.current) return;
-    const dy = e.clientY - dragRef.current.startY;
+    const dy = dragRef.current.lastY - dragRef.current.startY;
     dragRef.current = null;
     setDragDelta(0);
     if (Math.abs(dy) > 72) advance(dy > 0 ? "down" : "up");
+  }
+
+  function onPointerCancel() {
+    dragRef.current = null;
+    setDragDelta(0);
   }
 
   function handleRemoveLocation(path: string) {
@@ -1178,6 +1225,33 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
     localStorage.removeItem(MEDIA_ROOT_KEY);
     setShowLocations(false);
   }
+
+  const handleDeleteMedia = useCallback(async (itemToDelete: ScannedMediaItem) => {
+    const confirmDelete = window.confirm(
+      `Are you sure you want to permanently delete "${itemToDelete.relativePath.split("/").pop()}"?`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      await deleteMedia({
+        rootPath: mediaRoot,
+        mediaRelativePath: itemToDelete.relativePath,
+      });
+
+      // Remove from items list
+      setItems((prev) => {
+        const updated = prev.filter((item) => item.relativePath !== itemToDelete.relativePath);
+        setIndex((currIndex) => {
+          const nextFiltered = updated.filter((item) => mediaTypeFilter === "all" || item.type === mediaTypeFilter);
+          if (nextFiltered.length === 0) return 0;
+          return currIndex >= nextFiltered.length ? nextFiltered.length - 1 : currIndex;
+        });
+        return updated;
+      });
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to delete media asset.");
+    }
+  }, [mediaRoot, mediaTypeFilter]);
 
   const currentItem = filteredItems[index];
   const nextItem = filteredItems.length > 0 ? filteredItems[(index + 1) % filteredItems.length] : undefined;
@@ -1745,11 +1819,12 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
                   : undefined,
                 transition: dragDelta ? "none" : "transform 0.12s ease-out",
                 animation: "mb-fadein 0.3s ease",
+                touchAction: "none",
               }}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
-              onPointerCancel={onPointerUp}
+              onPointerCancel={onPointerCancel}
             >
               <MediaCard
                 key={`${index}-${currentItem.relativePath}`}
@@ -1762,6 +1837,7 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
                 index={index}
                 onNext={() => advance("up")}
                 onPrev={() => advance("down")}
+                onDelete={() => handleDeleteMedia(currentItem)}
               />
             </div>
           </>
