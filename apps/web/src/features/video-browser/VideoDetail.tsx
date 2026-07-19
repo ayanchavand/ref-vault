@@ -1962,7 +1962,16 @@ export function VideoDetail({
       const isTyping = activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
       if (isTyping) return;
 
-      if (e.key === "ArrowLeft") {
+      if (e.key === " " || e.code === "Space") {
+        e.preventDefault();
+        if (videoRef.current) {
+          if (videoRef.current.paused) {
+            videoRef.current.play().catch(() => {});
+          } else {
+            videoRef.current.pause();
+          }
+        }
+      } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         skipBackward(10);
       } else if (e.key === "ArrowRight") {
