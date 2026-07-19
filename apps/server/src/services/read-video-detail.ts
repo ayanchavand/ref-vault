@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { readFile, readdir, realpath } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
@@ -122,6 +123,15 @@ export async function readVideoDetail(
 
     if (metadata.value) {
       video.metadata = metadata.value;
+    }
+
+    try {
+      const techMeta = await probeVideo(join(videoDirectory.value, "main.mp4"));
+      if (techMeta.width) video.width = techMeta.width;
+      if (techMeta.height) video.height = techMeta.height;
+      if (techMeta.framerate) video.framerate = techMeta.framerate;
+    } catch {
+      // Ignore probe failures
     }
 
     return {
@@ -315,4 +325,60 @@ function isContainedPath(libraryRootPath: string, targetPath: string): boolean {
 function toLibraryRelativePath(libraryRootPath: string, targetPath: string): string {
   const path = relative(libraryRootPath, targetPath);
   return path.length === 0 ? "." : path.split(sep).join("/");
+}
+
+function probeVideo(filePath: string): Promise<{ width?: number; height?: number; framerate?: string }> {
+  return new Promise((resolve) => {
+    const process = spawn("ffprobe", [
+      "-v", "error",
+      "-select_streams", "v:0",
+      "-show_entries", "stream=width,height,r_frame_rate",
+      "-of", "json",
+      filePath
+    ]);
+
+    let stdout = "";
+    process.stdout?.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    process.on("close", (code) => {
+      if (code !== 0) {
+        resolve({});
+        return;
+      }
+      try {
+        const parsed = JSON.parse(stdout);
+        const stream = parsed.streams?.[0];
+        if (!stream) {
+          resolve({});
+          return;
+        }
+
+        const width = typeof stream.width === "number" ? stream.width : undefined;
+        const height = typeof stream.height === "number" ? stream.height : undefined;
+        let framerate = undefined;
+
+        if (typeof stream.r_frame_rate === "string") {
+          const parts = stream.r_frame_rate.split("/");
+          if (parts.length === 2) {
+            const num = parseFloat(parts[0]!);
+            const den = parseFloat(parts[1]!);
+            if (den !== 0 && !isNaN(num) && !isNaN(den)) {
+              const fps = num / den;
+              framerate = `${parseFloat(fps.toFixed(2))} fps`;
+            }
+          }
+        }
+
+        resolve({ width, height, framerate });
+      } catch {
+        resolve({});
+      }
+    });
+
+    process.on("error", () => {
+      resolve({});
+    });
+  });
 }

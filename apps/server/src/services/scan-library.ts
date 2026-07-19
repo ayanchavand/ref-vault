@@ -88,10 +88,30 @@ async function describeVideo(
   const clipsDirectory = entries.find(
     (entry) => entry.name === "clips" && entry.isDirectory(),
   );
+
+  let clipsMetadata: JsonObject = {};
+  if (entries.some((entry) => entry.name === "clips.json" && entry.isFile())) {
+    try {
+      const content = await readFile(join(directoryPath, "clips.json"), "utf8");
+      const parsed = JSON.parse(content);
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        clipsMetadata = parsed as JsonObject;
+      }
+    } catch {
+      // Ignore reading/parsing error during scan
+    }
+  }
+
+  const clips = await findClips(
+    join(directoryPath, clipsDirectory!.name),
+    libraryRootPath,
+    clipsMetadata,
+  );
+
   const video: ScannedVideo = {
     relativePath: relativePath(libraryRootPath, directoryPath),
     mainVideoPath: relativePath(libraryRootPath, join(directoryPath, "main.mp4")),
-    clips: await findClips(join(directoryPath, clipsDirectory!.name), libraryRootPath),
+    clips,
   };
 
   if (entries.some((entry) => entry.name === "clips.json" && entry.isFile())) {
@@ -131,18 +151,16 @@ async function describeVideo(
 async function findClips(
   directoryPath: string,
   libraryRootPath: string,
+  clipsMetadata: JsonObject = {},
 ): Promise<ScannedClip[]> {
   const entries = (await readdir(directoryPath, { withFileTypes: true })) as DirectoryEntry[];
   const clips: ScannedClip[] = [];
-  const fileNames = new Set(
-    entries.filter((entry) => entry.isFile()).map((entry) => entry.name),
-  );
 
   for (const entry of entries) {
     const entryPath = join(directoryPath, entry.name);
 
     if (entry.isDirectory()) {
-      clips.push(...(await findClips(entryPath, libraryRootPath)));
+      clips.push(...(await findClips(entryPath, libraryRootPath, clipsMetadata)));
       continue;
     }
 
@@ -150,10 +168,14 @@ async function findClips(
       continue;
     }
 
-    const metadataFileName = `${basename(entry.name, ".mp4")}.json`;
+    const clipKey = entry.name.replace(/\.mp4$/u, "");
     const clip: ScannedClip = {
       mediaPath: relativePath(libraryRootPath, entryPath),
     };
+
+    if (Object.prototype.hasOwnProperty.call(clipsMetadata, clipKey)) {
+      clip.metadata = clipsMetadata[clipKey] as JsonObject;
+    }
 
     clips.push(clip);
   }

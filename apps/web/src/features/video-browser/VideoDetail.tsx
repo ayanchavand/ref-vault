@@ -1835,6 +1835,7 @@ export function VideoDetail({
 
   const [isPaused, setIsPaused] = useState(true);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [resolutionText, setResolutionText] = useState("1080p · 24fps");
   const [captureResult, setCaptureResult] = useState<string | null>(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
 
@@ -1873,34 +1874,17 @@ export function VideoDetail({
   const [globalTags, setGlobalTags] = useState<string[]>([]);
 
   useEffect(() => {
-    let active = true;
     if (!allVideos || allVideos.length === 0) return;
     
-    Promise.all(
-      allVideos.map(async (v) => {
-        try {
-          return await getVideoDetail({ rootPath, videoRelativePath: v.relativePath });
-        } catch {
-          return null;
-        }
-      })
-    ).then((results) => {
-      if (!active) return;
-      const set = new Set<string>();
-      results.forEach((res) => {
-        if (!res) return;
-        extractTags(res.video.metadata).forEach((t) => set.add(t));
-        res.video.clips.forEach((c) => {
-          extractTags(c.metadata).forEach((t) => set.add(t));
-        });
+    const set = new Set<string>();
+    allVideos.forEach((v) => {
+      extractTags(v.metadata).forEach((t) => set.add(t));
+      v.clips.forEach((c) => {
+        extractTags(c.metadata).forEach((t) => set.add(t));
       });
-      setGlobalTags(Array.from(set).sort());
     });
-
-    return () => {
-      active = false;
-    };
-  }, [rootPath, allVideos]);
+    setGlobalTags(Array.from(set).sort());
+  }, [allVideos]);
 
 
   const mediaUrl = useMemo(() => {
@@ -1924,6 +1908,28 @@ export function VideoDetail({
     setSelectedMediaPath(video.mainVideoPath);
     setPlayRate(1);
   }, [video.mainVideoPath]);
+
+  useEffect(() => {
+    if (video.width && video.height) {
+      let label = "";
+      const w = video.width;
+      const h = video.height;
+      if (w === 3840 && h === 2160) label = "4K";
+      else if (h === 2160) label = "2160p";
+      else if (h === 1440) label = "1440p";
+      else if (h === 1080) label = "1080p";
+      else if (h === 720) label = "720p";
+      else if (h === 480) label = "480p";
+      else label = `${w}x${h}`;
+
+      if (video.framerate) {
+        label += ` · ${video.framerate}`;
+      }
+      setResolutionText(label);
+    } else {
+      setResolutionText("1080p · 24fps");
+    }
+  }, [video, selectedMediaPath]);
 
   function skipForward(seconds = 10) {
     if (videoRef.current) {
@@ -2069,7 +2075,7 @@ export function VideoDetail({
 
             {/* Viewfinder HUD overlays */}
             <div className="absolute top-3.5 right-3.5 z-20 pointer-events-none hidden md:block font-mono text-[0.62rem] tracking-wider text-white/40 bg-black/40 px-2 py-0.5 rounded backdrop-blur-[1px]">
-              <span>1080p · 24fps</span>
+              <span>{resolutionText}</span>
             </div>
 
             {/* Ambilight Glow */}
@@ -2087,7 +2093,22 @@ export function VideoDetail({
                 onPause={() => setIsPaused(true)}
                 onSeeked={(e) => setIsPaused(e.currentTarget.paused)}
                 onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-                onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+                onLoadedMetadata={(e) => {
+                  setDuration(e.currentTarget.duration);
+                  const w = e.currentTarget.videoWidth;
+                  const h = e.currentTarget.videoHeight;
+                  if (w && h) {
+                    let label = "";
+                    if (w === 3840 && h === 2160) label = "4K";
+                    else if (h === 2160) label = "2160p";
+                    else if (h === 1440) label = "1440p";
+                    else if (h === 1080) label = "1080p";
+                    else if (h === 720) label = "720p";
+                    else if (h === 480) label = "480p";
+                    else label = `${w}x${h}`;
+                    setResolutionText(label);
+                  }
+                }}
               >
                 Your browser does not support the video element.
               </video>

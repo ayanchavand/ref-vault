@@ -140,10 +140,12 @@ export async function resolveUploadDirectory(
   libraryRootPath: string,
   videoRelativePath: string,
 ): Promise<ResolveUploadDirResult> {
+  const resolvedTarget = resolve(libraryRootPath, videoRelativePath);
   if (
     videoRelativePath.trim().length === 0 ||
     isAbsolute(videoRelativePath) ||
-    !isContainedPath(libraryRootPath, resolve(libraryRootPath, videoRelativePath))
+    resolvedTarget === libraryRootPath ||
+    !isContainedPath(libraryRootPath, resolvedTarget)
   ) {
     return {
       ok: false,

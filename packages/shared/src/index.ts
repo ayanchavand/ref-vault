@@ -24,6 +24,7 @@ export interface ScanLibraryRequest {
 export interface ScannedClip {
   mediaPath: string;
   metadataPath?: string;
+  metadata?: JsonObject;
 }
 
 export interface ScannedVideo {
@@ -63,6 +64,9 @@ export interface VideoDetail {
   thumbnailPath?: string;
   clipsMetadataPath?: string;
   clips: DetailedClip[];
+  width?: number;
+  height?: number;
+  framerate?: string;
 }
 
 export interface GetVideoDetailResponse {

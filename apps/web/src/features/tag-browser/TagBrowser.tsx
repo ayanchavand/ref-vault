@@ -200,59 +200,14 @@ export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: T
   }, []);
 
   useEffect(() => {
-    let active = true;
     setIsLoading(true);
     setError(null);
-    setVideoDetails([]);
+    setVideoDetails(videos as unknown as VideoDetailType[]);
     setSelectedVideoTags([]);
     setSelectedClipTags([]);
     setSelectedCategories({});
-
-    if (videos.length === 0) {
-      setIsLoading(false);
-      return;
-    }
-
-    Promise.all(
-      videos.map(async (video) => {
-        try {
-          return {
-            ok: true as const,
-            video: await getVideoDetail({ rootPath, videoRelativePath: video.relativePath }),
-          };
-        } catch (cause) {
-          return { ok: false as const, error: cause, video };
-        }
-      }),
-    ).then((results) => {
-      if (!active) {
-        return;
-      }
-
-      const details: VideoDetailType[] = [];
-      const errors: string[] = [];
-
-      for (const result of results) {
-        if (!result.ok) {
-          errors.push(
-            result.error instanceof ApiError
-              ? result.error.message
-              : "An unexpected error occurred while loading video metadata.",
-          );
-          continue;
-        }
-        details.push(result.video.video);
-      }
-
-      setVideoDetails(details);
-      setError(errors.length > 0 ? Array.from(new Set(errors)).join(" ") : null);
-      setIsLoading(false);
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [rootPath, videos]);
+    setIsLoading(false);
+  }, [videos]);
 
   const { videoTagsList, clipTagsList } = useMemo(() => {
     const vTags = new Set<string>();
