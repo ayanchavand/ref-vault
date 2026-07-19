@@ -74,14 +74,17 @@ def process_split_plan(plan_file: Path):
 
         print(f"Chop: {clip_name}.mp4 ({start_tc} -> {end_tc})")
 
-        # Run ffmpeg to cut segment
+        duration = max(0.0, end_seconds - start_seconds)
         cmd = [
             "ffmpeg",
             "-y",
             "-ss", str(start_seconds),
-            "-to", str(end_seconds),
             "-i", str(main_video),
-            "-c", "copy",
+            "-t", str(duration),
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-crf", "18",
+            "-c:a", "aac",
             str(output_file),
         ]
         

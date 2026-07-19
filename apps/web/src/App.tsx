@@ -45,6 +45,15 @@ function loadSavedLibraryRoot(): string {
   return window.localStorage.getItem(libraryRootStorageKey) ?? "";
 }
 
+function shuffleVideos(videos: ScannedVideo[]): ScannedVideo[] {
+  const shuffled = [...videos];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
+  }
+  return shuffled;
+}
+
 
 
 // Global keyframes shared by shimmer thumbnails and the top loading bar
@@ -229,7 +238,10 @@ export function App() {
         getLibraryConfig({ rootPath: saved }).catch(() => ({ config: { fields: [] } })),
       ])
         .then(([scanRes, configRes]) => {
-          setScanResult(scanRes);
+          setScanResult({
+            ...scanRes,
+            videos: shuffleVideos(scanRes.videos),
+          });
           setLibraryConfig(configRes.config);
           setVideoPage(1);
         })
@@ -290,7 +302,10 @@ export function App() {
         scanLibrary(newPath),
         getLibraryConfig({ rootPath: newPath }).catch(() => ({ config: { fields: [] } })),
       ]);
-      setScanResult(scanRes);
+      setScanResult({
+        ...scanRes,
+        videos: shuffleVideos(scanRes.videos),
+      });
       setLibraryConfig(configRes.config);
       setVideoPage(1);
     } catch (cause) {
@@ -538,7 +553,10 @@ export function App() {
                     setIsLoading(true);
                     try {
                       const result = await scanLibrary(activeRootPath!);
-                      setScanResult(result);
+                      setScanResult({
+                        ...result,
+                        videos: shuffleVideos(result.videos),
+                      });
                       setVideoPage(1);
                       navigate({ view: "BROWSE_LIBRARY" });
                     } catch (cause) {
@@ -579,7 +597,10 @@ export function App() {
                     setVideoDetail(null);
                     try {
                       const result = await scanLibrary(activeRootPath!);
-                      setScanResult(result);
+                      setScanResult({
+                        ...result,
+                        videos: shuffleVideos(result.videos),
+                      });
                       setVideoPage(1);
                       navigate({ view: "BROWSE_LIBRARY" });
                     } catch (cause) {

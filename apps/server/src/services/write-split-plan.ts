@@ -116,12 +116,16 @@ export async function writeSplitPlan(
     const clipName = `scene_${String(clipIndex).padStart(2, "0")}`;
     const outputFilePath = join(outputDir, `${clipName}.mp4`);
 
+    const duration = Math.max(0, seg.end - seg.start);
     const ffmpegArgs = [
       "-y",
       "-ss", String(seg.start),
-      "-to", String(seg.end),
       "-i", mainVideoPath,
-      "-c", "copy",
+      "-t", String(duration),
+      "-c:v", "libx264",
+      "-preset", "ultrafast",
+      "-crf", "18",
+      "-c:a", "aac",
       outputFilePath,
     ];
 

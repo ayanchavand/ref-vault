@@ -18,7 +18,7 @@ const waiters: Array<() => void> = [];
  */
 async function getFromClientCache(key: string): Promise<string[] | null> {
   try {
-    const cache = await caches.open("thumbnail-extraction-cache");
+    const cache = await caches.open("thumbnail-extraction-cache-v2");
     const response = await cache.match(key);
     if (response) {
       const data = await response.json();
@@ -35,7 +35,7 @@ async function getFromClientCache(key: string): Promise<string[] | null> {
  */
 async function saveToClientCache(key: string, frames: string[]): Promise<void> {
   try {
-    const cache = await caches.open("thumbnail-extraction-cache");
+    const cache = await caches.open("thumbnail-extraction-cache-v2");
     const response = new Response(JSON.stringify({ frames }), {
       headers: { "Content-Type": "application/json" },
     });
@@ -176,9 +176,12 @@ export function useLazyThumbnail({
       videoElement.muted = true;
       videoElement.preload = "metadata";
       videoElement.crossOrigin = "anonymous";
+      videoElement.playsInline = true;
+      videoElement.setAttribute("playsinline", "true");
 
-      const onLoadedData = () => {
+      const onSeeked = () => {
         if (cancelled) {
+          release();
           return;
         }
 
@@ -207,6 +210,14 @@ export function useLazyThumbnail({
         }
       };
 
+      const onLoadedMetadata = () => {
+        if (cancelled) {
+          release();
+          return;
+        }
+        videoElement.currentTime = 0.1;
+      };
+
       const onError = () => {
         if (!cancelled) {
           setPoster(undefined);
@@ -214,8 +225,11 @@ export function useLazyThumbnail({
         release();
       };
 
-      videoElement.addEventListener("loadeddata", onLoadedData);
+      videoElement.addEventListener("loadedmetadata", onLoadedMetadata);
+      videoElement.addEventListener("seeked", onSeeked);
       videoElement.addEventListener("error", onError);
+
+      videoElement.load();
     });
 
     return () => {
@@ -268,12 +282,7 @@ export function useDynamicThumbnail({
       return;
     }
 
-    // If we have a server-side posterUrl and we are on mobile, we will never hover
-    // and never cycle. We can return the poster immediately and avoid observer setup.
-    if (posterUrl && isMobile) {
-      setPoster(posterUrl);
-      return;
-    }
+
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -289,12 +298,19 @@ export function useDynamicThumbnail({
     return () => observer.disconnect();
   }, [posterUrl, rootMargin, isMobile]);
 
-  // Set the default poster instantly if provided
+  // Reset state and set initial poster when mediaUrl or posterUrl changes
   useEffect(() => {
+    setFrames([]);
+    firstFrameRef.current = undefined;
+    currentFrameIndexRef.current = 0;
+    setShouldExtract(false);
+    setIsVisible(false);
     if (posterUrl) {
       setPoster(posterUrl);
+    } else {
+      setPoster(undefined);
     }
-  }, [posterUrl]);
+  }, [mediaUrl, posterUrl]);
 
   // Load from client-side Cache Storage if available
   useEffect(() => {
@@ -326,14 +342,8 @@ export function useDynamicThumbnail({
     if (!isVisible || frames.length > 0) {
       return;
     }
-
-    // Trigger extraction if:
-    // 1. There is no posterUrl (needs static poster immediately).
-    // 2. Or, user is hovering (desktop only) and we need the frames to cycle.
-    if (!posterUrl || (isHovering && !isMobile)) {
-      setShouldExtract(true);
-    }
-  }, [isVisible, posterUrl, isHovering, isMobile, frames.length]);
+    setShouldExtract(true);
+  }, [isVisible, frames.length]);
 
   // Client-side extraction effect
   useEffect(() => {
@@ -358,6 +368,8 @@ export function useDynamicThumbnail({
       videoElement.muted = true;
       videoElement.preload = "metadata";
       videoElement.crossOrigin = "anonymous";
+      videoElement.playsInline = true;
+      videoElement.setAttribute("playsinline", "true");
 
       const onLoadedMetadata = () => {
         if (cancelled) {
@@ -370,8 +382,7 @@ export function useDynamicThumbnail({
           return;
         }
 
-        // On mobile fallback, only extract 1 frame to save resources
-        const actualFrameCount = isMobile ? 1 : frameCount;
+        const actualFrameCount = frameCount;
 
         canvas.width = 640;
         canvas.height = 360;
@@ -410,9 +421,12 @@ export function useDynamicThumbnail({
         };
 
         const advance = () => {
-          framesExtracted += 1;
           if (framesExtracted < actualFrameCount) {
-            videoElement.currentTime = (duration / actualFrameCount) * framesExtracted;
+            const seekTime = framesExtracted === 0 
+              ? 0.1 
+              : (duration / actualFrameCount) * framesExtracted;
+            videoElement.currentTime = seekTime;
+            framesExtracted += 1;
           } else {
             finish();
           }
@@ -438,15 +452,13 @@ export function useDynamicThumbnail({
           videoElement.removeEventListener("seeked", onSeeked);
         });
 
-        try {
-          extractedFrames.push(captureCurrentFrame());
-          advance();
-        } catch (e) {
-          release();
-        }
+        // Start the process
+        advance();
       };
 
       videoElement.addEventListener("loadedmetadata", onLoadedMetadata);
+
+      videoElement.load();
     });
 
     return () => {

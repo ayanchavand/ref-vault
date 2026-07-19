@@ -11,20 +11,7 @@ interface VideoImportProps {
   libraryConfig?: LibraryConfig;
 }
 
-// Load video duration using a temporary HTMLVideoElement
-const checkVideoDuration = (file: File): Promise<number> => {
-  return new Promise((resolve) => {
-    const video = document.createElement("video");
-    video.preload = "metadata";
-    video.onloadedmetadata = () => {
-      resolve(video.duration);
-    };
-    video.onerror = () => {
-      resolve(0); // If it can't load, default to 0
-    };
-    video.src = URL.createObjectURL(file);
-  });
-};
+
 
 export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }: VideoImportProps) {
   const [importType, setImportType] = useState<"video" | "media">("video");
@@ -79,13 +66,6 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
 
       if (!selectedFile.type.startsWith("video/")) {
         setErrorMessage("Only video files (mp4, webm, etc.) are supported.");
-        return;
-      }
-
-      // Check duration > 3 minutes (180 seconds)
-      const duration = await checkVideoDuration(selectedFile);
-      if (duration < 180) {
-        setErrorMessage("Only videos longer than 3 minutes (180 seconds) can be imported as Video References.");
         return;
       }
 
@@ -358,7 +338,7 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
               03 · Add reference
             </p>
             <p className="mt-1 font-mono text-sm text-white/50">
-              {importType === "video" ? "Import video reference (> 3 mins)" : "Import media asset directly"}
+              {importType === "video" ? "Import video reference" : "Import media asset directly"}
             </p>
           </div>
         </div>
@@ -562,7 +542,7 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
                   </p>
                 </div>
                 <p className="text-[0.65rem] text-amber-300/40 font-mono mt-2">
-                  {importType === "video" ? "MP4, WebM, or MOV formats (> 3 minutes)" : "GIF, MP4, WebM, MOV, JPG, PNG, WebP, AVIF"}
+                  {importType === "video" ? "MP4, WebM, or MOV formats" : "GIF, MP4, WebM, MOV, JPG, PNG, WebP, AVIF"}
                 </p>
               </div>
             )}

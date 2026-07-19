@@ -329,29 +329,29 @@ function WelcomeStep({ onNext }: { onNext(): void }) {
   const features = [
     {
       icon: Film,
-      title: "Smart Video Library",
-      desc: "Choose any folder on your computer. Your videos stay exactly where they are.",
+      title: "Organize Video Reference",
+      desc: "Give hundreds of gigs of motion ref, gameplay, and clips a searchable home in plain folders.",
       color: "text-amber-400",
       bg: "bg-amber-400/10 border-amber-400/20",
     },
     {
       icon: Scissors,
-      title: "Split Plan Editor",
-      desc: "Break videos down into smaller clips and add notes without changing the original file.",
+      title: "Cut Clips & Capture Frames",
+      desc: "Trim clips and grab frame captures mid-scrub directly without needing a separate video editor.",
       color: "text-sky-400",
       bg: "bg-sky-400/10 border-sky-400/20",
     },
     {
       icon: Tag,
-      title: "Tag Everything",
-      desc: "Organize with searchable tags, custom categories, and star ratings.",
+      title: "Tags, Notes & Custom Fields",
+      desc: "Tag reference, leave notes, star rate clips, and shape custom metadata fields to how you work.",
       color: "text-purple-400",
       bg: "bg-purple-400/10 border-purple-400/20",
     },
     {
       icon: Zap,
-      title: "Media Browser",
-      desc: "Swipe through inspiration images, animated loops, and clips like a deck of cards.",
+      title: "Images, GIFs & Inspiration",
+      desc: "Store concept art, screenshots, and animated loops in a dedicated visual inspiration feed.",
       color: "text-emerald-400",
       bg: "bg-emerald-400/10 border-emerald-400/20",
     },
@@ -373,15 +373,14 @@ function WelcomeStep({ onNext }: { onNext(): void }) {
               Reference Vault
             </p>
             <h1 className="text-xl font-bold tracking-tight text-white">
-              Your personal reference studio
+              Visual reference manager for creators
             </h1>
           </div>
         </div>
 
         <p className="text-sm text-white/50 leading-relaxed max-w-lg">
-          Reference Vault stores all your video references, sketches, and notes directly on your computer.
-          There is no cloud and no database — your files stay exactly where you want them.
-          Let's get you set up in under a minute.
+          The single searchable library for all your visual inspiration — videos, clips, images, GIFs, and screenshots.
+          No subscriptions, no cloud sync, and no accounts required. Everything stays sitting in plain folders on your computer that you control.
         </p>
       </div>
 
@@ -407,11 +406,10 @@ function WelcomeStep({ onNext }: { onNext(): void }) {
 
       {/* Filesystem note */}
       <div className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-        <HardDrive className="h-4 w-4 shrink-0 mt-0.5 text-white/30" />
+        <HardDrive className="h-4 w-4 shrink-0 mt-0.5 text-amber-400/70" />
         <p className="text-xs text-white/40 leading-relaxed">
-          <span className="text-white/60 font-medium">Keep your files.</span>{" "}
-          Your notes, ratings, and tags are saved as files right next to your videos.
-          If you move a video folder, your notes will move with it.
+          <span className="text-white/60 font-medium">Your machine, your rules.</span>{" "}
+          Your files never leave your computer. All metadata sits alongside your media in plain JSON files — no database corruption, no vendor lock-in.
         </p>
       </div>
 
@@ -692,11 +690,13 @@ function VideoLibraryStep({
         <div className="space-y-6 animate-[rv-slide-down_0.25s_ease-out]">
           {/* Expected structure */}
           <div className="rounded-xl border border-white/[0.06] bg-[#0D0F12] p-4 font-mono text-xs text-white/50 space-y-1 overflow-x-auto">
-            <p className="text-amber-300/60 text-[0.65rem] uppercase tracking-widest mb-2">How to organize your videos</p>
-            <p><span className="text-white/30">📁</span> <span className="text-white/70">my-video-folder/</span></p>
-            <p className="pl-4"><span className="text-white/30">📁</span> <span className="text-white/60">tracking-shot-references/</span></p>
-            <p className="pl-8"><span className="text-amber-400/60">🎬</span> <span className="text-amber-300/60">main.mp4</span> <span className="text-white/30 text-[0.65rem]">(required video file name)</span></p>
-            <p className="pl-8"><span className="text-white/30">📄</span> <span className="text-white/40">metadata.json</span> <span className="text-white/20 text-[0.6rem]">(created automatically)</span></p>
+            <p className="text-amber-300/60 text-[0.65rem] uppercase tracking-widest mb-2">How your video library is organized</p>
+            <p><span className="text-white/30">📁</span> <span className="text-white/70">videos/</span></p>
+            <p className="pl-4"><span className="text-white/30">📁</span> <span className="text-white/60">Parkour Jump/</span></p>
+            <p className="pl-8"><span className="text-amber-400/60">🎬</span> <span className="text-amber-300/60">main.mp4</span> <span className="text-white/30 text-[0.65rem]">(source video file)</span></p>
+            <p className="pl-8"><span className="text-white/30">📄</span> <span className="text-white/40">metadata.json</span> <span className="text-white/20 text-[0.6rem]">(tags, ratings & notes)</span></p>
+            <p className="pl-8"><span className="text-white/30">📄</span> <span className="text-white/40">clips.json</span> <span className="text-white/20 text-[0.6rem]">(clip definitions)</span></p>
+            <p className="pl-8"><span className="text-white/30">📁</span> <span className="text-white/40">clips/</span> <span className="text-white/20 text-[0.6rem]">(trimmed MP4 files)</span></p>
           </div>
 
           <PathInput
@@ -839,17 +839,17 @@ function MediaLibraryStep({
           </h2>
         </div>
         <p className="text-sm text-white/50 leading-relaxed">
-          The Media Library is a place for your reference images, animated GIFs, and short loops that you can swipe through (like a deck of cards) to find ideas. We recommend keeping this folder separate from your main videos. You can always set this up later.
+          The Media Library is a general inspiration dump for reference images, photos, concept art, animated GIFs, and short video loops. Keep them in organized subfolders so you can browse them as a randomized visual feed.
         </p>
       </div>
 
       {/* Media structure */}
       <div className="rounded-xl border border-white/[0.06] bg-[#0D0F12] p-4 font-mono text-xs text-white/50 space-y-1">
-        <p className="text-purple-300/60 text-[0.65rem] uppercase tracking-widest mb-2">Recommended Folder Setup</p>
-        <p><span className="text-white/30">📁</span> <span className="text-white/70">my-inspiration/</span></p>
-        <p className="pl-4"><span className="text-white/30">📁</span> <span className="text-purple-300/60">images/</span> <span className="text-white/20 text-[0.6rem]">(for reference photos and sketches)</span></p>
-        <p className="pl-4"><span className="text-white/30">📁</span> <span className="text-purple-300/60">gifs/</span> <span className="text-white/20 text-[0.6rem]">(for repeating animations)</span></p>
-        <p className="pl-4"><span className="text-white/30">📁</span> <span className="text-purple-300/60">videos/</span> <span className="text-white/20 text-[0.6rem]">(for short video loops)</span></p>
+        <p className="text-purple-300/60 text-[0.65rem] uppercase tracking-widest mb-2">Media Folder Structure</p>
+        <p><span className="text-white/30">📁</span> <span className="text-white/70">media/</span></p>
+        <p className="pl-4"><span className="text-white/30">📁</span> <span className="text-purple-300/60">images/</span> <span className="text-white/20 text-[0.6rem]">(concept art, photos & screenshots)</span></p>
+        <p className="pl-4"><span className="text-white/30">📁</span> <span className="text-purple-300/60">gifs/</span> <span className="text-white/20 text-[0.6rem]">(animated loops & GIFs)</span></p>
+        <p className="pl-4"><span className="text-white/30">📁</span> <span className="text-purple-300/60">videos/</span> <span className="text-white/20 text-[0.6rem]">(short video clips)</span></p>
       </div>
 
       {/* Path input */}
@@ -1019,12 +1019,12 @@ function CompleteStep({
         </p>
         <div className="space-y-2">
           {[
-            "Your library will scan automatically on launch",
-            "Click any video to scrub through and annotate clips",
-            "Use the Tags view to browse by category across your entire library",
+            "Your video and media libraries will scan automatically on launch",
+            "Cut clips directly out of longer video footage and grab frame captures mid-scrub",
+            "Organize with searchable tags, star ratings, notes, and custom metadata fields",
             mediaPath
-              ? "The Media Browser is ready — swipe through your reference images and GIFs"
-              : "Add a Media Library later via Settings → Media Library",
+              ? "Browse your concept art, screenshots, and animated GIFs in the Media Feed"
+              : "Set up a Media Library later anytime in Settings",
           ].map((hint, i) => (
             <div key={i} className="flex items-start gap-2.5">
               <ChevronRight className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-400/60" />
@@ -1182,7 +1182,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
         {/* Bottom attribution */}
         <p className="mt-4 text-center font-mono text-[0.58rem] uppercase tracking-widest text-white/15">
-          Local-first · No cloud · No database · Your files, your rules
+          Local-first · Plain Folders & JSON · Free & Open Source · No Subscriptions
         </p>
       </div>
 
