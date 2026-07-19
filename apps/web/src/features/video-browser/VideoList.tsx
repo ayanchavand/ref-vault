@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, memo } from "react";
 import { List, LayoutGrid, Video, User, FileText, Film, Tag, AlertTriangle } from "lucide-react";
-import type { ScannedVideo, JsonObject } from "@reference-vault/shared";
+import type { ScannedVideo, JsonObject, LibraryConfig, LibraryConfigField } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover, useDynamicThumbnail } from "./Uselazythumbnail";
 
 function getTagColorClass(tag: string): string {
@@ -46,6 +46,7 @@ interface VideoListProps {
   isLoading: boolean;
   openingVideoPath: string | null;
   error: string | null;
+  libraryConfig?: LibraryConfig;
 }
 
 function ShimmerFill() {
@@ -80,6 +81,7 @@ const VideoThumbnailCard = memo(function VideoThumbnailCard({
   onSelect,
   viewMode = "details",
   cardIndex = 0,
+  libraryConfig,
 }: {
   rootPath: string;
   video: ScannedVideo;
@@ -88,6 +90,7 @@ const VideoThumbnailCard = memo(function VideoThumbnailCard({
   onSelect(video: ScannedVideo): void;
   viewMode?: "details" | "moodboard";
   cardIndex?: number;
+  libraryConfig?: LibraryConfig;
 }) {
   const artist = video.metadata?.artist ? String(video.metadata.artist) : null;
   const rating = video.metadata?.rating ? Number(video.metadata.rating) : 0;
@@ -101,6 +104,18 @@ const VideoThumbnailCard = memo(function VideoThumbnailCard({
     }
     return [];
   }, [video.metadata]);
+
+  const configuredVideoFields = useMemo(() => {
+    return libraryConfig?.fields.filter((f) => f.type === "video") ?? [];
+  }, [libraryConfig]);
+
+  const customFields = useMemo(() => {
+    if (!video.metadata) return [];
+    const configuredNames = configuredVideoFields.map((f) => f.name);
+    return Object.entries(video.metadata).filter(
+      ([key]) => !["tags", "rating", "artist", "notes", ...configuredNames].includes(key)
+    );
+  }, [video.metadata, configuredVideoFields]);
 
   const [isHovering, setIsHovering] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
@@ -192,7 +207,7 @@ const VideoThumbnailCard = memo(function VideoThumbnailCard({
                 <p className="truncate font-semibold text-white text-xs">{video.relativePath}</p>
               </div>
 
-              {(artist || rating > 0 || tags.length > 0) && (
+              {(artist || rating > 0 || tags.length > 0 || customFields.length > 0 || configuredVideoFields.some((f) => video.metadata?.[f.name])) && (
                 <div className="flex flex-wrap items-center gap-1.5 border-t border-white/10 pt-1.5 mt-0.5">
                   {rating > 0 && (
                     <div className="flex items-center gap-0.5 text-amber-400 text-[0.65rem] drop-shadow-[0_0_2px_rgba(251,191,36,0.5)]">
@@ -209,7 +224,7 @@ const VideoThumbnailCard = memo(function VideoThumbnailCard({
                       {artist}
                     </span>
                   )}
-                  {tags.slice(0, 2).map((tag, i) => (
+                  {tags.slice(0, 1).map((tag, i) => (
                     <span
                       key={i}
                       className={`inline-flex items-center gap-0.5 rounded px-1 py-0.2 font-mono text-[0.55rem] leading-none ${getTagColorClass(tag)}`}
@@ -218,8 +233,38 @@ const VideoThumbnailCard = memo(function VideoThumbnailCard({
                       {tag}
                     </span>
                   ))}
-                  {tags.length > 2 && (
-                    <span className="text-[0.55rem] text-white/30">+{tags.length - 2}</span>
+                  {configuredVideoFields.slice(0, 1).map((field) => {
+                    const val = video.metadata?.[field.name];
+                    if (!val) return null;
+                    const displayValue = Array.isArray(val) ? val.join(", ") : String(val);
+                    return (
+                      <span
+                        key={field.name}
+                        className={`inline-flex items-center gap-0.5 rounded px-1 py-0.2 font-mono text-[0.55rem] leading-none ${getTagColorClass(field.name)}`}
+                      >
+                        <span className="font-semibold text-amber-300/80">{field.name}</span>
+                        <span className="text-white/20">:</span>
+                        <span className="max-w-[4rem] truncate">{displayValue}</span>
+                      </span>
+                    );
+                  })}
+                  {customFields.slice(0, 1).map(([key, value]) => {
+                    const displayValue = typeof value === "object" && value !== null ? JSON.stringify(value) : String(value);
+                    return (
+                      <span
+                        key={key}
+                        className="inline-flex items-center gap-0.5 rounded px-1 py-0.2 font-mono text-[0.55rem] leading-none border border-white/[0.08] bg-white/[0.03] text-white/60"
+                      >
+                        <span className="font-semibold text-white/50">{key}</span>
+                        <span className="text-white/20">:</span>
+                        <span className="max-w-[4rem] truncate">{displayValue}</span>
+                      </span>
+                    );
+                  })}
+                  {(tags.length + customFields.length + configuredVideoFields.filter((f) => video.metadata?.[f.name]).length > 2) && (
+                    <span className="text-[0.55rem] text-white/30">
+                      +{tags.length + customFields.length + configuredVideoFields.filter((f) => video.metadata?.[f.name]).length - 2}
+                    </span>
                   )}
                 </div>
               )}
@@ -248,6 +293,46 @@ const VideoThumbnailCard = memo(function VideoThumbnailCard({
                     +{tags.length - 4}
                   </span>
                 )}
+              </div>
+            )}
+
+            {/* Structured Configured Fields section */}
+            {configuredVideoFields.some((field) => video.metadata?.[field.name]) && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {configuredVideoFields.map((field) => {
+                  const val = video.metadata?.[field.name];
+                  if (!val) return null;
+                  const displayValue = Array.isArray(val) ? val.join(", ") : String(val);
+                  return (
+                    <span
+                      key={field.name}
+                      className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 font-mono text-[0.6rem] leading-none ${getTagColorClass(field.name)}`}
+                    >
+                      <span className="font-semibold text-amber-300/80">{field.name}</span>
+                      <span className="text-white/20">·</span>
+                      <span className="max-w-[8rem] truncate">{displayValue}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Custom Fields section */}
+            {customFields.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {customFields.map(([key, value]) => {
+                  const displayValue = typeof value === "object" && value !== null ? JSON.stringify(value) : String(value);
+                  return (
+                    <span
+                      key={key}
+                      className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 font-mono text-[0.6rem] leading-none text-white/60"
+                    >
+                      <span className="font-semibold text-white/50">{key}</span>
+                      <span className="text-white/20">·</span>
+                      <span className="max-w-[8rem] truncate">{displayValue}</span>
+                    </span>
+                  );
+                })}
               </div>
             )}
 
@@ -296,6 +381,7 @@ export function VideoList({
   isLoading,
   openingVideoPath,
   error,
+  libraryConfig,
 }: VideoListProps) {
   const [viewMode, setViewMode] = useState<"details" | "moodboard">("details");
   const isInitialScan = isLoading && videos.length === 0;
@@ -386,6 +472,7 @@ export function VideoList({
                 isOpening={openingVideoPath === video.relativePath}
                 disabled={openingVideoPath !== null}
                 onSelect={onSelectVideo}
+                libraryConfig={libraryConfig}
               />
             ))}
           </ul>

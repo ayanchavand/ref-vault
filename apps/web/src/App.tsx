@@ -515,6 +515,7 @@ export function App() {
                   isLoading={isLoading}
                   openingVideoPath={openingVideoPath}
                   error={error}
+                  libraryConfig={libraryConfig}
                 />
                 <VideoListPagination
                   currentPage={clampedVideoPage}
