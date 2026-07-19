@@ -223,7 +223,7 @@ function VideoDetailsDisplay({ metadata, libraryConfig }: VideoDetailsDisplayPro
 
       {/* Notes display */}
       {notes && (
-        <div className="inline-flex items-start gap-2 rounded-xl border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-300 max-w-xl">
+        <div className="flex items-start gap-2 rounded-xl border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-300 max-w-xl w-full">
           <FileText className="h-4 w-4 mt-0.5 shrink-0 text-blue-400" />
           <div className="space-y-0.5 text-left">
             <span className="block font-mono text-[0.55rem] uppercase tracking-wider text-blue-400/70">Notes</span>
@@ -330,14 +330,14 @@ function ClipCard({
       }}
       aria-current={active}
       {...prefetchHandlers}
-      className={`group relative flex w-full cursor-pointer gap-3 rounded-xl border p-2.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0B0D] ${
+      className={`group relative flex w-full cursor-pointer gap-3 rounded-none sm:rounded-xl border-x-0 border-t border-b-0 sm:border border-white/[0.06] px-0 py-3.5 sm:p-2.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0B0D] ${
         active
-          ? "border-amber-400/60 bg-[#17140D] shadow-[0_0_0_1px_rgba(232,163,61,0.15)]"
-          : "border-white/[0.06] bg-[#111316] hover:-translate-y-0.5 hover:border-amber-400/30 hover:bg-[#14171B]"
+          ? "border-amber-400/60 bg-[#17140D]/30 sm:bg-[#17140D] shadow-[0_0_0_1px_rgba(232,163,61,0.15)]"
+          : "border-white/[0.06] bg-transparent sm:bg-[#111316] hover:bg-[#14171B]/50 sm:hover:bg-[#14171B]"
       }`}
     >
       <span
-        className={`absolute left-0 top-0 h-full w-[3px] rounded-l-xl transition-all duration-200 origin-top ${
+        className={`absolute left-0 top-0 h-full w-[3px] rounded-l-xl transition-all duration-200 origin-top hidden sm:block ${
           active ? "bg-amber-400 scale-y-100" : "scale-y-0 bg-transparent group-hover:scale-y-100 group-hover:bg-amber-400/30"
         }`}
         aria-hidden="true"
@@ -830,11 +830,11 @@ function ClipMetadataEditor({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
           <button
             type="submit"
             disabled={isSaving || !isModified}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(251,191,36,0.4)] active:translate-y-px active:shadow-none active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-none"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(251,191,36,0.4)] active:translate-y-px active:shadow-none active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-none flex-1 sm:flex-initial"
           >
             <Save className="h-3.5 w-3.5" />
             {isSaving ? "Saving..." : "Save Changes"}
@@ -843,7 +843,7 @@ function ClipMetadataEditor({
             type="button"
             onClick={handleReset}
             disabled={isSaving || !isModified}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06] active:translate-y-px active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06] active:translate-y-px active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40 flex-1 sm:flex-initial"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Reset
@@ -852,7 +852,7 @@ function ClipMetadataEditor({
             type="button"
             onClick={handleDelete}
             disabled={isSaving}
-            className="inline-flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-400 transition-all duration-200 hover:bg-rose-500/20 hover:-translate-y-0.5 active:translate-y-px active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-400 transition-all duration-200 hover:bg-rose-500/20 hover:-translate-y-0.5 active:translate-y-px active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 disabled:cursor-not-allowed disabled:opacity-40 w-full sm:w-auto"
             style={{ }}
             onMouseEnter={(e) => { if (!isSaving) e.currentTarget.style.animation = 'rv-danger-pulse 1s ease-in-out infinite'; }}
             onMouseLeave={(e) => { e.currentTarget.style.animation = ''; }}
@@ -1308,11 +1308,11 @@ function VideoMetadataEditor({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
           <button
             type="submit"
             disabled={isSaving || !isModified}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(251,191,36,0.4)] active:translate-y-px active:shadow-none active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-none"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(251,191,36,0.4)] active:translate-y-px active:shadow-none active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-none flex-1 sm:flex-initial"
           >
             <Save className="h-3.5 w-3.5" />
             {isSaving ? "Saving..." : "Save Changes"}
@@ -1321,7 +1321,7 @@ function VideoMetadataEditor({
             type="button"
             onClick={handleReset}
             disabled={isSaving || !isModified}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06] active:translate-y-px active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06] active:translate-y-px active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40 flex-1 sm:flex-initial"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Reset
@@ -1560,7 +1560,7 @@ function SegmentEditor({
           <p className="text-xs text-white/40">
             Define segments to chop later using the python script.
           </p>
-          <div className="mt-1 flex flex-wrap gap-1 text-[0.62rem] font-mono text-white/30 items-center">
+          <div className="mt-1 hidden md:flex flex-wrap gap-1 text-[0.62rem] font-mono text-white/30 items-center">
             <span>Shortcuts:</span>
             <kbd className="bg-white/10 px-1 rounded text-white/60">M</kbd>
             <span>Add Marker</span>
@@ -1613,7 +1613,7 @@ function SegmentEditor({
               </div>
 
               {/* Time inputs */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <label className="block font-mono text-[0.55rem] uppercase tracking-wider text-white/40">
                     Start (seconds)
@@ -1778,12 +1778,12 @@ function SegmentEditor({
 
       {/* Buttons */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
           <button
             type="button"
             onClick={handleSave}
             disabled={isSaving || segments.length === 0}
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(251,191,36,0.4)] active:translate-y-px active:shadow-none active:scale-[0.97] focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-none"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#0A0B0D] transition-all duration-200 hover:bg-amber-300 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(251,191,36,0.4)] active:translate-y-px active:shadow-none active:scale-[0.97] focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-none flex-1 sm:flex-initial"
           >
             {isSaving ? "Saving..." : "Confirm & Save Split Plan"}
           </button>
@@ -1791,7 +1791,7 @@ function SegmentEditor({
             type="button"
             onClick={onCancel}
             disabled={isSaving}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06] active:translate-y-px active:scale-[0.97] focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-white/80 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06] active:translate-y-px active:scale-[0.97] focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 flex-1 sm:flex-initial"
           >
             Cancel
           </button>
@@ -2003,9 +2003,9 @@ export function VideoDetail({
   }, [video.clips, selectedMediaPath]);
 
   return (
-    <div className="flex min-h-[calc(100vh-7rem)] flex-col gap-5 bg-[#0A0B0D] text-white">
+    <div className="flex min-h-[calc(100vh-7rem)] flex-col gap-4 sm:gap-5 bg-[#0A0B0D] text-white">
       {/* Header */}
-      <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316] px-4 py-4 sm:px-5 sm:py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="hidden sm:flex flex-col gap-4 rounded-none sm:rounded-2xl border-0 sm:border border-white/[0.06] bg-[#111316] px-4 py-4 sm:px-5 sm:py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 min-w-0">
           <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(232,163,61,0.7)]" />
           <div className="min-w-0">
@@ -2017,9 +2017,61 @@ export function VideoDetail({
         </div>
       </div>
 
-      <div className="grid flex-1 gap-5 xl:grid-cols-[minmax(0,2.3fr)_minmax(0,0.9fr)]">
-        {/* Player */}
-        <section className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316] p-4">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2.3fr)_minmax(0,0.9fr)] gap-4 sm:gap-5 items-start">
+        {/* Sticky Video Player Container */}
+        <div className="sticky top-0 z-30 -mx-2 w-[calc(100%+1rem)] mt-0 xl:relative xl:top-auto xl:z-auto xl:mx-0 xl:w-full xl:col-start-1 xl:col-end-2 xl:row-start-1 xl:row-end-2 bg-black aspect-video overflow-hidden rounded-none sm:rounded-2xl border-0 sm:border border-white/[0.06]">
+          {/* Corner Viewfinder Braces */}
+          <div className="pointer-events-none absolute -inset-1 z-10 hidden md:block">
+            <span className="absolute left-0 top-0 h-6 w-6 border-l-2 border-t-2 border-amber-400/50" />
+            <span className="absolute right-0 top-0 h-6 w-6 border-r-2 border-t-2 border-amber-400/50" />
+            <span className="absolute bottom-0 left-0 h-6 w-6 border-b-2 border-l-2 border-amber-400/50" />
+            <span className="absolute bottom-0 right-0 h-6 w-6 border-b-2 border-r-2 border-amber-400/50" />
+          </div>
+
+          {/* Viewfinder HUD overlays */}
+          <div className="absolute top-3.5 right-3.5 z-20 pointer-events-none hidden md:block font-mono text-[0.62rem] tracking-wider text-white/40 bg-black/40 px-2 py-0.5 rounded backdrop-blur-[1px]">
+            <span>{resolutionText}</span>
+          </div>
+
+          {/* Ambilight Glow */}
+          <div className="absolute inset-0 z-0 bg-amber-400/20 blur-[100px] rounded-full scale-90 mix-blend-screen opacity-50" />
+          
+          <div className="relative z-10 w-full h-full bg-black aspect-video">
+            <video
+              ref={videoRef}
+              controls
+              className="h-full w-full bg-black aspect-video"
+              src={mediaUrl}
+              poster={posterUrl}
+              preload="metadata"
+              onPlay={() => setIsPaused(false)}
+              onPause={() => setIsPaused(true)}
+              onSeeked={(e) => setIsPaused(e.currentTarget.paused)}
+              onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+              onLoadedMetadata={(e) => {
+                setDuration(e.currentTarget.duration);
+                const w = e.currentTarget.videoWidth;
+                const h = e.currentTarget.videoHeight;
+                if (w && h) {
+                  let label = "";
+                  if (w === 3840 && h === 2160) label = "4K";
+                  else if (h === 2160) label = "2160p";
+                  else if (h === 1440) label = "1440p";
+                  else if (h === 1080) label = "1080p";
+                  else if (h === 720) label = "720p";
+                  else if (h === 480) label = "480p";
+                  else label = `${w}x${h}`;
+                  setResolutionText(label);
+                }
+              }}
+            >
+              Your browser does not support the video element.
+            </video>
+          </div>
+        </div>
+
+        {/* Video Info & Controls Panel */}
+        <section className="flex flex-col gap-4 rounded-none sm:rounded-2xl border-0 sm:border border-white/[0.06] bg-[#111316] p-4 xl:col-start-1 xl:col-end-2 xl:row-start-2 xl:row-end-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
@@ -2050,58 +2102,6 @@ export function VideoDetail({
             )}
           </div>
 
-          {/* Viewfinder-framed player — signature element */}
-          <div className="relative w-full aspect-video">
-            {/* Corner Viewfinder Braces */}
-            <div className="pointer-events-none absolute -inset-1 z-10 hidden md:block">
-              <span className="absolute left-0 top-0 h-6 w-6 border-l-2 border-t-2 border-amber-400/50" />
-              <span className="absolute right-0 top-0 h-6 w-6 border-r-2 border-t-2 border-amber-400/50" />
-              <span className="absolute bottom-0 left-0 h-6 w-6 border-b-2 border-l-2 border-amber-400/50" />
-              <span className="absolute bottom-0 right-0 h-6 w-6 border-b-2 border-r-2 border-amber-400/50" />
-            </div>
-
-            {/* Viewfinder HUD overlays */}
-            <div className="absolute top-3.5 right-3.5 z-20 pointer-events-none hidden md:block font-mono text-[0.62rem] tracking-wider text-white/40 bg-black/40 px-2 py-0.5 rounded backdrop-blur-[1px]">
-              <span>{resolutionText}</span>
-            </div>
-
-            {/* Ambilight Glow */}
-            <div className="absolute inset-0 z-0 bg-amber-400/20 blur-[100px] rounded-full scale-90 mix-blend-screen opacity-50" />
-            
-            <div className="relative z-10 w-full h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-black aspect-video">
-              <video
-                ref={videoRef}
-                controls
-                className="h-full w-full bg-black aspect-video"
-                src={mediaUrl}
-                poster={posterUrl}
-                preload="metadata"
-                onPlay={() => setIsPaused(false)}
-                onPause={() => setIsPaused(true)}
-                onSeeked={(e) => setIsPaused(e.currentTarget.paused)}
-                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-                onLoadedMetadata={(e) => {
-                  setDuration(e.currentTarget.duration);
-                  const w = e.currentTarget.videoWidth;
-                  const h = e.currentTarget.videoHeight;
-                  if (w && h) {
-                    let label = "";
-                    if (w === 3840 && h === 2160) label = "4K";
-                    else if (h === 2160) label = "2160p";
-                    else if (h === 1440) label = "1440p";
-                    else if (h === 1080) label = "1080p";
-                    else if (h === 720) label = "720p";
-                    else if (h === 480) label = "480p";
-                    else label = `${w}x${h}`;
-                    setResolutionText(label);
-                  }
-                }}
-              >
-                Your browser does not support the video element.
-              </video>
-            </div>
-          </div>
-
           {/* Capture Feedback Toast */}
           {(captureResult || captureError) && (
             <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-[0.7rem] font-mono uppercase tracking-wider ${
@@ -2117,14 +2117,14 @@ export function VideoDetail({
           )}
 
           {/* Advanced Playback Control Panel */}
-          <div className="grid grid-cols-2 gap-3 p-2.5 text-xs sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:p-3 sm:text-sm rounded-xl border border-white/[0.04] bg-white/[0.01]">
+          <div className="flex flex-col gap-3.5 p-3 rounded-xl border border-white/[0.04] bg-white/[0.01] sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-3 text-xs sm:text-sm">
             {/* Frame step buttons */}
-            <div className="flex items-center gap-1.5 col-span-2 justify-between sm:justify-start">
+            <div className="flex items-center gap-1.5 w-full sm:w-auto justify-between sm:justify-start">
               <button
                 type="button"
                 onClick={stepFrameBackward}
                 title="Step 1 Frame Back (Comma)"
-                className="flex-1 sm:flex-initial text-center rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-white/80 hover:border-amber-400/40 hover:bg-white/[0.06] transition focus:outline-none"
+                className="flex-1 sm:flex-initial text-center rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2 font-mono text-[0.65rem] uppercase tracking-wider text-white/80 hover:border-amber-400/40 hover:bg-white/[0.06] transition-all focus:outline-none active:scale-[0.97]"
               >
                 ◀ Frame
               </button>
@@ -2132,25 +2132,27 @@ export function VideoDetail({
                 type="button"
                 onClick={stepFrameForward}
                 title="Step 1 Frame Forward (Period)"
-                className="flex-1 sm:flex-initial text-center rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-wider text-white/80 hover:border-amber-400/40 hover:bg-white/[0.06] transition focus:outline-none"
+                className="flex-1 sm:flex-initial text-center rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2 font-mono text-[0.65rem] uppercase tracking-wider text-white/80 hover:border-amber-400/40 hover:bg-white/[0.06] transition-all focus:outline-none active:scale-[0.97]"
               >
                 Frame ▶
               </button>
             </div>
 
             {/* Playback speed rate selection */}
-            <div className="flex items-center gap-1 justify-between sm:justify-start sm:gap-1.5">
-              <Gauge className="h-3.5 w-3.5 text-white/30 shrink-0" />
-              <span className="font-mono text-[0.6rem] uppercase tracking-widest text-white/30 mr-1 hidden min-[370px]:inline">Speed</span>
-              <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5 justify-between w-full sm:w-auto sm:justify-start">
+              <div className="flex items-center gap-1 text-white/40">
+                <Gauge className="h-3.5 w-3.5 text-white/30 shrink-0" />
+                <span className="font-mono text-[0.6rem] uppercase tracking-widest text-white/30 mr-1 min-[320px]:inline sm:hidden lg:inline">Speed</span>
+              </div>
+              <div className="flex flex-1 justify-end sm:justify-start items-center gap-1 sm:gap-1.5">
                 {[0.25, 0.5, 1, 2].map((rate) => (
                   <button
                     key={rate}
                     type="button"
                     onClick={() => changePlayRate(rate)}
-                    className={`rounded-lg px-2 py-1 sm:px-2.5 sm:py-1 font-mono text-[0.68rem] sm:text-xs transition focus:outline-none ${
+                    className={`rounded-lg px-2.5 py-2 sm:px-2.5 sm:py-1.5 font-mono text-[0.68rem] sm:text-xs transition-all focus:outline-none active:scale-[0.95] ${
                       playRate === rate
-                        ? "bg-amber-400 font-semibold text-[#0A0B0D]"
+                        ? "bg-amber-400 font-semibold text-[#0A0B0D] shadow-[0_0_12px_rgba(251,191,36,0.25)]"
                         : "border border-white/[0.08] bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
                     }`}
                   >
@@ -2160,35 +2162,38 @@ export function VideoDetail({
               </div>
             </div>
 
-            {/* Loop Toggle */}
-            <button
-              type="button"
-              onClick={() => setIsLooping(!isLooping)}
-              className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition-all duration-200 focus:outline-none text-center hover:-translate-y-0.5 active:translate-y-px active:scale-[0.97] ${
-                isLooping
-                  ? "bg-amber-400/20 border border-amber-400/50 text-amber-300 font-semibold shadow-[0_0_8px_rgba(232,163,61,0.2)]"
-                  : "border border-white/[0.08] bg-white/[0.03] text-white/60 hover:text-white"
-              }`}
-            >
-              <Repeat className="h-3.5 w-3.5" />
-              Loop: {isLooping ? "ON" : "OFF"}
-            </button>
+            {/* Action Buttons: Loop & Capture */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {/* Loop Toggle */}
+              <button
+                type="button"
+                onClick={() => setIsLooping(!isLooping)}
+                className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 font-mono text-[0.65rem] uppercase tracking-widest transition-all duration-200 focus:outline-none text-center hover:-translate-y-0.5 active:translate-y-px active:scale-[0.97] ${
+                  isLooping
+                    ? "bg-amber-400/20 border border-amber-400/50 text-amber-300 font-semibold shadow-[0_0_8px_rgba(232,163,61,0.2)]"
+                    : "border border-white/[0.08] bg-white/[0.03] text-white/60 hover:text-white"
+                }`}
+              >
+                <Repeat className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Loop: {isLooping ? "ON" : "OFF"}</span>
+              </button>
 
-            {/* Capture Frame Button */}
-            <button
-              type="button"
-              onClick={handleCaptureFrame}
-              disabled={isCapturing || !isPaused}
-              title={!isPaused ? "Pause the video first to capture a frame" : "Capture current frame to Generated/"}
-              className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest transition-all duration-200 focus:outline-none text-center hover:-translate-y-0.5 active:translate-y-px active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${
-                isCapturing
-                  ? "bg-amber-400/20 border border-amber-400/50 text-amber-300 font-semibold animate-pulse"
-                  : "border border-white/[0.08] bg-white/[0.03] text-white/60 hover:text-white hover:border-amber-400/50"
-              }`}
-            >
-              <Camera className="h-3.5 w-3.5" />
-              {isCapturing ? "Capturing..." : "Capture Frame"}
-            </button>
+              {/* Capture Frame Button */}
+              <button
+                type="button"
+                onClick={handleCaptureFrame}
+                disabled={isCapturing || !isPaused}
+                title={!isPaused ? "Pause the video first to capture a frame" : "Capture current frame to Generated/"}
+                className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 font-mono text-[0.65rem] uppercase tracking-widest transition-all duration-200 focus:outline-none text-center hover:-translate-y-0.5 active:translate-y-px active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${
+                  isCapturing
+                    ? "bg-amber-400/20 border border-amber-400/50 text-amber-300 font-semibold animate-pulse"
+                    : "border border-white/[0.08] bg-white/[0.03] text-white/60 hover:text-white hover:border-amber-400/50"
+                }`}
+              >
+                <Camera className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{isCapturing ? "Capturing..." : "Capture Frame"}</span>
+              </button>
+            </div>
           </div>
 
 
@@ -2248,8 +2253,8 @@ export function VideoDetail({
         </section>
 
 
-        {/* Clip rail */}
-        <aside className="flex flex-col gap-4 rounded-2xl border border-white/[0.06] bg-[#111316] p-4 max-h-[500px] xl:max-h-[80vh]">
+        {/* Clip rail (YouTube recommended videos style) */}
+        <aside className="flex flex-col gap-4 rounded-none sm:rounded-2xl border-0 sm:border border-white/[0.06] bg-transparent sm:bg-[#111316] p-0 sm:p-4 max-h-none xl:max-h-[80vh] overflow-y-visible xl:overflow-y-auto no-scrollbar xl:col-start-2 xl:col-end-3 xl:row-start-1 xl:row-span-2">
           <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] pb-3">
             <div>
               <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
@@ -2306,7 +2311,7 @@ export function VideoDetail({
               </p>
             </div>
           ) : (
-            <ul className="flex-1 space-y-2 overflow-y-auto pr-0.5">
+            <ul className="flex-1 space-y-2 overflow-y-visible pr-0.5">
               {video.clips.map((clip, index) => (
                 <li key={clip.mediaPath}>
                   <ClipCard

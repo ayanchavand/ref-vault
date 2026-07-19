@@ -42,6 +42,8 @@ function loadSavedLibraryRoot(): string {
   return window.localStorage.getItem(libraryRootStorageKey) ?? "";
 }
 
+
+
 // Global keyframes shared by shimmer thumbnails and the top loading bar
 // across every feature component. Defined once here since App is always
 // mounted at the root.
@@ -398,8 +400,8 @@ export function App() {
         </div>
       )}
 
-      <div className="flex h-screen w-full flex-col px-4 py-6 sm:px-10 sm:py-8">
-        <header className="relative flex flex-col gap-4 border-b border-white/[0.06] pb-4 sm:pb-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex h-screen w-full flex-col px-2 pt-0 pb-6 sm:px-10 sm:pt-8 sm:pb-8">
+        <header className="relative flex flex-col gap-4 border-b border-white/[0.06] pb-0 sm:pb-6 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-0">
           <div className="flex items-center gap-3">
             <span
               className={`h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400 shadow-[0_0_10px_rgba(232,163,61,0.8)] ${
@@ -472,14 +474,14 @@ export function App() {
           </nav>
         </header>
 
-        <section className="flex flex-col flex-1 min-h-0 overflow-y-auto pt-6 pb-24 sm:py-12">
+        <section className="flex flex-col flex-1 min-h-0 overflow-y-auto pt-0 pb-24 sm:pt-12 sm:pb-12">
           <Suspense fallback={
             <div className="flex flex-1 items-center justify-center p-8 text-sm font-mono uppercase tracking-widest text-white/30">
               Loading view…
             </div>
           }>
             {activeRoute.view === "SELECT_LIBRARY" && (
-              <div className="flex flex-1 items-center justify-center py-10 animate-[rv-fade-up_0.4s_ease-out_both]">
+              <div className="flex flex-1 items-center justify-center py-10 animate-[rv-fade-up_0.4s_ease-out_both] px-2 sm:px-0">
                 <div className="max-w-xl text-center space-y-6">
                   <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-400 font-mono text-3xl font-bold text-[#0A0B0D] shadow-[0_0_30px_rgba(232,163,61,0.3)] mx-auto">
                     RV
@@ -505,7 +507,7 @@ export function App() {
             )}
 
             {activeRoute.view === "BROWSE_LIBRARY" && scanResult && (
-              <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
+              <div className="animate-[rv-fade-up_0.35s_ease-out_both] px-2 sm:px-0">
                 <VideoList
                   rootPath={activeRootPath!}
                   videos={paginatedVideos}
@@ -524,7 +526,7 @@ export function App() {
             )}
 
             {activeRoute.view === "IMPORT_VIDEO" && (
-              <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
+              <div className="animate-[rv-fade-up_0.35s_ease-out_both] px-2 sm:px-0">
                 <VideoImport
                   rootPath={activeRootPath!}
                   libraryConfig={libraryConfig}
@@ -550,7 +552,7 @@ export function App() {
             )}
 
             {activeRoute.view === "BROWSE_TAGS" && scanResult && (
-              <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
+              <div className="animate-[rv-fade-up_0.35s_ease-out_both] px-2 sm:px-0">
                 <TagBrowser
                   rootPath={activeRootPath!}
                   videos={scanResult.videos}
@@ -589,11 +591,13 @@ export function App() {
             )}
 
             {activeRoute.view === "BROWSE_MEDIA" && (
-              <MediaBrowser onGoToSettings={() => navigate({ view: "SETTINGS" })} />
+              <div className="animate-[rv-fade-up_0.35s_ease-out_both] px-2 sm:px-0">
+                <MediaBrowser onGoToSettings={() => navigate({ view: "SETTINGS" })} />
+              </div>
             )}
 
             {activeRoute.view === "SETTINGS" && (
-              <div className="animate-[rv-fade-up_0.35s_ease-out_both]">
+              <div className="animate-[rv-fade-up_0.35s_ease-out_both] px-2 sm:px-0">
                 <Settings
                   onVideoLibraryChange={handleVideoRootChange}
                   onForgetVideoLibrary={handleVideoRootForget}
