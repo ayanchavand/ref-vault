@@ -1019,11 +1019,31 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
   const [showLocations, setShowLocations] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [mediaTypeFilter, setMediaTypeFilter] = useState<"all" | "image" | "gif" | "video">("all");
+  const [isMobileLayout, setIsMobileLayout] = useState(() => typeof window !== "undefined" ? window.innerWidth <= 640 : false);
 
   // drag state
   const dragRef = useRef<{ startY: number; dragging: boolean } | null>(null);
   const [dragDelta, setDragDelta] = useState(0);
   const stageRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleResize() { setIsMobileLayout(window.innerWidth <= 640); }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Lock body scroll while mobile full-screen is active
+  useEffect(() => {
+    if (!isMobileLayout) return;
+    const prevOverflow = document.body.style.overflow;
+    const prevTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.touchAction = prevTouchAction;
+    };
+  }, [isMobileLayout]);
 
   const filteredItems = useMemo(() => {
     if (mediaTypeFilter === "all") return items;
@@ -1170,6 +1190,8 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
   const showEmptyFilter = !isLoading && !error && hasSavedRoot && items.length > 0 && filteredItems.length === 0;
   const showCard = !isLoading && !error && !!currentItem;
 
+  const filterLabels: Record<string, string> = { all: "All", image: "Images", gif: "GIFs", video: "Videos" };
+
   return (
     <div
       style={{
@@ -1177,7 +1199,10 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
         flexDirection: "column",
         flex: 1,
         minHeight: 0,
-        position: "relative",
+        position: isMobileLayout ? "fixed" : "relative",
+        inset: isMobileLayout ? 0 : undefined,
+        zIndex: isMobileLayout ? 40 : undefined,
+        background: isMobileLayout ? "#000" : undefined,
         userSelect: "none",
       }}
     >
@@ -1193,6 +1218,10 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
         @keyframes mb-fadein {
           from { opacity: 0; transform: translateY(6px) scale(0.98); }
           to   { opacity: 1; transform: translateY(0)   scale(1); }
+        }
+        @keyframes mb-drawer-up {
+          from { transform: translateY(100%); }
+          to   { transform: translateY(0); }
         }
         .tiktok-card-container {
           position: absolute;
@@ -1246,117 +1275,319 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
         }
       `}</style>
 
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 0 16px 0",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
-          flexShrink: 0,
-          position: "relative",
-          gap: 12,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div>
+      {/* ── Desktop header (hidden on mobile) ─────────────────────────────── */}
+      {!isMobileLayout && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 0 16px 0",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            flexShrink: 0,
+            position: "relative",
+            gap: 12,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div>
+              <p
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: 10,
+                  letterSpacing: "0.25em",
+                  textTransform: "uppercase",
+                  color: "#f0c060",
+                  margin: 0,
+                }}
+              >
+                Media Browser
+              </p>
+              {filteredItems.length > 0 && !isLoading && (
+                <p style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, margin: "2px 0 0" }}>
+                  {index + 1} / {filteredItems.length}
+                </p>
+              )}
+              {isLoading && (
+                <p style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, margin: "2px 0 0", fontFamily: "monospace" }}>
+                  scanning…
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Middle: Filter Tabs */}
+          {hasSavedRoot && items.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                background: "rgba(255, 255, 255, 0.02)",
+                border: "1px solid rgba(255, 255, 255, 0.05)",
+                borderRadius: 12,
+                padding: 3,
+              }}
+            >
+              {(["all", "image", "gif", "video"] as const).map((type) => {
+                const isActive = mediaTypeFilter === type;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setMediaTypeFilter(type)}
+                    style={{
+                      background: isActive ? "rgba(240, 192, 96, 0.15)" : "transparent",
+                      border: isActive ? "1px solid rgba(240, 192, 96, 0.3)" : "1px solid transparent",
+                      borderRadius: 9,
+                      color: isActive ? "#f0c060" : "rgba(255, 255, 255, 0.5)",
+                      padding: "4px 12px",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      fontWeight: isActive ? 600 : 400,
+                      fontFamily: "sans-serif",
+                      transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                    }}
+                  >
+                    {filterLabels[type]}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Right side: folder pill */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {mediaRoot && !isLoading && (
+              <span
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: 10,
+                  color: "rgba(255,255,255,0.35)",
+                  backgroundColor: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: 8,
+                  padding: "6px 12px",
+                  maxWidth: 240,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+                title={mediaRoot}
+              >
+                📁 {mediaRoot.split("/").pop() || mediaRoot}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Mobile transparent overlay controls ────────────────────────────── */}
+      {isMobileLayout && hasSavedRoot && !error && !isLoading && (
+        <>
+          {/* Top-left: title + counter */}
+          <div
+            style={{
+              position: "absolute",
+              top: 16,
+              left: 16,
+              zIndex: 60,
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              pointerEvents: "none",
+            }}
+          >
             <p
               style={{
                 fontFamily: "monospace",
-                fontSize: 10,
+                fontSize: 9,
                 letterSpacing: "0.25em",
                 textTransform: "uppercase",
-                color: "#f0c060",
+                color: "rgba(240,192,96,0.9)",
                 margin: 0,
+                textShadow: "0 1px 6px rgba(0,0,0,0.8)",
               }}
             >
-              Media Browser
+              Media
             </p>
-            {filteredItems.length > 0 && !isLoading && (
-              <p style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, margin: "2px 0 0" }}>
+            {filteredItems.length > 0 && (
+              <p
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: 10,
+                  color: "rgba(255,255,255,0.5)",
+                  margin: 0,
+                  textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+                }}
+              >
                 {index + 1} / {filteredItems.length}
               </p>
             )}
-            {isLoading && (
-              <p style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, margin: "2px 0 0", fontFamily: "monospace" }}>
-                scanning…
-              </p>
-            )}
           </div>
-        </div>
 
-        {/* Middle: Filter Tabs */}
-        {hasSavedRoot && items.length > 0 && (
+          {/* Top-right: folder button */}
+          {mediaRoot && (
+            <button
+              onClick={() => setShowLocations((v) => !v)}
+              style={{
+                position: "absolute",
+                top: 14,
+                right: 14,
+                zIndex: 60,
+                background: "rgba(0,0,0,0.45)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                border: "1px solid rgba(255,255,255,0.15)",
+                borderRadius: 12,
+                color: "rgba(255,255,255,0.8)",
+                fontSize: 11,
+                fontFamily: "monospace",
+                padding: "6px 10px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                letterSpacing: "0.05em",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
+              }}
+            >
+              <span style={{ fontSize: 13 }}>📁</span>
+              <span style={{ maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {mediaRoot.split("/").pop() || mediaRoot}
+              </span>
+            </button>
+          )}
+
+          {/* Bottom overlay: filter tabs */}
+          {items.length > 0 && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: 28,
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 60,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                background: "rgba(0,0,0,0.45)",
+                backdropFilter: "blur(16px)",
+                WebkitBackdropFilter: "blur(16px)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 50,
+                padding: "5px 6px",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+              }}
+            >
+              {(["all", "image", "gif", "video"] as const).map((type) => {
+                const isActive = mediaTypeFilter === type;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setMediaTypeFilter(type)}
+                    style={{
+                      background: isActive ? "rgba(240,192,96,0.9)" : "transparent",
+                      border: "none",
+                      borderRadius: 50,
+                      color: isActive ? "#0A0B0D" : "rgba(255,255,255,0.55)",
+                      padding: "5px 14px",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      fontWeight: isActive ? 700 : 400,
+                      fontFamily: "sans-serif",
+                      transition: "all 0.2s cubic-bezier(0.4,0,0.2,1)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {filterLabels[type]}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Mobile: loading indicator overlay ─────────────────────────────── */}
+      {isMobileLayout && isLoading && (
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%,-50%)",
+            zIndex: 60,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              background: "rgba(255, 255, 255, 0.02)",
-              border: "1px solid rgba(255, 255, 255, 0.05)",
-              borderRadius: 12,
-              padding: 3,
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              border: "2.5px solid rgba(240,192,96,0.2)",
+              borderTopColor: "#f0c060",
+              animation: "mb-spin 0.7s linear infinite",
+            }}
+          />
+          <p style={{ fontFamily: "monospace", fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", margin: 0 }}>scanning…</p>
+        </div>
+      )}
+
+      {/* ── Mobile: LocationManager as bottom-sheet drawer ─────────────────── */}
+      {isMobileLayout && showLocations && (
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setShowLocations(false)}
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 70,
+              background: "rgba(0,0,0,0.5)",
+              backdropFilter: "blur(4px)",
+              WebkitBackdropFilter: "blur(4px)",
+            }}
+          />
+          {/* Drawer */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              zIndex: 80,
+              background: "rgba(12,13,16,0.97)",
+              backdropFilter: "blur(24px)",
+              WebkitBackdropFilter: "blur(24px)",
+              borderTop: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: "20px 20px 0 0",
+              padding: "8px 0 0",
+              animation: "mb-drawer-up 0.28s cubic-bezier(0.22,1,0.36,1) both",
+              boxShadow: "0 -24px 80px rgba(0,0,0,0.8)",
             }}
           >
-            {(["all", "image", "gif", "video"] as const).map((type) => {
-              const isActive = mediaTypeFilter === type;
-              const label =
-                type === "all"
-                  ? "All"
-                  : type === "image"
-                    ? "Images"
-                    : type === "gif"
-                      ? "GIFs"
-                      : "Videos";
-              return (
-                <button
-                  key={type}
-                  onClick={() => setMediaTypeFilter(type)}
-                  style={{
-                    background: isActive ? "rgba(240, 192, 96, 0.15)" : "transparent",
-                    border: isActive ? "1px solid rgba(240, 192, 96, 0.3)" : "1px solid transparent",
-                    borderRadius: 9,
-                    color: isActive ? "#f0c060" : "rgba(255, 255, 255, 0.5)",
-                    padding: "4px 12px",
-                    cursor: "pointer",
-                    fontSize: 11,
-                    fontWeight: isActive ? 600 : 400,
-                    fontFamily: "sans-serif",
-                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                  }}
-                >
-                  {label}
-                </button>
-              );
-            })}
+            {/* Drag handle */}
+            <div style={{ display: "flex", justifyContent: "center", paddingBottom: 12 }}>
+              <div style={{ width: 36, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.15)" }} />
+            </div>
+            <div style={{ padding: "0 20px 32px" }}>
+              <LocationManager
+                savedLocations={savedLocations}
+                activeRoot={mediaRoot}
+                isLoading={isLoading}
+                onSelect={(path) => { loadMedia(path); setShowLocations(false); }}
+                onAdd={(path) => loadMedia(path)}
+                onRemove={handleRemoveLocation}
+                onClose={() => setShowLocations(false)}
+              />
+            </div>
           </div>
-        )}
-
-        {/* Right side: folder pill */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {mediaRoot && !isLoading && (
-            <span
-              style={{
-                fontFamily: "monospace",
-                fontSize: 10,
-                color: "rgba(255,255,255,0.35)",
-                backgroundColor: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.06)",
-                borderRadius: 8,
-                padding: "6px 12px",
-                maxWidth: 240,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-              title={mediaRoot}
-            >
-              📁 {mediaRoot.split("/").pop() || mediaRoot}
-            </span>
-          )}
-        </div>
-      </div>
+        </>
+      )}
 
       {/* Stage */}
       <div ref={stageRef} style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1537,8 +1768,8 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
         )}
       </div>
 
-      {/* Bottom controls tip */}
-      {!isLoading && !error && filteredItems.length > 0 && (
+      {/* Bottom controls tip — desktop only */}
+      {!isMobileLayout && !isLoading && !error && filteredItems.length > 0 && (
         <div
           style={{
             flexShrink: 0,
