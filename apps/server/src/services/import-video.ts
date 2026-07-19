@@ -1,5 +1,5 @@
 import { mkdir, stat, rm } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type {
   ApiErrorResponse,
   CreateVideoPlaceholderRequest,
@@ -157,9 +157,25 @@ export async function resolveUploadDirectory(
   }
 
   try {
-    const videoDirectory = await stat(resolve(libraryRootPath, videoRelativePath));
+    const targetStats = await stat(resolvedTarget);
 
-    if (!videoDirectory.isDirectory()) {
+    let canonicalPath = resolvedTarget;
+    if (targetStats.isFile()) {
+      canonicalPath = dirname(resolvedTarget);
+    }
+
+    if (canonicalPath === libraryRootPath || !isContainedPath(libraryRootPath, canonicalPath)) {
+      return {
+        ok: false,
+        error: {
+          error: "INVALID_VIDEO_PATH",
+          message: "videoRelativePath must stay within the library root.",
+        },
+      };
+    }
+
+    const dirStats = await stat(canonicalPath);
+    if (!dirStats.isDirectory()) {
       return {
         ok: false,
         error: {
@@ -169,7 +185,6 @@ export async function resolveUploadDirectory(
       };
     }
 
-    const canonicalPath = resolve(libraryRootPath, videoRelativePath);
     return { ok: true, value: canonicalPath };
   } catch {
     return {

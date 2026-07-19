@@ -457,6 +457,18 @@ test("deletes a clip and resequences remaining clips on disk and in clips.json m
   };
   await writeFile(join(videoDirectory, "clips.json"), JSON.stringify(initialMetadata, null, 2));
 
+  // Write split_plan.json
+  const initialSplitPlan = {
+    videoRelativePath: "video-a",
+    mainVideoPath: "video-a/main.mp4",
+    segments: [
+      { start: 0, end: 5, tags: ["first"] },
+      { start: 10, end: 15, tags: ["second"] },
+      { start: 20, end: 25, tags: ["third"] },
+    ],
+  };
+  await writeFile(join(videoDirectory, "split_plan.json"), JSON.stringify(initialSplitPlan, null, 2));
+
   const app = await buildApp();
 
   try {
@@ -488,6 +500,13 @@ test("deletes a clip and resequences remaining clips on disk and in clips.json m
       "scene_01": { tags: ["first"], notes: "Clip one notes" },
       "scene_02": { tags: ["third"], notes: "Clip three notes" },
     });
+
+    // Verify split_plan.json segments are synced
+    const splitPlan = JSON.parse(await readFile(join(videoDirectory, "split_plan.json"), "utf8"));
+    assert.deepEqual(splitPlan.segments, [
+      { start: 0, end: 5, tags: ["first"] },
+      { start: 20, end: 25, tags: ["third"] },
+    ]);
   } finally {
     await app.close();
     await rm(library, { force: true, recursive: true });
@@ -656,6 +675,25 @@ test("deletes a media file successfully and rejects path traversal", async () =>
       fileExists = false;
     }
     assert.ok(!fileExists, "File should have been deleted");
+
+    // Deleting main.mp4 of a video directory should remove the whole video directory
+    const videoDir = join(library, "video-main");
+    await mkdir(join(videoDir, "clips"), { recursive: true });
+    await writeFile(join(videoDir, "main.mp4"), "video");
+    await writeFile(join(videoDir, "metadata.json"), "{}");
+
+    const deleteMainResponse = await app.inject({
+      method: "POST",
+      url: "/api/media/delete",
+      payload: {
+        rootPath: library,
+        mediaRelativePath: "video-main/main.mp4",
+      },
+    });
+
+    assert.equal(deleteMainResponse.statusCode, 200);
+    assert.deepEqual(deleteMainResponse.json(), { success: true });
+    await assert.rejects(stat(videoDir), { code: "ENOENT" });
 
     // Path traversal attempt should fail
     const responseTraversal = await app.inject({

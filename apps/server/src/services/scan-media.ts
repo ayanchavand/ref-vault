@@ -1,5 +1,5 @@
 import { readdir, stat, rm } from "node:fs/promises";
-import { extname, join, relative, sep } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, sep } from "node:path";
 
 import type {
   ApiErrorResponse,
@@ -143,20 +143,35 @@ export async function deleteMediaItem(
   const pathFromParent = relative(libraryRootPath, targetFilePath);
   const isContained =
     pathFromParent === "" ||
-    (!pathFromParent.startsWith(`..${sep}`) && pathFromParent !== "..");
+    (!pathFromParent.startsWith("..") && !isAbsolute(pathFromParent));
 
   if (!isContained) {
     return {
       ok: false,
       error: {
-        error: "INVALID_VIDEO_PATH", // Reuses existing validation code or error type
+        error: "INVALID_VIDEO_PATH",
         message: "Media file path must stay within the library root.",
       },
     };
   }
 
   try {
-    await rm(targetFilePath, { force: true });
+    const fileName = basename(targetFilePath);
+    const parentDir = dirname(targetFilePath);
+    const parentRel = relative(libraryRootPath, parentDir);
+    const isParentContained =
+      parentDir !== libraryRootPath &&
+      parentRel !== "" &&
+      !parentRel.startsWith("..") &&
+      !isAbsolute(parentRel);
+
+    // If deleting main.mp4 of a video directory, delete the whole video directory
+    if (fileName.toLowerCase() === "main.mp4" && isParentContained) {
+      await rm(parentDir, { recursive: true, force: true });
+    } else {
+      await rm(targetFilePath, { recursive: true, force: true });
+    }
+
     return {
       ok: true,
       value: { success: true },

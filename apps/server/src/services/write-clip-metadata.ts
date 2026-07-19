@@ -417,6 +417,26 @@ export async function deleteClip(
     }
   }
 
+  // Sync split_plan.json if it exists
+  const splitPlanPath = join(videoDirectory.value, "split_plan.json");
+  try {
+    const existingSplitPlan = await readFile(splitPlanPath, "utf8");
+    const parsedPlan = JSON.parse(existingSplitPlan);
+    if (
+      typeof parsedPlan === "object" &&
+      parsedPlan !== null &&
+      Array.isArray(parsedPlan.segments)
+    ) {
+      const segmentIndex = deletedIndex - 1;
+      if (segmentIndex >= 0 && segmentIndex < parsedPlan.segments.length) {
+        parsedPlan.segments.splice(segmentIndex, 1);
+        await writeJsonAtomically(splitPlanPath, parsedPlan);
+      }
+    }
+  } catch {
+    // Ignore error if split_plan.json does not exist or fails to parse
+  }
+
   return {
     ok: true,
     value: {
