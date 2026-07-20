@@ -43,6 +43,7 @@ function getTagColorClass(tag: string): string {
 interface VideoListProps {
   rootPath: string;
   videos: ScannedVideo[];
+  totalVideos?: number;
   onSelectVideo(video: ScannedVideo): void;
   isLoading: boolean;
   openingVideoPath: string | null;
@@ -386,6 +387,7 @@ const VideoThumbnailCard = memo(function VideoThumbnailCard({
 export function VideoList({
   rootPath,
   videos,
+  totalVideos,
   onSelectVideo,
   isLoading,
   openingVideoPath,
@@ -394,6 +396,7 @@ export function VideoList({
 }: VideoListProps) {
   const [viewMode, setViewMode] = useState<"details" | "moodboard">("details");
   const isInitialScan = isLoading && videos.length === 0;
+  const totalVideoCount = totalVideos ?? videos.length;
 
   const [showTitleInList, setShowTitleInList] = useState(
     () => localStorage.getItem(showTitleInListKey) !== "false"
@@ -422,9 +425,14 @@ export function VideoList({
         <div className="flex items-center gap-3 min-w-0">
           <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(232,163,61,0.7)]" />
           <div className="min-w-0">
-            <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
-              Library
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
+                Library
+              </p>
+              <span className="inline-flex items-center rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 font-mono text-[0.6rem] font-semibold text-amber-300">
+                {totalVideoCount} {totalVideoCount === 1 ? "video" : "videos"}
+              </span>
+            </div>
             <p className="mt-1 truncate font-mono text-sm text-white/50">{rootPath}</p>
           </div>
         </div>

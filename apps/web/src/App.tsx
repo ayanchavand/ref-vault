@@ -140,6 +140,7 @@ function GlobalMotionStyles() {
 interface VideoListPaginationProps {
   currentPage: number;
   totalPages: number;
+  totalVideos?: number;
   onPrevPage: () => void;
   onNextPage: () => void;
 }
@@ -149,6 +150,7 @@ interface VideoListPaginationProps {
 function VideoListPagination({
   currentPage,
   totalPages,
+  totalVideos,
   onPrevPage,
   onNextPage,
 }: VideoListPaginationProps) {
@@ -169,6 +171,9 @@ function VideoListPagination({
       </button>
       <span className="font-mono text-[0.7rem] uppercase tracking-widest text-white/40">
         Page {currentPage} of {totalPages}
+        {totalVideos !== undefined && (
+          <span className="ml-1 text-white/60">({totalVideos} total videos)</span>
+        )}
       </span>
       <button
         type="button"
@@ -529,6 +534,7 @@ export function App() {
                 <VideoList
                   rootPath={activeRootPath!}
                   videos={paginatedVideos}
+                  totalVideos={scanResult.videos.length}
                   onSelectVideo={handleSelectVideo}
                   isLoading={isLoading}
                   openingVideoPath={openingVideoPath}
@@ -538,6 +544,7 @@ export function App() {
                 <VideoListPagination
                   currentPage={clampedVideoPage}
                   totalPages={totalVideoPages}
+                  totalVideos={scanResult.videos.length}
                   onPrevPage={handlePrevVideoPage}
                   onNextPage={handleNextVideoPage}
                 />

@@ -91,9 +91,14 @@ const TagBrowserClipCard = memo(function TagBrowserClipCard({
   const mediaUrl = `/api/media?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
     entry.clip.mediaPath,
   )}`;
-  const posterUrl = `/api/media/thumbnail?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
-    entry.clip.mediaPath,
-  )}`;
+  const posterUrl =
+    video?.thumbnailPath && entry.source === "video"
+      ? `/api/media?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
+          video.thumbnailPath,
+        )}`
+      : `/api/media/thumbnail?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
+          entry.clip.mediaPath,
+        )}`;
   const { containerRef, poster } = useLazyThumbnail({ mediaUrl, posterUrl });
   const prefetchHandlers = usePrefetchOnHover(mediaUrl);
 
@@ -112,7 +117,7 @@ const TagBrowserClipCard = memo(function TagBrowserClipCard({
         {poster ? (
           <img
             src={poster}
-            alt="Clip thumbnail"
+            alt={entry.source === "video" ? "Video thumbnail" : "Clip thumbnail"}
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
@@ -129,7 +134,7 @@ const TagBrowserClipCard = memo(function TagBrowserClipCard({
         <div className="flex flex-wrap gap-1">
           <span className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[0.6rem] text-white/60">
             {entry.source === "clip" ? <Scissors className="h-3 w-3" /> : <Film className="h-3 w-3" />}
-            {entry.source === "clip" ? "clip" : "video"}
+            {entry.source === "clip" ? "clip" : "main video"}
           </span>
           <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[0.6rem] text-white/60">
             {entry.clip.metadata ? Object.keys(entry.clip.metadata).length : 0} fields
@@ -242,8 +247,9 @@ export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: T
     const counts: Record<string, number> = {};
     for (const detail of videoDetails) {
       const vTags = extractTags(detail.metadata);
+      const countToAdd = detail.clips.length === 0 ? 1 : detail.clips.length;
       for (const tag of vTags) {
-        counts[tag] = (counts[tag] || 0) + detail.clips.length;
+        counts[tag] = (counts[tag] || 0) + countToAdd;
       }
     }
     return counts;
@@ -278,6 +284,7 @@ export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: T
 
     for (const detail of videoDetails) {
       const videoFields = libraryConfig?.fields.filter((f) => f.type === "video") ?? [];
+      const countToAdd = detail.clips.length === 0 ? 1 : detail.clips.length;
       videoFields.forEach((field) => {
         const val = detail.metadata?.[field.name];
         if (val) {
@@ -286,7 +293,7 @@ export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: T
             const vStr = String(v);
             const fieldCounts = counts[field.name];
             if (fieldCounts && fieldCounts[vStr] !== undefined) {
-              fieldCounts[vStr] += detail.clips.length;
+              fieldCounts[vStr] += countToAdd;
             }
           });
         }
@@ -349,38 +356,56 @@ export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: T
       }
       if (!matchesVideoCategories) continue;
 
-      for (const clip of detail.clips) {
-        // 3. Check flat clip tags
-        const cTags = extractTags(clip.metadata);
-        const matchesClipTags = selectedClipTags.every((t) => cTags.includes(t));
-        if (!matchesClipTags) continue;
+      if (detail.clips.length === 0) {
+        // Video has 0 clips. Include main video if no clip-level filters are selected.
+        const hasClipFilters =
+          selectedClipTags.length > 0 ||
+          configuredClipFields.some((field) => (selectedCategories[field.name] || []).length > 0);
 
-        // 4. Check clip-level dynamic categories
-        let matchesClipCategories = true;
-        for (const field of configuredClipFields) {
-          const selectedVals = selectedCategories[field.name] || [];
-          if (selectedVals.length === 0) continue;
-          const actual = clip.metadata?.[field.name];
-          if (actual === undefined || actual === null) {
-            matchesClipCategories = false;
-            break;
-          }
-          if (Array.isArray(actual)) {
-            if (!selectedVals.some((v) => actual.includes(v))) {
-              matchesClipCategories = false;
-              break;
-            }
-          } else {
-            if (!selectedVals.includes(String(actual))) {
-              matchesClipCategories = false;
-              break;
-            }
-          }
+        if (!hasClipFilters) {
+          list.push({
+            clip: {
+              mediaPath: detail.mainVideoPath,
+              metadata: detail.metadata,
+            },
+            video: detail,
+            source: "video",
+          });
         }
-        if (!matchesClipCategories) continue;
+      } else {
+        for (const clip of detail.clips) {
+          // 3. Check flat clip tags
+          const cTags = extractTags(clip.metadata);
+          const matchesClipTags = selectedClipTags.every((t) => cTags.includes(t));
+          if (!matchesClipTags) continue;
 
-        const source = clip.metadata ? ("clip" as const) : ("video" as const);
-        list.push({ clip, video: detail, source });
+          // 4. Check clip-level dynamic categories
+          let matchesClipCategories = true;
+          for (const field of configuredClipFields) {
+            const selectedVals = selectedCategories[field.name] || [];
+            if (selectedVals.length === 0) continue;
+            const actual = clip.metadata?.[field.name];
+            if (actual === undefined || actual === null) {
+              matchesClipCategories = false;
+              break;
+            }
+            if (Array.isArray(actual)) {
+              if (!selectedVals.some((v) => actual.includes(v))) {
+                matchesClipCategories = false;
+                break;
+              }
+            } else {
+              if (!selectedVals.includes(String(actual))) {
+                matchesClipCategories = false;
+                break;
+              }
+            }
+          }
+          if (!matchesClipCategories) continue;
+
+          const source = clip.metadata ? ("clip" as const) : ("video" as const);
+          list.push({ clip, video: detail, source });
+        }
       }
     }
     return list;
@@ -454,7 +479,7 @@ export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: T
             Vault / Tags
           </p>
           <p className="mt-1 text-lg font-semibold tracking-tight text-white sm:text-xl">
-            Browse clips by tags and dynamic categories.
+            Browse clips and main videos by tags and dynamic categories.
           </p>
         </div>
       </div>
@@ -472,7 +497,7 @@ export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: T
               Filter Library
             </p>
             <p className="mt-1 text-sm text-white/50">
-              Search or expand categories below to filter matching reference clips.
+              Search or expand categories below to filter matching reference clips and main videos.
             </p>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-xs font-medium text-white/50">
@@ -843,11 +868,11 @@ export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: T
         <div className="pt-4 border-t border-white/[0.04]">
           {!isFilterActive ? (
             <div className="rounded-xl border border-dashed border-white/[0.10] px-4 py-10 text-center text-sm text-white/40">
-              Select one or more filters above or type in the search box to find matching clips.
+              Select one or more filters above or type in the search box to find matching clips or main videos.
             </div>
           ) : matchedClips.length === 0 ? (
             <div className="rounded-xl border border-dashed border-white/[0.10] px-4 py-10 text-center text-sm text-white/40">
-              No clips match the selected combination of filters.
+              No clips or main videos match the selected combination of filters.
             </div>
           ) : (
             <div className="grid grid-cols-1 min-[450px]:grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
