@@ -712,6 +712,60 @@ test("deletes a media file successfully and rejects path traversal", async () =>
   }
 });
 
+test("recursively scans media and infers implicit tagging from folder structure", async () => {
+  const library = await mkdtemp(join(tmpdir(), "reference-vault-"));
+  const imagesDir = join(library, "images");
+  const lightingDir = join(imagesDir, "Lighting", "Studio", "Soft");
+  const compositionDir = join(imagesDir, "Composition");
+  await mkdir(lightingDir, { recursive: true });
+  await mkdir(compositionDir, { recursive: true });
+
+  await writeFile(join(lightingDir, "image1.png"), "");
+  await writeFile(join(compositionDir, "image2.jpg"), "");
+  await writeFile(join(imagesDir, "root-image.png"), "");
+
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/media/scan",
+      payload: { rootPath: library },
+    });
+
+    assert.equal(response.statusCode, 200);
+    const body = response.json();
+    assert.equal(body.rootPath, library);
+    assert.ok(Array.isArray(body.items));
+
+    // Find the three files
+    const item1 = body.items.find((i: any) => i.relativePath.endsWith("image1.png"));
+    const item2 = body.items.find((i: any) => i.relativePath.endsWith("image2.jpg"));
+    const item3 = body.items.find((i: any) => i.relativePath.endsWith("root-image.png"));
+
+    assert.ok(item1);
+    assert.ok(item2);
+    assert.ok(item3);
+
+    // Verify tag lists
+    // relativePath of item1: "images/Lighting/Studio/Soft/image1.png"
+    // tags: ["Lighting", "Lighting/Studio", "Lighting/Studio/Soft"]
+    assert.deepEqual(item1.tags, ["Lighting", "Lighting/Studio", "Lighting/Studio/Soft"]);
+
+    // relativePath of item2: "images/Composition/image2.jpg"
+    // tags: ["Composition"]
+    assert.deepEqual(item2.tags, ["Composition"]);
+
+    // relativePath of item3: "images/root-image.png"
+    // tags: []
+    assert.deepEqual(item3.tags, []);
+
+  } finally {
+    await app.close();
+    await rm(library, { force: true, recursive: true });
+  }
+});
+
 
 
 

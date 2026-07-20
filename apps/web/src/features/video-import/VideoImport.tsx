@@ -395,6 +395,64 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
         </div>
       )}
 
+      {importType === "media" && mediaRoot && (
+        <div
+          style={{
+            background: "rgba(255, 255, 255, 0.02)",
+            border: "1px solid rgba(255, 255, 255, 0.06)",
+            borderRadius: "16px",
+            padding: "16px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+            marginBottom: "16px",
+            maxWidth: "672px",
+            marginLeft: "auto",
+            marginRight: "auto",
+            width: "100%",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ fontSize: "16px" }}>📁</span>
+            <span style={{ fontSize: "11px", fontFamily: "monospace", fontWeight: 700, color: "#f0c060", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+              Media Library Directories
+            </span>
+          </div>
+          <p style={{ fontSize: "11px", color: "rgba(255, 255, 255, 0.45)", margin: 0, lineHeight: "1.4" }}>
+            In the media system, tags are generated implicitly based on subdirectories. Imported files are stored by file type in these folders:
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+              <span style={{ fontSize: "9px", fontWeight: 600, color: "rgba(255, 255, 255, 0.3)", textTransform: "uppercase", fontFamily: "monospace" }}>
+                📸 Images Folder:
+              </span>
+              <code style={{ fontSize: "11px", fontFamily: "monospace", color: "#4ade80", wordBreak: "break-all", background: "rgba(0,0,0,0.2)", padding: "4px 8px", borderRadius: "6px" }}>
+                {mediaRoot + "/images"}
+              </code>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+              <span style={{ fontSize: "9px", fontWeight: 600, color: "rgba(255, 255, 255, 0.3)", textTransform: "uppercase", fontFamily: "monospace" }}>
+                🎞️ GIFs Folder:
+              </span>
+              <code style={{ fontSize: "11px", fontFamily: "monospace", color: "#c084fc", wordBreak: "break-all", background: "rgba(0,0,0,0.2)", padding: "4px 8px", borderRadius: "6px" }}>
+                {mediaRoot + "/gifs"}
+              </code>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+              <span style={{ fontSize: "9px", fontWeight: 600, color: "rgba(255, 255, 255, 0.3)", textTransform: "uppercase", fontFamily: "monospace" }}>
+                🎥 Videos Folder:
+              </span>
+              <code style={{ fontSize: "11px", fontFamily: "monospace", color: "#60a5fa", wordBreak: "break-all", background: "rgba(0,0,0,0.2)", padding: "4px 8px", borderRadius: "6px" }}>
+                {mediaRoot + "/videos"}
+              </code>
+            </div>
+          </div>
+          <p style={{ fontSize: "10px", color: "rgba(240, 192, 96, 0.7)", fontStyle: "italic", margin: "6px 0 0 0", lineHeight: "1.4" }}>
+            💡 Tip: Create subdirectories inside these folders (e.g. <code style={{ fontSize: "10px", fontFamily: "monospace", color: "#f0c060" }}>/images/Lighting/Studio/</code>) and place your reference files there to automatically generate implicit tags and subtags in the browser!
+          </p>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className={importType === "video" ? "grid gap-6 md:grid-cols-[1fr_0.9fr]" : "flex flex-col gap-5 max-w-2xl mx-auto w-full"}>
         {/* Left Side: Drag & Drop Zone */}
         <div className="flex flex-col gap-3">

@@ -154,6 +154,7 @@ interface MediaCardProps {
   onNext: () => void;
   onPrev: () => void;
   onDelete: () => void;
+  onToggleFilter: () => void;
 }
 
 function MediaCard({
@@ -167,6 +168,7 @@ function MediaCard({
   onNext,
   onPrev,
   onDelete,
+  onToggleFilter,
 }: MediaCardProps) {
   const url = buildMediaUrl(rootPath, item.relativePath);
   const isVideo = item.type === "video";
@@ -363,6 +365,9 @@ function MediaCard({
             textShadow: "0 2px 4px rgba(0,0,0,0.8)",
             textAlign: "left",
             pointerEvents: "none",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
           }}
         >
           <p
@@ -374,6 +379,7 @@ function MediaCard({
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
+              width: "100%",
             }}
           >
             {item.relativePath.split("/").pop()}
@@ -387,10 +393,38 @@ function MediaCard({
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
+              width: "100%",
             }}
           >
             {item.relativePath}
           </p>
+          {item.tags && item.tags.length > 0 && (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                marginTop: 6,
+                flexWrap: "wrap",
+              }}
+            >
+              <span style={{ fontSize: 10 }}>🏷️</span>
+              <span
+                style={{
+                  fontFamily: "sans-serif",
+                  fontSize: 10,
+                  color: "rgba(240, 192, 96, 0.9)",
+                  backgroundColor: "rgba(240, 192, 96, 0.12)",
+                  border: "1px solid rgba(240, 192, 96, 0.2)",
+                  borderRadius: 4,
+                  padding: "1px 6px",
+                  fontWeight: 500,
+                }}
+              >
+                {item.tags[item.tags.length - 1]!.split("/").join(" > ")}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Right side TikTok action overlay bar */}
@@ -428,6 +462,35 @@ function MediaCard({
           >
             {index + 1}
           </div>
+
+          {/* Tag Filter Toggle Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFilter();
+            }}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: "rgba(0, 0, 0, 0.6)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              fontSize: 16,
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+              backdropFilter: "blur(8px)",
+              transition: "transform 0.15s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.1)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            title="Filter by tags"
+          >
+            🏷️
+          </button>
 
           {/* Mute/Unmute Toggle (videos only) */}
           {isVideo && (
@@ -1043,6 +1106,122 @@ function RootPicker({ onRoot, savedLocations, isLoading }: RootPickerProps) {
   );
 }
 
+// ─── Tag tree explorer panel ──────────────────────────────────────────────────
+interface TagNode {
+  name: string;
+  fullPath: string;
+  count: number;
+  children: TagNode[];
+}
+
+interface TagTreeExplorerProps {
+  nodes: TagNode[];
+  selectedTag: string | null;
+  onSelectTag: (tag: string | null) => void;
+  expandedTags: Record<string, boolean>;
+  onToggleExpand: (path: string) => void;
+}
+
+function TagTreeExplorer({
+  nodes,
+  selectedTag,
+  onSelectTag,
+  expandedTags,
+  onToggleExpand,
+}: TagTreeExplorerProps) {
+  function renderNode(node: TagNode, depth: number = 0) {
+    const isExpanded = !!expandedTags[node.fullPath];
+    const isSelected = selectedTag === node.fullPath;
+    const hasChildren = node.children.length > 0;
+
+    return (
+      <div key={node.fullPath} style={{ display: "flex", flexDirection: "column" }}>
+        <div
+          onClick={() => {
+            onSelectTag(isSelected ? null : node.fullPath);
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "8px 10px",
+            borderRadius: 8,
+            cursor: "pointer",
+            marginLeft: depth * 12,
+            backgroundColor: isSelected ? "rgba(240, 192, 96, 0.12)" : "transparent",
+            border: isSelected ? "1px solid rgba(240, 192, 96, 0.25)" : "1px solid transparent",
+            color: isSelected ? "#f0c060" : "rgba(255, 255, 255, 0.75)",
+            transition: "all 0.15s ease",
+            marginBottom: 2,
+          }}
+          className="tag-node-row"
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 6, overflow: "hidden", flex: 1 }}>
+            {hasChildren ? (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpand(node.fullPath);
+                }}
+                style={{
+                  fontSize: 10,
+                  width: 14,
+                  height: 14,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: isSelected ? "#f0c060" : "rgba(255, 255, 255, 0.4)",
+                  transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+                  transition: "transform 0.15s ease",
+                }}
+              >
+                ▶
+              </span>
+            ) : (
+              <span style={{ width: 14 }} />
+            )}
+            <span
+              style={{
+                fontSize: 13,
+                fontFamily: "monospace",
+                userSelect: "none",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              📁 {node.name}
+            </span>
+          </div>
+
+          <span
+            style={{
+              fontSize: 10,
+              fontFamily: "monospace",
+              color: isSelected ? "#f0c060" : "rgba(255, 255, 255, 0.35)",
+              marginLeft: 8,
+            }}
+          >
+            {node.count}
+          </span>
+        </div>
+
+        {hasChildren && isExpanded && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 2 }}>
+            {node.children.map((child) => renderNode(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {nodes.map((node) => renderNode(node, 0))}
+    </div>
+  );
+}
+
 // ─── Main MediaBrowser ────────────────────────────────────────────────────────
 interface MediaBrowserProps {
   onGoToSettings: () => void;
@@ -1061,6 +1240,9 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
   const [isMuted, setIsMuted] = useState(true);
   const [mediaTypeFilter, setMediaTypeFilter] = useState<"all" | "image" | "gif" | "video">("all");
   const [isMobileLayout, setIsMobileLayout] = useState(() => typeof window !== "undefined" ? window.innerWidth <= 640 : false);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [expandedTags, setExpandedTags] = useState<Record<string, boolean>>({});
+  const [showFilterOverlay, setShowFilterOverlay] = useState(false);
 
   // drag state
   const dragRef = useRef<{ startY: number; lastY: number; dragging: boolean } | null>(null);
@@ -1086,10 +1268,71 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
     };
   }, [isMobileLayout]);
 
-  const filteredItems = useMemo(() => {
-    if (mediaTypeFilter === "all") return items;
-    return items.filter((item) => item.type === mediaTypeFilter);
+  const tagTree = useMemo(() => {
+    // 1. Get items matching the current mediaTypeFilter
+    const typeFiltered = items.filter(
+      (item) => mediaTypeFilter === "all" || item.type === mediaTypeFilter
+    );
+
+    // 2. Build map of tag path -> count
+    const tagCounts: Record<string, number> = {};
+    for (const item of typeFiltered) {
+      if (!item.tags) continue;
+      for (const t of item.tags) {
+        tagCounts[t] = (tagCounts[t] || 0) + 1;
+      }
+    }
+
+    // 3. Build tree
+    const rootChildren = new Map<string, any>();
+
+    for (const tagPath of Object.keys(tagCounts)) {
+      const segments = tagPath.split("/");
+      let currentMap = rootChildren;
+      let pathAccumulator = "";
+      
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i]!;
+        pathAccumulator = pathAccumulator ? `${pathAccumulator}/${seg}` : seg;
+        
+        if (!currentMap.has(seg)) {
+          currentMap.set(seg, {
+            name: seg,
+            fullPath: pathAccumulator,
+            children: new Map(),
+          });
+        }
+        currentMap = currentMap.get(seg).children;
+      }
+    }
+
+    // Convert map to sorted TagNode array
+    function toSortedNodes(map: Map<string, any>): TagNode[] {
+      const nodes: TagNode[] = [];
+      for (const val of map.values()) {
+        nodes.push({
+          name: val.name,
+          fullPath: val.fullPath,
+          count: tagCounts[val.fullPath] || 0,
+          children: toSortedNodes(val.children),
+        });
+      }
+      return nodes.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    return toSortedNodes(rootChildren);
   }, [items, mediaTypeFilter]);
+
+  const filteredItems = useMemo(() => {
+    let result = items;
+    if (mediaTypeFilter !== "all") {
+      result = result.filter((item) => item.type === mediaTypeFilter);
+    }
+    if (selectedTag) {
+      result = result.filter((item) => item.tags?.includes(selectedTag));
+    }
+    return result;
+  }, [items, mediaTypeFilter, selectedTag]);
 
   // Reset index when filter changes
   useEffect(() => {
@@ -1097,6 +1340,8 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
     setExitDir(null);
     setPendingDir(null);
     setDragDelta(0);
+    setSelectedTag(null);
+    setShowFilterOverlay(false);
   }, [mediaTypeFilter]);
 
   const loadMedia = useCallback(async (rootPath: string) => {
@@ -1392,40 +1637,65 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
 
           {/* Middle: Filter Tabs */}
           {hasSavedRoot && items.length > 0 && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                background: "rgba(255, 255, 255, 0.02)",
-                border: "1px solid rgba(255, 255, 255, 0.05)",
-                borderRadius: 12,
-                padding: 3,
-              }}
-            >
-              {(["all", "image", "gif", "video"] as const).map((type) => {
-                const isActive = mediaTypeFilter === type;
-                return (
-                  <button
-                    key={type}
-                    onClick={() => setMediaTypeFilter(type)}
-                    style={{
-                      background: isActive ? "rgba(240, 192, 96, 0.15)" : "transparent",
-                      border: isActive ? "1px solid rgba(240, 192, 96, 0.3)" : "1px solid transparent",
-                      borderRadius: 9,
-                      color: isActive ? "#f0c060" : "rgba(255, 255, 255, 0.5)",
-                      padding: "4px 12px",
-                      cursor: "pointer",
-                      fontSize: 11,
-                      fontWeight: isActive ? 600 : 400,
-                      fontFamily: "sans-serif",
-                      transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                    }}
-                  >
-                    {filterLabels[type]}
-                  </button>
-                );
-              })}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  background: "rgba(255, 255, 255, 0.02)",
+                  border: "1px solid rgba(255, 255, 255, 0.05)",
+                  borderRadius: 12,
+                  padding: 3,
+                }}
+              >
+                {(["all", "image", "gif", "video"] as const).map((type) => {
+                  const isActive = mediaTypeFilter === type;
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => setMediaTypeFilter(type)}
+                      style={{
+                        background: isActive ? "rgba(240, 192, 96, 0.15)" : "transparent",
+                        border: isActive ? "1px solid rgba(240, 192, 96, 0.3)" : "1px solid transparent",
+                        borderRadius: 9,
+                        color: isActive ? "#f0c060" : "rgba(255, 255, 255, 0.5)",
+                        padding: "4px 12px",
+                        cursor: "pointer",
+                        fontSize: 11,
+                        fontWeight: isActive ? 600 : 400,
+                        fontFamily: "sans-serif",
+                        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                      }}
+                    >
+                      {filterLabels[type]}
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedTag && (
+                <div
+                  onClick={() => setSelectedTag(null)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 10,
+                    fontFamily: "monospace",
+                    background: "rgba(240, 192, 96, 0.12)",
+                    border: "1px solid rgba(240, 192, 96, 0.25)",
+                    color: "#f0c060",
+                    borderRadius: 6,
+                    padding: "2px 8px",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                  title="Click to clear tag filter"
+                >
+                  <span>TAG: {selectedTag.split("/").join(" > ")}</span>
+                  <span style={{ fontWeight: "bold" }}>✕</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -1497,7 +1767,64 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
                 {index + 1} / {filteredItems.length}
               </p>
             )}
+            {selectedTag && (
+              <div
+                onClick={() => setSelectedTag(null)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 9,
+                  fontFamily: "monospace",
+                  background: "rgba(240, 192, 96, 0.15)",
+                  border: "1px solid rgba(240, 192, 96, 0.3)",
+                  color: "#f0c060",
+                  borderRadius: 4,
+                  padding: "1px 6px",
+                  cursor: "pointer",
+                  pointerEvents: "auto",
+                  marginTop: 4,
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+                  alignSelf: "flex-start",
+                }}
+              >
+                <span>{selectedTag.split("/").pop()} ✕</span>
+              </div>
+            )}
           </div>
+
+          {/* Top-right: tag button */}
+          {mediaRoot && items.length > 0 && (
+            <button
+              onClick={() => setShowFilterOverlay((v) => !v)}
+              style={{
+                position: "absolute",
+                top: 14,
+                right: 125,
+                zIndex: 60,
+                background: "rgba(0,0,0,0.45)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                border: "1px solid rgba(255,255,255,0.15)",
+                borderRadius: 12,
+                color: selectedTag ? "#f0c060" : "rgba(255,255,255,0.8)",
+                fontSize: 11,
+                fontFamily: "monospace",
+                padding: "6px 10px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                letterSpacing: "0.05em",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
+              }}
+            >
+              <span style={{ fontSize: 13 }}>🏷️</span>
+              <span style={{ maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {selectedTag ? selectedTag.split("/").pop() : "Filter"}
+              </span>
+            </button>
+          )}
 
           {/* Top-right: folder button */}
           {mediaRoot && (
@@ -1663,185 +1990,381 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
         </>
       )}
 
-      {/* Stage */}
-      <div ref={stageRef} style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {showSkeleton && <SkeletonCard />}
-
-        {error && (
+      {/* Main Content Area */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          flex: 1,
+          minHeight: 0,
+          position: "relative",
+          width: "100%",
+        }}
+      >
+        {/* Desktop Sidebar */}
+        {!isMobileLayout && hasSavedRoot && !isLoading && !error && items.length > 0 && (
           <div
             style={{
-              position: "absolute",
-              inset: 0,
+              width: 260,
+              background: "rgba(255, 255, 255, 0.01)",
+              borderRight: "1px solid rgba(255, 255, 255, 0.06)",
+              padding: "16px 12px 16px 0",
               display: "flex",
               flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 12,
-              padding: 32,
-              textAlign: "center",
-              animation: "mb-fadein 0.3s ease",
+              gap: 16,
+              overflowY: "auto",
+              flexShrink: 0,
+              maxHeight: "100%",
             }}
           >
-            <p style={{ color: "#fca5a5", fontSize: 14, margin: 0 }}>{error}</p>
-            <p style={{ color: "rgba(255,255,255,0.25)", fontSize: 12, margin: 0, fontFamily: "monospace" }}>
-              {mediaRoot}
+            <p
+              style={{
+                fontFamily: "monospace",
+                fontSize: 10,
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                color: "#f0c060",
+                margin: "0 0 4px 8px",
+                fontWeight: 600,
+              }}
+            >
+              🏷️ Directory Tags
             </p>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-              <button
-                onClick={onGoToSettings}
-                style={{
-                  background: "rgba(240,192,96,0.1)",
-                  border: "1px solid rgba(240,192,96,0.2)",
-                  borderRadius: 8,
-                  color: "#f0c060",
-                  padding: "8px 16px",
-                  cursor: "pointer",
-                  fontSize: 13,
-                }}
-              >
-                Go to Settings
-              </button>
+
+            <div
+              onClick={() => setSelectedTag(null)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "8px 10px",
+                borderRadius: 8,
+                cursor: "pointer",
+                backgroundColor: !selectedTag ? "rgba(240, 192, 96, 0.12)" : "transparent",
+                border: !selectedTag ? "1px solid rgba(240, 192, 96, 0.25)" : "1px solid transparent",
+                color: !selectedTag ? "#f0c060" : "rgba(255, 255, 255, 0.75)",
+                transition: "all 0.15s ease",
+              }}
+              className="tag-node-row"
+            >
+              <span style={{ fontSize: 13, fontFamily: "monospace", userSelect: "none" }}>
+                📁 All Files
+              </span>
+              <span style={{ fontSize: 10, fontFamily: "monospace", color: !selectedTag ? "#f0c060" : "rgba(255,255,255,0.3)" }}>
+                {items.filter(item => mediaTypeFilter === "all" || item.type === mediaTypeFilter).length}
+              </span>
             </div>
-          </div>
-        )}
 
-        {showPicker && (
-          <div className="flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto gap-4" style={{ animation: "mb-fadein 0.3s ease" }}>
-            <span className="text-4xl">📁</span>
-            <h3 className="text-xl font-semibold text-white">Media folder not configured</h3>
-            <p className="text-sm text-white/50 leading-relaxed">
-              Set up your media folder path in Settings to start browsing independent loops, GIFs, and reference images.
-            </p>
-            <button
-              onClick={onGoToSettings}
-              className="mt-2 rounded-lg bg-amber-400 px-5 py-2.5 text-xs font-semibold text-[#0A0B0D] hover:bg-amber-300 transition active:scale-[0.98]"
-            >
-              Go to Settings
-            </button>
-          </div>
-        )}
-
-        {showEmptyFolder && (
-          <div className="flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto gap-4" style={{ animation: "mb-fadein 0.3s ease" }}>
-            <span className="text-4xl">📂</span>
-            <h3 className="text-xl font-semibold text-white">Media library is empty</h3>
-            <p className="text-sm text-white/50 leading-relaxed">
-              We couldn't find any supported media files (.jpg, .png, .gif, .mp4, etc.) in your media folder:
-            </p>
-            <code className="px-2.5 py-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] text-xs text-amber-300 font-mono break-all max-w-full">
-              {mediaRoot}
-            </code>
-            <p className="text-xs text-white/40">
-              Add some images, GIFs, or videos to this folder, then click refresh or re-scan.
-            </p>
-            <button
-              onClick={() => loadMedia(mediaRoot)}
-              className="mt-2 rounded-lg bg-amber-400 px-5 py-2.5 text-xs font-semibold text-[#0A0B0D] hover:bg-amber-300 transition active:scale-[0.98]"
-            >
-              Scan Folder Again
-            </button>
-          </div>
-        )}
-
-        {showEmptyFilter && (
-          <div className="flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto gap-3" style={{ animation: "mb-fadein 0.3s ease" }}>
-            <span className="text-3xl">🔍</span>
-            <h3 className="text-lg font-semibold text-white">No {mediaTypeFilter === "image" ? "images" : mediaTypeFilter === "gif" ? "GIFs" : "videos"} found</h3>
-            <p className="text-xs text-white/40 leading-relaxed">
-              We couldn't find any {mediaTypeFilter === "image" ? "image files (.jpg, .png, etc.)" : mediaTypeFilter === "gif" ? "animated GIFs (.gif)" : "video files (.mp4, etc.)"} in this folder.
-            </p>
-            <button
-              onClick={() => setMediaTypeFilter("all")}
-              className="mt-1 rounded-lg bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.12] text-white/80 px-4 py-2 text-xs font-semibold transition active:scale-[0.98]"
-            >
-              Show All Media
-            </button>
-          </div>
-        )}
-
-        {showCard && (
-          <>
-            {/* Prefetch next item silently */}
-            <Prefetch rootPath={mediaRoot} item={nextItem} />
-
-            {/* Swipe hint */}
-            {dragDelta !== 0 && (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  zIndex: 10,
-                  pointerEvents: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexDirection: "column",
-                  padding: 32,
-                }}
-              >
-                <div
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: 12,
-                    fontWeight: 800,
-                    fontSize: 20,
-                    background:
-                      dragDelta > 72
-                        ? "rgba(248,113,113,0.2)"
-                        : dragDelta < -72
-                          ? "rgba(74,222,128,0.2)"
-                          : "rgba(255,255,255,0.06)",
-                    border:
-                      dragDelta > 72
-                        ? "2px solid rgba(248,113,113,0.5)"
-                        : dragDelta < -72
-                          ? "2px solid rgba(74,222,128,0.5)"
-                          : "2px solid rgba(255,255,255,0.08)",
-                    color:
-                      dragDelta > 72 ? "#f87171" : dragDelta < -72 ? "#4ade80" : "rgba(255,255,255,0.3)",
-                    backdropFilter: "blur(8px)",
-                    transition: "all 0.08s",
-                  }}
-                >
-                  {dragDelta > 0 ? "↓" : "↑"}
-                </div>
-              </div>
+            {tagTree.length > 0 ? (
+              <TagTreeExplorer
+                nodes={tagTree}
+                selectedTag={selectedTag}
+                onSelectTag={setSelectedTag}
+                expandedTags={expandedTags}
+                onToggleExpand={(path) =>
+                  setExpandedTags((prev) => ({ ...prev, [path]: !prev[path] }))
+                }
+              />
+            ) : (
+              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.25)", fontStyle: "italic", marginLeft: 8 }}>
+                No tags found. Add subfolders under images/gifs/videos to tag.
+              </p>
             )}
+          </div>
+        )}
 
-            {/* Draggable card stage */}
+        {/* Stage */}
+        <div ref={stageRef} style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {showSkeleton && <SkeletonCard />}
+
+          {error && (
             <div
               style={{
                 position: "absolute",
                 inset: 0,
-                cursor: exitDir ? "default" : "grab",
-                transform: dragDelta
-                  ? `translateY(${dragDelta * 0.18}px)`
-                  : undefined,
-                transition: dragDelta ? "none" : "transform 0.12s ease-out",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+                padding: 32,
+                textAlign: "center",
                 animation: "mb-fadein 0.3s ease",
-                touchAction: "none",
               }}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerCancel}
             >
-              <MediaCard
-                key={`${index}-${currentItem.relativePath}`}
-                item={currentItem}
-                rootPath={mediaRoot}
-                exitDirection={exitDir}
-                onAnimationEnd={handleAnimationEnd}
-                isMuted={isMuted}
-                onToggleMute={() => setIsMuted((m) => !m)}
-                index={index}
-                onNext={() => advance("up")}
-                onPrev={() => advance("down")}
-                onDelete={() => handleDeleteMedia(currentItem)}
-              />
+              <p style={{ color: "#fca5a5", fontSize: 14, margin: 0 }}>{error}</p>
+              <p style={{ color: "rgba(255,255,255,0.25)", fontSize: 12, margin: 0, fontFamily: "monospace" }}>
+                {mediaRoot}
+              </p>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+                <button
+                  onClick={onGoToSettings}
+                  style={{
+                    background: "rgba(240,192,96,0.1)",
+                    border: "1px solid rgba(240,192,96,0.2)",
+                    borderRadius: 8,
+                    color: "#f0c060",
+                    padding: "8px 16px",
+                    cursor: "pointer",
+                    fontSize: 13,
+                  }}
+                >
+                  Go to Settings
+                </button>
+              </div>
             </div>
-          </>
-        )}
+          )}
+
+          {showPicker && (
+            <div className="flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto gap-4" style={{ animation: "mb-fadein 0.3s ease" }}>
+              <span className="text-4xl">📁</span>
+              <h3 className="text-xl font-semibold text-white">Media folder not configured</h3>
+              <p className="text-sm text-white/50 leading-relaxed">
+                Set up your media folder path in Settings to start browsing independent loops, GIFs, and reference images.
+              </p>
+              <button
+                onClick={onGoToSettings}
+                className="mt-2 rounded-lg bg-amber-400 px-5 py-2.5 text-xs font-semibold text-[#0A0B0D] hover:bg-amber-300 transition active:scale-[0.98]"
+              >
+                Go to Settings
+              </button>
+            </div>
+          )}
+
+          {showEmptyFolder && (
+            <div className="flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto gap-4" style={{ animation: "mb-fadein 0.3s ease" }}>
+              <span className="text-4xl">📂</span>
+              <h3 className="text-xl font-semibold text-white">Media library is empty</h3>
+              <p className="text-sm text-white/50 leading-relaxed">
+                We couldn't find any supported media files (.jpg, .png, .gif, .mp4, etc.) in your media folder:
+              </p>
+              <code className="px-2.5 py-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] text-xs text-amber-300 font-mono break-all max-w-full">
+                {mediaRoot}
+              </code>
+              <p className="text-xs text-white/40">
+                Add some images, GIFs, or videos to this folder, then click refresh or re-scan.
+              </p>
+              <button
+                onClick={() => loadMedia(mediaRoot)}
+                className="mt-2 rounded-lg bg-amber-400 px-5 py-2.5 text-xs font-semibold text-[#0A0B0D] hover:bg-amber-300 transition active:scale-[0.98]"
+              >
+                Scan Folder Again
+              </button>
+            </div>
+          )}
+
+          {showEmptyFilter && (
+            <div className="flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto gap-3" style={{ animation: "mb-fadein 0.3s ease" }}>
+              <span className="text-3xl">🔍</span>
+              <h3 className="text-lg font-semibold text-white">No {mediaTypeFilter === "image" ? "images" : mediaTypeFilter === "gif" ? "GIFs" : "videos"} found</h3>
+              <p className="text-xs text-white/40 leading-relaxed">
+                We couldn't find any {mediaTypeFilter === "image" ? "image files (.jpg, .png, etc.)" : mediaTypeFilter === "gif" ? "animated GIFs (.gif)" : "video files (.mp4, etc.)"} in this folder.
+              </p>
+              <button
+                onClick={() => {
+                  setMediaTypeFilter("all");
+                  setSelectedTag(null);
+                }}
+                className="mt-1 rounded-lg bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.12] text-white/80 px-4 py-2 text-xs font-semibold transition active:scale-[0.98]"
+              >
+                Show All Media
+              </button>
+            </div>
+          )}
+
+          {showCard && (
+            <>
+              {/* Prefetch next item silently */}
+              <Prefetch rootPath={mediaRoot} item={nextItem} />
+
+              {/* Swipe hint */}
+              {dragDelta !== 0 && (
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: 10,
+                    pointerEvents: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexDirection: "column",
+                    padding: 32,
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: 12,
+                      fontWeight: 800,
+                      fontSize: 20,
+                      background:
+                        dragDelta > 72
+                          ? "rgba(248,113,113,0.2)"
+                          : dragDelta < -72
+                            ? "rgba(74,222,128,0.2)"
+                            : "rgba(255,255,255,0.06)",
+                      border:
+                        dragDelta > 72
+                          ? "2px solid rgba(248,113,113,0.5)"
+                          : dragDelta < -72
+                            ? "2px solid rgba(74,222,128,0.5)"
+                            : "2px solid rgba(255,255,255,0.08)",
+                      color:
+                        dragDelta > 72 ? "#f87171" : dragDelta < -72 ? "#4ade80" : "rgba(255,255,255,0.3)",
+                      backdropFilter: "blur(8px)",
+                      transition: "all 0.08s",
+                    }}
+                  >
+                    {dragDelta > 0 ? "↓" : "↑"}
+                  </div>
+                </div>
+              )}
+
+              {/* Draggable card stage */}
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  cursor: exitDir ? "default" : "grab",
+                  transform: dragDelta
+                    ? `translateY(${dragDelta * 0.18}px)`
+                    : undefined,
+                  transition: dragDelta ? "none" : "transform 0.12s ease-out",
+                  animation: "mb-fadein 0.3s ease",
+                  touchAction: "none",
+                }}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerCancel}
+              >
+                <MediaCard
+                  key={`${index}-${currentItem.relativePath}`}
+                  item={currentItem}
+                  rootPath={mediaRoot}
+                  exitDirection={exitDir}
+                  onAnimationEnd={handleAnimationEnd}
+                  isMuted={isMuted}
+                  onToggleMute={() => setIsMuted((m) => !m)}
+                  index={index}
+                  onNext={() => advance("up")}
+                  onPrev={() => advance("down")}
+                  onDelete={() => handleDeleteMedia(currentItem)}
+                  onToggleFilter={() => setShowFilterOverlay(true)}
+                />
+              </div>
+            </>
+          )}
+
+          {/* Tag Filter Card Overlay */}
+          {showFilterOverlay && (
+            <div
+              style={{
+                position: "absolute",
+                inset: isMobileLayout ? 0 : "16px",
+                zIndex: 100,
+                background: "rgba(10, 11, 13, 0.95)",
+                backdropFilter: "blur(24px)",
+                WebkitBackdropFilter: "blur(24px)",
+                borderRadius: isMobileLayout ? 0 : 24,
+                border: isMobileLayout ? "none" : "1px solid rgba(255, 255, 255, 0.1)",
+                display: "flex",
+                flexDirection: "column",
+                padding: 24,
+                animation: "mb-fadein 0.25s ease",
+                color: "#fff",
+                width: "100%",
+                maxWidth: isMobileLayout ? "100%" : 420,
+                height: isMobileLayout ? "100%" : "calc(100% - 32px)",
+                boxShadow: "0 24px 60px rgba(0,0,0,0.8)",
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.1em", color: "#f0c060" }}>
+                  🏷️ TAG EXPLORER
+                </span>
+                <button
+                  onClick={() => setShowFilterOverlay(false)}
+                  style={{
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "none",
+                    borderRadius: "50%",
+                    color: "rgba(255, 255, 255, 0.6)",
+                    cursor: "pointer",
+                    fontSize: 16,
+                    width: 32,
+                    height: 32,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "background 0.2s",
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Clear Filter Option */}
+              <div
+                onClick={() => {
+                  setSelectedTag(null);
+                  setShowFilterOverlay(false);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  backgroundColor: !selectedTag ? "rgba(240, 192, 96, 0.12)" : "rgba(255,255,255,0.03)",
+                  border: !selectedTag ? "1px solid rgba(240, 192, 96, 0.25)" : "1px solid rgba(255, 255, 255, 0.06)",
+                  color: !selectedTag ? "#f0c060" : "rgba(255, 255, 255, 0.75)",
+                  transition: "all 0.15s ease",
+                  marginBottom: 16,
+                }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 600, fontFamily: "monospace" }}>
+                  📁 Show All Files
+                </span>
+                <span style={{ fontSize: 11, fontFamily: "monospace" }}>
+                  {items.filter(item => mediaTypeFilter === "all" || item.type === mediaTypeFilter).length}
+                </span>
+              </div>
+
+              {/* Tag Tree Container */}
+              <div style={{ flex: 1, overflowY: "auto", paddingRight: 4 }}>
+                {tagTree.length > 0 ? (
+                  <TagTreeExplorer
+                    nodes={tagTree}
+                    selectedTag={selectedTag}
+                    onSelectTag={(tag) => {
+                      setSelectedTag(tag);
+                      setShowFilterOverlay(false);
+                    }}
+                    expandedTags={expandedTags}
+                    onToggleExpand={(path) =>
+                      setExpandedTags((prev) => ({ ...prev, [path]: !prev[path] }))
+                    }
+                  />
+                ) : (
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontStyle: "italic", textAlign: "center", marginTop: 32 }}>
+                    No directories found inside images/gifs/videos.
+                  </p>
+                )}
+              </div>
+
+              {/* Footer / Tip */}
+              <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: 12, marginTop: 12, textAlign: "center" }}>
+                <p style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", margin: 0 }}>
+                  Select a tag folder to filter your inspiration deck.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Bottom controls tip — desktop only */}

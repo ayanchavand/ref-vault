@@ -27,6 +27,20 @@ function toForwardSlash(p: string): string {
   return p.split(sep).join("/");
 }
 
+function extractTagsFromPath(relativePath: string): string[] {
+  const parts = relativePath.split("/");
+  if (parts.length <= 2) return [];
+  const tags: string[] = [];
+  const intermediate = parts.slice(1, -1);
+  let currentPath = "";
+  for (const segment of intermediate) {
+    if (!segment) continue;
+    currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+    tags.push(currentPath);
+  }
+  return tags;
+}
+
 /**
  * Recursively collect all supported media files under dirPath.
  * Sub-directories are walked in parallel; stat() calls for files
@@ -61,11 +75,15 @@ async function collectMedia(
     const fullPath = join(dirPath, entry.name);
     filePromises.push(
       stat(fullPath)
-        .then((fileStats): ScannedMediaItem => ({
-          relativePath: toForwardSlash(relative(rootPath, fullPath)),
-          type,
-          sizeBytes: fileStats.size,
-        }))
+        .then((fileStats): ScannedMediaItem => {
+          const relativePath = toForwardSlash(relative(rootPath, fullPath));
+          return {
+            relativePath,
+            type,
+            sizeBytes: fileStats.size,
+            tags: extractTagsFromPath(relativePath),
+          };
+        })
         .catch(() => null), // skip unreadable files
     );
   }

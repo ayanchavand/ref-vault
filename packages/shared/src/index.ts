@@ -129,6 +129,8 @@ export interface ScannedMediaItem {
   type: ScannedMediaType;
   /** Byte size of the file */
   sizeBytes: number;
+  /** Inferred directory-based tags */
+  tags: string[];
 }
 
 export interface ScanMediaResponse {
