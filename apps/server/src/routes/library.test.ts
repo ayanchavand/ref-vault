@@ -712,6 +712,100 @@ test("deletes a media file successfully and rejects path traversal", async () =>
   }
 });
 
+test("categorizes a media file to a subcategory directory and uncategorizes it", async () => {
+  const library = await mkdtemp(join(tmpdir(), "reference-vault-"));
+  const app = await buildApp();
+
+  try {
+    const imagesDir = join(library, "images");
+    await mkdir(imagesDir, { recursive: true });
+
+    const mediaFile = join(imagesDir, "test-media.png");
+    await writeFile(mediaFile, "test-image-content");
+
+    // Initialize cache database
+    await app.inject({
+      method: "POST",
+      url: "/api/media/scan",
+      payload: { rootPath: library },
+    });
+
+    // Categorize request to a new subdirectory
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/media/categorize",
+      payload: {
+        rootPath: library,
+        mediaRelativePath: "images/test-media.png",
+        category: "images/sports/running",
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), {
+      success: true,
+      newRelativePath: "images/sports/running/test-media.png",
+      tags: ["sports", "sports/running"],
+    });
+
+    // Verify physical file moved on disk
+    const targetFile = join(library, "images", "sports", "running", "test-media.png");
+    assert.ok((await stat(targetFile)).isFile());
+    await assert.rejects(stat(mediaFile), { code: "ENOENT" });
+
+    // Uncategorize (move back to images root folder)
+    const responseUncat = await app.inject({
+      method: "POST",
+      url: "/api/media/categorize",
+      payload: {
+        rootPath: library,
+        mediaRelativePath: "images/sports/running/test-media.png",
+        category: null,
+      },
+    });
+
+    assert.equal(responseUncat.statusCode, 200);
+    assert.deepEqual(responseUncat.json(), {
+      success: true,
+      newRelativePath: "images/test-media.png",
+      tags: [],
+    });
+
+    // Verify physical file moved back to root of images folder
+    const rootFile = join(library, "images", "test-media.png");
+    assert.ok((await stat(rootFile)).isFile());
+    await assert.rejects(stat(targetFile), { code: "ENOENT" });
+
+    // Moving an image to the videos folder should fail (boundary rule)
+    const responseWrongPrefix = await app.inject({
+      method: "POST",
+      url: "/api/media/categorize",
+      payload: {
+        rootPath: library,
+        mediaRelativePath: "images/test-media.png",
+        category: "videos/sports",
+      },
+    });
+    assert.equal(responseWrongPrefix.statusCode, 400);
+
+    // Path traversal containment check should fail
+    const responseTraversal = await app.inject({
+      method: "POST",
+      url: "/api/media/categorize",
+      payload: {
+        rootPath: library,
+        mediaRelativePath: "images/test-media.png",
+        category: "../../outside",
+      },
+    });
+    assert.equal(responseTraversal.statusCode, 400);
+
+  } finally {
+    await app.close();
+    await rm(library, { force: true, recursive: true });
+  }
+});
+
 test("recursively scans media and infers implicit tagging from folder structure", async () => {
   const library = await mkdtemp(join(tmpdir(), "reference-vault-"));
   const imagesDir = join(library, "images");

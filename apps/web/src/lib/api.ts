@@ -27,6 +27,8 @@ import type {
   GetLibraryConfigResponse,
   PutLibraryConfigRequest,
   PutLibraryConfigResponse,
+  CategorizeMediaRequest,
+  CategorizeMediaResponse,
 } from "@reference-vault/shared";
 
 export class ApiError extends Error {
@@ -280,6 +282,24 @@ export async function deleteMedia(
   }
 
   return payload as DeleteMediaResponse;
+}
+
+export async function categorizeMedia(
+  request: CategorizeMediaRequest,
+): Promise<CategorizeMediaResponse> {
+  const response = await fetch("/api/media/categorize", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const payload: unknown = await response.json();
+
+  if (!response.ok) {
+    const error = payload as ApiErrorResponse;
+    throw new ApiError(error.message || "The media asset could not be categorized.");
+  }
+
+  return payload as CategorizeMediaResponse;
 }
 
 export function uploadMediaFile(

@@ -10,6 +10,7 @@ import type {
 
 import { validateLibraryRoot } from "./validate-library-root.js";
 import { writeJsonAtomically, toLibraryRelativePath } from "./write-clip-metadata.js";
+import { removeVideoFromCache, syncVaultCache } from "./cache-sync.js";
 
 type CreatePlaceholderResult =
   | { ok: true; value: CreateVideoPlaceholderResponse }
@@ -223,6 +224,7 @@ export async function deleteVideo(
 
   try {
     await rm(videoDirectory, { recursive: true, force: true });
+    removeVideoFromCache(libraryRootPath, videoRelativePath);
     return {
       ok: true,
       value: { success: true },

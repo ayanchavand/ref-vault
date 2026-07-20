@@ -14,6 +14,7 @@ import {
   writeJsonAtomically,
   toLibraryRelativePath,
 } from "./write-clip-metadata.js";
+import { syncVaultCache } from "./cache-sync.js";
 
 type WriteSplitPlanResult =
   | { ok: true; value: SaveSplitPlanResponse }
@@ -184,6 +185,8 @@ export async function writeSplitPlan(
       },
     };
   }
+
+  await syncVaultCache(rootValidation.value.rootPath);
 
   return {
     ok: true,

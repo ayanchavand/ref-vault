@@ -10,6 +10,7 @@ import type {
 } from "@reference-vault/shared";
 
 import { validateLibraryRoot } from "./validate-library-root.js";
+import { updateClipsMetadataInCache, syncVaultCache } from "./cache-sync.js";
 
 type WriteClipMetadataResult =
   | { ok: true; value: PutClipMetadataResponse }
@@ -86,6 +87,24 @@ export async function writeClipMetadata(
 
   try {
     await writeJsonAtomically(clipsMetadataPath, clipsMetadata);
+
+    const relVideoPath = toLibraryRelativePath(
+      rootValidation.value.rootPath,
+      videoDirectory.value,
+    ) || ".";
+    const clipRelPath = toLibraryRelativePath(
+      rootValidation.value.rootPath,
+      clipPath.value,
+    );
+
+    updateClipsMetadataInCache(
+      rootValidation.value.rootPath,
+      relVideoPath,
+      clipRelPath,
+      metadata,
+      clipsMetadata,
+    );
+
     return {
       ok: true,
       value: {
@@ -436,6 +455,8 @@ export async function deleteClip(
   } catch {
     // Ignore error if split_plan.json does not exist or fails to parse
   }
+
+  await syncVaultCache(rootValidation.value.rootPath);
 
   return {
     ok: true,

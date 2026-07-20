@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { ScannedMediaItem } from "@reference-vault/shared";
-import { scanMedia, deleteMedia, ApiError } from "../../lib/api";
+import { scanMedia, deleteMedia, categorizeMedia, ApiError } from "../../lib/api";
 
 // ─── Storage keys ─────────────────────────────────────────────────────────────
 const MEDIA_ROOT_KEY = "reference-vault.media-root";
@@ -155,6 +155,7 @@ interface MediaCardProps {
   onPrev: () => void;
   onDelete: () => void;
   onToggleFilter: () => void;
+  onCategorize: () => void;
 }
 
 function MediaCard({
@@ -169,6 +170,7 @@ function MediaCard({
   onPrev,
   onDelete,
   onToggleFilter,
+  onCategorize,
 }: MediaCardProps) {
   const url = buildMediaUrl(rootPath, item.relativePath);
   const isVideo = item.type === "video";
@@ -551,6 +553,35 @@ function MediaCard({
             title="Copy path"
           >
             📋
+          </button>
+
+          {/* Categorize Asset */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onCategorize();
+            }}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: "rgba(0, 0, 0, 0.6)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              fontSize: 16,
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+              backdropFilter: "blur(8px)",
+              transition: "transform 0.15s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.1)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            title="Categorize (C)"
+          >
+            📁
           </button>
 
           {/* Delete Asset */}
@@ -1222,15 +1253,115 @@ function TagTreeExplorer({
   );
 }
 
-// ─── Main MediaBrowser ────────────────────────────────────────────────────────
+// ─── Category tree explorer for the categorize overlay ───────────────────────
+interface CatTreeExplorerProps {
+  nodes: TagNode[];
+  selectedPath: string | null;
+  onSelect: (path: string) => void;
+  expandedNodes: Record<string, boolean>;
+  onToggleExpand: (path: string) => void;
+}
+
+function CatTreeExplorer({
+  nodes,
+  selectedPath,
+  onSelect,
+  expandedNodes,
+  onToggleExpand,
+}: CatTreeExplorerProps) {
+  function renderNode(node: TagNode, depth: number = 0): React.ReactNode {
+    const isExpanded = !!expandedNodes[node.fullPath];
+    const isSelected = selectedPath === node.fullPath;
+    const hasChildren = node.children.length > 0;
+
+    return (
+      <div key={node.fullPath} style={{ display: "flex", flexDirection: "column" }}>
+        <div
+          onClick={() => onSelect(node.fullPath)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "8px 10px",
+            borderRadius: 8,
+            cursor: "pointer",
+            marginLeft: depth * 14,
+            backgroundColor: isSelected ? "rgba(240, 192, 96, 0.14)" : "transparent",
+            border: isSelected ? "1px solid rgba(240, 192, 96, 0.3)" : "1px solid transparent",
+            color: isSelected ? "#f0c060" : "rgba(255, 255, 255, 0.78)",
+            transition: "all 0.12s ease",
+            marginBottom: 2,
+            gap: 6,
+          }}
+          className="tag-node-row"
+        >
+          {hasChildren ? (
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleExpand(node.fullPath);
+              }}
+              style={{
+                fontSize: 10,
+                width: 14,
+                height: 14,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: isSelected ? "#f0c060" : "rgba(255,255,255,0.4)",
+                transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+                transition: "transform 0.15s ease",
+                flexShrink: 0,
+              }}
+            >
+              ▶
+            </span>
+          ) : (
+            <span style={{ width: 14, flexShrink: 0 }} />
+          )}
+          <span
+            style={{
+              fontSize: 12,
+              fontFamily: "monospace",
+              userSelect: "none",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              flex: 1,
+            }}
+          >
+            {isSelected ? "📂" : "📁"} {node.name}
+          </span>
+        </div>
+
+        {hasChildren && isExpanded && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 2 }}>
+            {node.children.map((child) => renderNode(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {nodes.map((node) => renderNode(node, 0))}
+    </div>
+  );
+}
+
+
 interface MediaBrowserProps {
   onGoToSettings: () => void;
+}
+
+interface MediaItemWithId extends ScannedMediaItem {
+  id: string;
 }
 
 export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
   const [mediaRoot, setMediaRoot] = useState(() => localStorage.getItem(MEDIA_ROOT_KEY) ?? "");
   const [savedLocations, setSavedLocations] = useState<string[]>(loadSavedLocations);
-  const [items, setItems] = useState<ScannedMediaItem[]>([]);
+  const [items, setItems] = useState<MediaItemWithId[]>([]);
   const [index, setIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1243,6 +1374,18 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [expandedTags, setExpandedTags] = useState<Record<string, boolean>>({});
   const [showFilterOverlay, setShowFilterOverlay] = useState(false);
+  const [showCategorizeOverlay, setShowCategorizeOverlay] = useState(false);
+  const [catExpandedNodes, setCatExpandedNodes] = useState<Record<string, boolean>>({});
+  const [catSelectedPath, setCatSelectedPath] = useState<string | null>(null);
+  const [newSubName, setNewSubName] = useState("");
+
+  useEffect(() => {
+    if (!showCategorizeOverlay) {
+      setCatExpandedNodes({});
+      setCatSelectedPath(null);
+      setNewSubName("");
+    }
+  }, [showCategorizeOverlay]);
 
   // drag state
   const dragRef = useRef<{ startY: number; lastY: number; dragging: boolean } | null>(null);
@@ -1323,6 +1466,20 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
     return toSortedNodes(rootChildren);
   }, [items, mediaTypeFilter]);
 
+  const availableCategories = useMemo(() => {
+    const categories = new Set<string>();
+    for (const item of items) {
+      const parts = item.relativePath.split("/");
+      if (parts.length > 1) {
+        const dirPath = parts.slice(0, -1).join("/");
+        if (dirPath) {
+          categories.add(dirPath);
+        }
+      }
+    }
+    return Array.from(categories).sort((a, b) => a.localeCompare(b));
+  }, [items]);
+
   const filteredItems = useMemo(() => {
     let result = items;
     if (mediaTypeFilter !== "all") {
@@ -1350,7 +1507,12 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
     setShowLocations(false);
     try {
       const result = await scanMedia(rootPath);
-      setItems(shuffle(result.items));
+      setItems(
+        shuffle(result.items).map((item) => ({
+          ...item,
+          id: `${item.relativePath}-${Math.random()}`,
+        }))
+      );
       setIndex(0);
       localStorage.setItem(MEDIA_ROOT_KEY, rootPath);
       setMediaRoot(rootPath);
@@ -1373,6 +1535,37 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
     if (saved) loadMedia(saved);
   }, [loadMedia]);
 
+  const handleCategorizeMedia = useCallback(async (category: string | null) => {
+    const activeItem = filteredItems[index];
+    if (!activeItem) return;
+    try {
+      const response = await categorizeMedia({
+        rootPath: mediaRoot,
+        mediaRelativePath: activeItem.relativePath,
+        category,
+      });
+
+      if (response.success) {
+        setItems((prev) =>
+          prev.map((item) =>
+            item.relativePath === activeItem.relativePath
+              ? {
+                  ...item,
+                  relativePath: response.newRelativePath,
+                  tags: response.tags,
+                }
+              : item
+          )
+        );
+
+        setShowCategorizeOverlay(false);
+        advance("up");
+      }
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to categorize media.");
+    }
+  }, [filteredItems, index, mediaRoot]);
+
   // Keyboard navigation
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -1380,7 +1573,12 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key === "ArrowDown" || e.key === "s") advance("up");
       if (e.key === "ArrowUp" || e.key === "w") advance("down");
-      if (e.key === "Escape") setShowLocations(false);
+      if (e.key === "c" || e.key === "C") setShowCategorizeOverlay(true);
+      if (e.key === "Escape") {
+        setShowLocations(false);
+        setShowFilterOverlay(false);
+        setShowCategorizeOverlay(false);
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1499,6 +1697,44 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
   }, [mediaRoot, mediaTypeFilter]);
 
   const currentItem = filteredItems[index];
+  const currentRootSeg = currentItem?.relativePath.split("/")[0] || "";
+  // Tree of folders scoped to the current item's media-type root, for the categorize overlay
+  const categorizeCatTree = useMemo((): TagNode[] => {
+    if (!currentRootSeg) return [];
+    // Only include paths that belong to the same root segment (e.g. "videos")
+    const scoped = availableCategories.filter(
+      (cat) => cat !== currentRootSeg && cat.split("/")[0] === currentRootSeg
+    );
+
+    // Build nested map: root segment -> children
+    const rootMap = new Map<string, any>();
+    for (const catPath of scoped) {
+      const segments = catPath.split("/");
+      let currentMap = rootMap;
+      let pathAcc = "";
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i]!;
+        pathAcc = pathAcc ? `${pathAcc}/${seg}` : seg;
+        if (!currentMap.has(seg)) {
+          currentMap.set(seg, { name: seg, fullPath: pathAcc, children: new Map() });
+        }
+        currentMap = currentMap.get(seg).children;
+      }
+    }
+
+    function toNodes(map: Map<string, any>): TagNode[] {
+      const arr: TagNode[] = [];
+      for (const val of map.values()) {
+        arr.push({ name: val.name, fullPath: val.fullPath, count: 0, children: toNodes(val.children) });
+      }
+      return arr.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    // Return only the children of the root segment (skip the root itself)
+    const rootNode = rootMap.get(currentRootSeg);
+    return rootNode ? toNodes(rootNode.children) : toNodes(rootMap);
+  }, [availableCategories, currentRootSeg]);
+
   const nextItem = filteredItems.length > 0 ? filteredItems[(index + 1) % filteredItems.length] : undefined;
   const hasSavedRoot = !!mediaRoot && !error;
 
@@ -2240,7 +2476,7 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
                 onPointerCancel={onPointerCancel}
               >
                 <MediaCard
-                  key={`${index}-${currentItem.relativePath}`}
+                  key={currentItem.id}
                   item={currentItem}
                   rootPath={mediaRoot}
                   exitDirection={exitDir}
@@ -2252,6 +2488,7 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
                   onPrev={() => advance("down")}
                   onDelete={() => handleDeleteMedia(currentItem)}
                   onToggleFilter={() => setShowFilterOverlay(true)}
+                  onCategorize={() => setShowCategorizeOverlay(true)}
                 />
               </div>
             </>
@@ -2361,6 +2598,190 @@ export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
                 <p style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", margin: 0 }}>
                   Select a tag folder to filter your inspiration deck.
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* Categorize Card Overlay */}
+          {showCategorizeOverlay && (
+            <div
+              style={{
+                position: "absolute",
+                inset: isMobileLayout ? 0 : "16px",
+                zIndex: 100,
+                background: "rgba(10, 11, 13, 0.95)",
+                backdropFilter: "blur(24px)",
+                WebkitBackdropFilter: "blur(24px)",
+                borderRadius: isMobileLayout ? 0 : 24,
+                border: isMobileLayout ? "none" : "1px solid rgba(255, 255, 255, 0.1)",
+                display: "flex",
+                flexDirection: "column",
+                padding: 24,
+                animation: "mb-fadein 0.25s ease",
+                color: "#fff",
+                width: "100%",
+                maxWidth: isMobileLayout ? "100%" : 420,
+                height: isMobileLayout ? "100%" : "calc(100% - 32px)",
+                boxShadow: "0 24px 60px rgba(0,0,0,0.8)",
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.1em", color: "#f0c060" }}>
+                  📁 CATEGORIZE MEDIA
+                </span>
+                <button
+                  onClick={() => setShowCategorizeOverlay(false)}
+                  style={{
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "none",
+                    borderRadius: "50%",
+                    color: "rgba(255, 255, 255, 0.6)",
+                    cursor: "pointer",
+                    fontSize: 16,
+                    width: 32,
+                    height: 32,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Selected destination badge */}
+              <div style={{ marginBottom: 12 }}>
+                <p style={{ margin: "0 0 4px", fontSize: 10, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", fontFamily: "monospace" }}>
+                  Move to
+                </p>
+                <p style={{
+                  margin: 0,
+                  fontSize: 12,
+                  fontFamily: "monospace",
+                  color: catSelectedPath ? "#f0c060" : "rgba(255,255,255,0.3)",
+                  background: "rgba(255,255,255,0.03)",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  wordBreak: "break-all",
+                  fontStyle: catSelectedPath ? "normal" : "italic",
+                }}>
+                  {catSelectedPath ?? "— select a folder below —"}
+                </p>
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                <button
+                  onClick={() => handleCategorizeMedia(catSelectedPath ?? currentRootSeg)}
+                  disabled={!catSelectedPath}
+                  style={{
+                    flex: 1,
+                    padding: "8px",
+                    background: catSelectedPath ? "rgba(240, 192, 96, 0.15)" : "rgba(255,255,255,0.04)",
+                    border: catSelectedPath ? "1px solid rgba(240, 192, 96, 0.35)" : "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 8,
+                    color: catSelectedPath ? "#f0c060" : "rgba(255,255,255,0.3)",
+                    fontWeight: 600,
+                    fontSize: 12,
+                    cursor: catSelectedPath ? "pointer" : "not-allowed",
+                    textAlign: "center",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  Move here
+                </button>
+                <button
+                  onClick={() => handleCategorizeMedia(null)}
+                  style={{
+                    padding: "8px 12px",
+                    background: "rgba(239, 68, 68, 0.12)",
+                    border: "1px solid rgba(239, 68, 68, 0.3)",
+                    borderRadius: 8,
+                    color: "#f87171",
+                    fontWeight: 600,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  ↩ Uncategorize
+                </button>
+              </div>
+
+              {/* Folder tree */}
+              <p style={{ margin: "0 0 6px", fontSize: 10, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", fontFamily: "monospace" }}>
+                Folders — {currentRootSeg}
+              </p>
+              <div style={{ flex: 1, overflowY: "auto", paddingRight: 4 }}>
+                {categorizeCatTree.length === 0 ? (
+                  <p style={{ color: "rgba(255,255,255,0.25)", fontSize: 12, fontStyle: "italic", marginTop: 8 }}>
+                    No subfolders found inside {currentRootSeg}/.
+                  </p>
+                ) : (
+                  <CatTreeExplorer
+                    nodes={categorizeCatTree}
+                    selectedPath={catSelectedPath}
+                    onSelect={(path) => setCatSelectedPath((prev) => (prev === path ? null : path))}
+                    expandedNodes={catExpandedNodes}
+                    onToggleExpand={(path) =>
+                      setCatExpandedNodes((prev) => ({ ...prev, [path]: !prev[path] }))
+                    }
+                  />
+                )}
+
+                {/* New subfolder input — creates inside selected folder, or root if none */}
+                <div style={{ marginTop: 16, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
+                  <p style={{ margin: "0 0 6px", fontSize: 10, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", fontFamily: "monospace" }}>
+                    New subfolder inside {catSelectedPath ? `"${catSelectedPath.split("/").pop()}"` : `"${currentRootSeg}"`}
+                  </p>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      type="text"
+                      placeholder="Folder name…"
+                      value={newSubName}
+                      onChange={(e) => setNewSubName(e.target.value)}
+                      style={{
+                        flex: 1,
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: 8,
+                        padding: "8px 12px",
+                        fontSize: 12,
+                        color: "#fff",
+                        outline: "none",
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newSubName.trim()) {
+                          const target = `${catSelectedPath ?? currentRootSeg}/${newSubName.trim()}`;
+                          handleCategorizeMedia(target);
+                          setNewSubName("");
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        if (newSubName.trim()) {
+                          const target = `${catSelectedPath ?? currentRootSeg}/${newSubName.trim()}`;
+                          handleCategorizeMedia(target);
+                          setNewSubName("");
+                        }
+                      }}
+                      style={{
+                        background: "#f0c060",
+                        border: "none",
+                        borderRadius: 8,
+                        padding: "0 14px",
+                        color: "#000",
+                        fontWeight: 700,
+                        fontSize: 12,
+                        cursor: "pointer",
+                      }}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

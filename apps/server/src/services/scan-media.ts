@@ -1,108 +1,23 @@
-import { readdir, stat, rm } from "node:fs/promises";
-import { basename, dirname, extname, isAbsolute, join, relative, sep } from "node:path";
+import { rm } from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
 
 import type {
   ApiErrorResponse,
-  ScannedMediaItem,
-  ScannedMediaType,
   ScanMediaResponse,
   DeleteMediaResponse,
 } from "@reference-vault/shared";
 
 import { validateLibraryRoot } from "./validate-library-root.js";
+import {
+  syncMediaCache,
+  getCachedMediaItems,
+  removeMediaItemFromCache,
+  removeVideoFromCache,
+} from "./cache-sync.js";
 
 type ScanMediaResult =
   | { ok: true; value: ScanMediaResponse }
   | { ok: false; error: ApiErrorResponse };
-
-function inferMediaType(filename: string): ScannedMediaType | null {
-  const ext = extname(filename).toLowerCase();
-  if (ext === ".gif") return "gif";
-  if (ext === ".mp4" || ext === ".webm" || ext === ".mov") return "video";
-  if ([".jpg", ".jpeg", ".png", ".webp", ".avif"].includes(ext)) return "image";
-  return null;
-}
-
-function toForwardSlash(p: string): string {
-  return p.split(sep).join("/");
-}
-
-function extractTagsFromPath(relativePath: string): string[] {
-  const parts = relativePath.split("/");
-  if (parts.length <= 2) return [];
-  const tags: string[] = [];
-  const intermediate = parts.slice(1, -1);
-  let currentPath = "";
-  for (const segment of intermediate) {
-    if (!segment) continue;
-    currentPath = currentPath ? `${currentPath}/${segment}` : segment;
-    tags.push(currentPath);
-  }
-  return tags;
-}
-
-/**
- * Recursively collect all supported media files under dirPath.
- * Sub-directories are walked in parallel; stat() calls for files
- * within each directory are also parallel — so large flat folders
- * (hundreds of GIFs) are scanned in O(depth) awaits instead of O(n).
- */
-async function collectMedia(
-  dirPath: string,
-  rootPath: string,
-): Promise<ScannedMediaItem[]> {
-  let entries;
-  try {
-    entries = await readdir(dirPath, { withFileTypes: true });
-  } catch {
-    return []; // skip unreadable dirs
-  }
-
-  const dirs: string[] = [];
-  const filePromises: Promise<ScannedMediaItem | null>[] = [];
-
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      dirs.push(join(dirPath, entry.name));
-      continue;
-    }
-
-    if (!entry.isFile()) continue;
-
-    const type = inferMediaType(entry.name);
-    if (!type) continue;
-
-    const fullPath = join(dirPath, entry.name);
-    filePromises.push(
-      stat(fullPath)
-        .then((fileStats): ScannedMediaItem => {
-          const relativePath = toForwardSlash(relative(rootPath, fullPath));
-          return {
-            relativePath,
-            type,
-            sizeBytes: fileStats.size,
-            tags: extractTagsFromPath(relativePath),
-          };
-        })
-        .catch(() => null), // skip unreadable files
-    );
-  }
-
-  // Kick off all sub-directory walks and file stats in parallel
-  const [fileResults, ...dirResults] = await Promise.all([
-    Promise.all(filePromises),
-    ...dirs.map((d) => collectMedia(d, rootPath)),
-  ]);
-
-  const items: ScannedMediaItem[] = [];
-  for (const r of fileResults) {
-    if (r !== null) items.push(r);
-  }
-  for (const dirItems of dirResults) {
-    items.push(...dirItems);
-  }
-  return items;
-}
 
 export async function scanMedia(rootPath: string): Promise<ScanMediaResult> {
   const rootValidation = await validateLibraryRoot(rootPath);
@@ -112,10 +27,9 @@ export async function scanMedia(rootPath: string): Promise<ScanMediaResult> {
   }
 
   try {
-    const items = await collectMedia(
-      rootValidation.value.rootPath,
-      rootValidation.value.rootPath,
-    );
+    const libraryRootPath = rootValidation.value.rootPath;
+    await syncMediaCache(libraryRootPath);
+    const items = getCachedMediaItems(libraryRootPath);
 
     // Fisher-Yates shuffle so every scan starts at a random position
     for (let i = items.length - 1; i > 0; i--) {
@@ -127,7 +41,7 @@ export async function scanMedia(rootPath: string): Promise<ScanMediaResult> {
 
     return {
       ok: true,
-      value: { rootPath: rootValidation.value.rootPath, items },
+      value: { rootPath: libraryRootPath, items },
     };
   } catch {
     return {
@@ -186,9 +100,12 @@ export async function deleteMediaItem(
     // If deleting main.mp4 of a video directory, delete the whole video directory
     if (fileName.toLowerCase() === "main.mp4" && isParentContained) {
       await rm(parentDir, { recursive: true, force: true });
+      removeVideoFromCache(libraryRootPath, parentRel);
     } else {
       await rm(targetFilePath, { recursive: true, force: true });
     }
+
+    removeMediaItemFromCache(libraryRootPath, mediaRelativePath);
 
     return {
       ok: true,

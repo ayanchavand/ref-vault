@@ -251,4 +251,16 @@ export interface PutLibraryConfigResponse {
   config: LibraryConfig;
 }
 
+export interface CategorizeMediaRequest {
+  rootPath: string;
+  mediaRelativePath: string;
+  category: string | null;
+}
+
+export interface CategorizeMediaResponse {
+  success: boolean;
+  newRelativePath: string;
+  tags: string[];
+}
+
 

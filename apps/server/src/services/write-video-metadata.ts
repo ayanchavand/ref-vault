@@ -11,6 +11,7 @@ import {
   writeJsonAtomically,
   toLibraryRelativePath,
 } from "./write-clip-metadata.js";
+import { updateVideoMetadataInCache } from "./cache-sync.js";
 
 type WriteVideoMetadataResult =
   | { ok: true; value: PutVideoMetadataResponse }
@@ -27,8 +28,9 @@ export async function writeVideoMetadata(
     return rootValidation;
   }
 
+  const libraryRootPath = rootValidation.value.rootPath;
   const videoDirectory = await resolveVideoDirectory(
-    rootValidation.value.rootPath,
+    libraryRootPath,
     videoRelativePath,
   );
 
@@ -40,11 +42,18 @@ export async function writeVideoMetadata(
 
   try {
     await writeJsonAtomically(videoMetadataPath, metadata);
+
+    const relPath = toLibraryRelativePath(
+      libraryRootPath,
+      videoDirectory.value,
+    );
+    updateVideoMetadataInCache(libraryRootPath, relPath || ".", metadata);
+
     return {
       ok: true,
       value: {
         metadataPath: toLibraryRelativePath(
-          rootValidation.value.rootPath,
+          libraryRootPath,
           videoMetadataPath,
         ),
         metadata,

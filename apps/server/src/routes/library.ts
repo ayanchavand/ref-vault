@@ -34,6 +34,8 @@ import type {
   GetLibraryConfigResponse,
   PutLibraryConfigRequest,
   PutLibraryConfigResponse,
+  CategorizeMediaRequest,
+  CategorizeMediaResponse,
 } from "@reference-vault/shared";
 
 import { validateLibraryRoot } from "../services/validate-library-root.js";
@@ -48,6 +50,7 @@ import { createVideoPlaceholder, resolveUploadDirectory, deleteVideo } from "../
 import { captureFrame } from "../services/capture-frame.js";
 import { initLibraryStructure } from "../services/init-library.js";
 import { readLibraryConfig, writeLibraryConfig } from "../services/library-config.js";
+import { categorizeMediaItem } from "../services/categorize-media.js";
 
 
 export async function registerLibraryRoutes(app: FastifyInstance): Promise<void> {
@@ -933,6 +936,45 @@ export async function registerLibraryRoutes(app: FastifyInstance): Promise<void>
       const result = await deleteMediaItem(
         request.body.rootPath,
         request.body.mediaRelativePath,
+      );
+
+      if (!result.ok) {
+        const statusCode =
+          result.error.error === "LIBRARY_ROOT_NOT_FOUND" ||
+          result.error.error === "MEDIA_NOT_FOUND"
+            ? 404
+            : 400;
+        return reply.status(statusCode).send(result.error);
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  );
+
+  app.post<{
+    Body: CategorizeMediaRequest;
+    Reply: CategorizeMediaResponse | ApiErrorResponse;
+  }>(
+    "/api/media/categorize",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["rootPath", "mediaRelativePath", "category"],
+          additionalProperties: false,
+          properties: {
+            rootPath: { type: "string" },
+            mediaRelativePath: { type: "string" },
+            category: { type: ["string", "null"] },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const result = await categorizeMediaItem(
+        request.body.rootPath,
+        request.body.mediaRelativePath,
+        request.body.category,
       );
 
       if (!result.ok) {
