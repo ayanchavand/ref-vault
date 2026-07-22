@@ -44,7 +44,8 @@ export async function categorizeMediaItem(
   }
 
   const libraryRootPath = rootValidation.value.rootPath;
-  const sourceFilePath = join(libraryRootPath, mediaRelativePath);
+  let sourceFilePath = join(libraryRootPath, mediaRelativePath);
+  let effectiveMediaRel = mediaRelativePath;
 
   // Validate containment of source file
   const sourceRel = relative(libraryRootPath, sourceFilePath);
@@ -61,7 +62,7 @@ export async function categorizeMediaItem(
     };
   }
 
-  // Check if file exists
+  // Check if file exists; if not, try smart fallback resolution
   let fileStats;
   try {
     fileStats = await stat(sourceFilePath);
@@ -69,13 +70,49 @@ export async function categorizeMediaItem(
       throw new Error("Not a file");
     }
   } catch {
-    return {
-      ok: false,
-      error: {
-        error: "MEDIA_NOT_FOUND",
-        message: "The requested media file was not found.",
-      },
-    };
+    // Fallback 1: Try prepending "media/" if omitted by client
+    const fallbackMediaRel = `media/${mediaRelativePath}`;
+    const fallbackPath = join(libraryRootPath, fallbackMediaRel);
+    try {
+      const s = await stat(fallbackPath);
+      if (s.isFile()) {
+        sourceFilePath = fallbackPath;
+        effectiveMediaRel = fallbackMediaRel;
+        fileStats = s;
+      } else {
+        throw new Error("Not a file");
+      }
+    } catch {
+      // Fallback 2: Query SQLite database cache for matching relative_path
+      try {
+        const db = getVaultDb(libraryRootPath);
+        const row = db
+          .prepare("SELECT relative_path FROM media_items WHERE relative_path = ? OR relative_path LIKE ?")
+          .get(mediaRelativePath, `%/${mediaRelativePath}`) as { relative_path: string } | undefined;
+
+        if (row) {
+          const dbPath = join(libraryRootPath, row.relative_path);
+          const s = await stat(dbPath);
+          if (s.isFile()) {
+            sourceFilePath = dbPath;
+            effectiveMediaRel = row.relative_path;
+            fileStats = s;
+          } else {
+            throw new Error("Not a file");
+          }
+        } else {
+          throw new Error("Not found in cache");
+        }
+      } catch {
+        return {
+          ok: false,
+          error: {
+            error: "MEDIA_NOT_FOUND",
+            message: "The requested media file was not found.",
+          },
+        };
+      }
+    }
   }
 
   const fileName = basename(sourceFilePath);
@@ -88,7 +125,7 @@ export async function categorizeMediaItem(
   }
 
   // Determine prefix path from source file if available
-  const sourceRelParts = toForwardSlash(mediaRelativePath).split("/");
+  const sourceRelParts = toForwardSlash(effectiveMediaRel).split("/");
   const expectedIndex = sourceRelParts.lastIndexOf(expectedSubfolder);
   const prefixPath = expectedIndex > 0 ? sourceRelParts.slice(0, expectedIndex).join("/") : "";
 
@@ -165,7 +202,10 @@ export async function categorizeMediaItem(
     const db = getVaultDb(libraryRootPath);
 
     // 1. Remove old path from cache
-    db.prepare("DELETE FROM media_items WHERE relative_path = ?").run(mediaRelativePath);
+    db.prepare("DELETE FROM media_items WHERE relative_path = ? OR relative_path = ?").run(
+      mediaRelativePath,
+      effectiveMediaRel,
+    );
 
     // 2. Insert new path into cache
     const tags = extractTagsFromPath(newRelativePath);
