@@ -1,4 +1,4 @@
-import { rename, mkdir, stat } from "node:fs/promises";
+import { rename, mkdir, stat, rm } from "node:fs/promises";
 import { basename, extname, isAbsolute, join, relative, sep } from "node:path";
 import type {
   ApiErrorResponse,
@@ -80,30 +80,33 @@ export async function categorizeMediaItem(
 
   const fileName = basename(sourceFilePath);
   const mediaType = inferMediaType(fileName) || "image";
-  let expectedPrefix = "images";
+  let expectedSubfolder = "images";
   if (mediaType === "video") {
-    expectedPrefix = "videos";
+    expectedSubfolder = "videos";
   } else if (mediaType === "gif") {
-    expectedPrefix = "gifs";
+    expectedSubfolder = "gifs";
   }
+
+  // Determine prefix path from source file if available
+  const sourceRelParts = toForwardSlash(mediaRelativePath).split("/");
+  const expectedIndex = sourceRelParts.lastIndexOf(expectedSubfolder);
+  const prefixPath = expectedIndex > 0 ? sourceRelParts.slice(0, expectedIndex).join("/") : "";
 
   // Resolve target directory
   let targetCategory = category ? category.trim() : "";
   if (!targetCategory) {
-    targetCategory = expectedPrefix;
+    targetCategory = prefixPath ? `${prefixPath}/${expectedSubfolder}` : expectedSubfolder;
   }
 
-  // Validate containment of target category to the expected prefix
+  // Validate containment of target category to the expected subfolder
   const targetCategoryNormalized = toForwardSlash(targetCategory);
-  if (
-    targetCategoryNormalized !== expectedPrefix &&
-    !targetCategoryNormalized.startsWith(expectedPrefix + "/")
-  ) {
+  const targetSegments = targetCategoryNormalized.split("/");
+  if (!targetSegments.includes(expectedSubfolder)) {
     return {
       ok: false,
       error: {
         error: "INVALID_VIDEO_PATH",
-        message: `Media files of type "${mediaType}" must stay within the "${expectedPrefix}" folder.`,
+        message: `Media files of type "${mediaType}" must stay within the "${expectedSubfolder}" folder.`,
       },
     };
   }
@@ -135,8 +138,28 @@ export async function categorizeMediaItem(
     const targetFilePath = join(targetDir, fileName);
     const newRelativePath = toForwardSlash(relative(libraryRootPath, targetFilePath));
 
-    // Move file on disk
-    await rename(sourceFilePath, targetFilePath);
+    // Move or deduplicate file on disk
+    if (sourceFilePath !== targetFilePath) {
+      try {
+        const existingStats = await stat(targetFilePath);
+        if (existingStats.size === fileStats.size) {
+          // Byte duplicate! Remove source duplicate to keep library clean
+          await rm(sourceFilePath);
+        } else {
+          // File with same name but different content exists: reject move to avoid collision/overwriting
+          return {
+            ok: false,
+            error: {
+              error: "FILE_ALREADY_EXISTS",
+              message: `A different file named "${fileName}" already exists in "${targetCategory}".`,
+            },
+          };
+        }
+      } catch {
+        // Target file does not exist: move file to target destination
+        await rename(sourceFilePath, targetFilePath);
+      }
+    }
 
     // Sync in SQLite cache
     const db = getVaultDb(libraryRootPath);
@@ -184,4 +207,33 @@ function inferMediaType(filename: string): string | null {
   if (ext === ".mp4" || ext === ".webm" || ext === ".mov") return "video";
   if ([".jpg", ".jpeg", ".png", ".webp", ".avif"].includes(ext)) return "image";
   return null;
+}
+
+async function resolveNonCollidingPath(
+  sourcePath: string,
+  targetDir: string,
+  fileName: string,
+): Promise<string> {
+  const candidatePath = join(targetDir, fileName);
+  if (candidatePath === sourcePath) return candidatePath;
+
+  try {
+    await stat(candidatePath);
+    // Collision detected: append counter suffix e.g. "video (1).mp4"
+    const ext = extname(fileName);
+    const nameWithoutExt = basename(fileName, ext);
+    let counter = 1;
+    while (true) {
+      const candidateName = `${nameWithoutExt} (${counter})${ext}`;
+      const testPath = join(targetDir, candidateName);
+      try {
+        await stat(testPath);
+        counter++;
+      } catch {
+        return testPath;
+      }
+    }
+  } catch {
+    return candidatePath;
+  }
 }

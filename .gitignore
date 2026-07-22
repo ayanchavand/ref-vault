@@ -10,3 +10,5 @@ ReferenceLibrary/
 # Tooling and editor state.
 .vite/
 .eslintcache
+*.tar
+*.tar.gz

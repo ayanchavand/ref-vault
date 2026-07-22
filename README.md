@@ -68,6 +68,49 @@ Since it's all just regular folders, sharing is about as simple as it gets:
 
 No export step, no weird proprietary file to convert. It's already just files.
 
+## Running with Docker (Self-Hosted)
+
+Reference Vault can be run as a containerized local application using Docker or Docker Compose.
+
+### Quick Start with Docker Compose
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/your-username/reference-vault.git
+   cd reference-vault
+   ```
+
+2. **Start the application**:
+   ```bash
+   LIBRARY_PATH="/path/to/your/Reference Library" docker compose up -d
+   ```
+   Replace `/path/to/your/Reference Library` with the local directory on your machine where your reference videos and images live.
+
+3. **Access the web app**:
+   Open [http://localhost:4310](http://localhost:4310) in your browser. When initializing or scanning the library in the app interface, use `/library` as your storage path (this matches the container volume mount).
+
+### Running directly with `docker run`
+
+```bash
+docker build -t reference-vault:latest .
+
+docker run -d \
+  --name reference-vault \
+  -p 4310:4310 \
+  -v "/path/to/your/Reference Library:/library" \
+  reference-vault:latest
+```
+
+### Local Development with Docker Compose
+
+For live hot-reloading development inside containers:
+
+```bash
+docker compose -f docker-compose.dev.yml up
+```
+
+Access the Vite dev server at [http://localhost:5173](http://localhost:5173).
+
 ## Philosophy
 
 Reference Vault isn't trying to own your content — it's just here to help you organize it. Your files stay exactly where they are, and all the metadata sits alongside them in plain, readable JSON. That means backups are trivial, migrating somewhere else doesn't require any special tooling, and you're never at the mercy of an app deciding to shut down or change its pricing.

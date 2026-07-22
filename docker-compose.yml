@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  reference-vault:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: reference-vault:latest
+    container_name: reference-vault
+    ports:
+      - "${PORT:-4310}:4310"
+    environment:
+      - PORT=4310
+      - HOST=0.0.0.0
+      - DEFAULT_LIBRARY_PATH=/library
+    volumes:
+      # Bind mount host reference library to container storage path
+      - ${LIBRARY_PATH:-./Reference Library}:/library
+    restart: unless-stopped

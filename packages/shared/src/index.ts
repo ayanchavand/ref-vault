@@ -158,7 +158,8 @@ export type LibraryRootValidationErrorCode =
   | "MEDIA_SCAN_FAILED"
   | "FRAME_CAPTURE_FAILED"
   | "CONFIG_READ_FAILED"
-  | "CONFIG_WRITE_FAILED";
+  | "CONFIG_WRITE_FAILED"
+  | "FILE_ALREADY_EXISTS";
 
 export interface ApiErrorResponse {
   error: LibraryRootValidationErrorCode;

@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: reference-vault-dev-server
+    command: npm run dev --workspace=@reference-vault/server
+    ports:
+      - "4310:4310"
+    environment:
+      - PORT=4310
+      - HOST=0.0.0.0
+      - DEFAULT_LIBRARY_PATH=/library
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ${LIBRARY_PATH:-./Reference Library}:/library
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: reference-vault-dev-web
+    command: npm run dev --workspace=@reference-vault/web -- --host 0.0.0.0
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - server
