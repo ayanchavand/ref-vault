@@ -314,7 +314,13 @@ function ClipCard({
     )}`;
   }, [rootPath, clip.mediaPath]);
 
-  const { containerRef, poster } = useLazyThumbnail({ mediaUrl });
+  const posterUrl = useMemo(() => {
+    return `/api/media/thumbnail?rootPath=${encodeURIComponent(rootPath)}&mediaPath=${encodeURIComponent(
+      clip.mediaPath,
+    )}`;
+  }, [rootPath, clip.mediaPath]);
+
+  const { containerRef, poster } = useLazyThumbnail({ mediaUrl, posterUrl });
   const prefetchHandlers = usePrefetchOnHover(mediaUrl);
 
   return (
