@@ -104,7 +104,7 @@ func TestScanLibraryAndVideosDetailEndpoints(t *testing.T) {
 	r, tempDir := setupTestServer(t)
 
 	vidDir := filepath.Join(tempDir, "sample-video")
-	_ = os.MkdirAll(vidDir, 0755)
+	_ = os.MkdirAll(filepath.Join(vidDir, "clips"), 0755)
 	_ = os.WriteFile(filepath.Join(vidDir, "main.mp4"), []byte("mp4 dummy content"), 0644)
 	_ = os.WriteFile(filepath.Join(vidDir, "metadata.json"), []byte(`{"title":"Sample"}`), 0644)
 
@@ -237,4 +237,60 @@ func TestMediaFileStreamingAndSecurity(t *testing.T) {
 	if badW.Code != http.StatusBadRequest {
 		t.Errorf("Expected status 400 Bad Request for path traversal attempt, got %d", badW.Code)
 	}
+
+	// Unsupported extension attempt
+	txtPath := filepath.Join(tempDir, "secret.txt")
+	_ = os.WriteFile(txtPath, []byte("secret content"), 0644)
+	unsupportedReq := httptest.NewRequest("GET", "/api/media?rootPath="+tempDir+"&mediaPath=secret.txt", nil)
+	unsupportedW := httptest.NewRecorder()
+	r.ServeHTTP(unsupportedW, unsupportedReq)
+
+	if unsupportedW.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 Bad Request for unsupported file extension, got %d", unsupportedW.Code)
+	}
 }
+
+func TestDeleteVideoRootProtection(t *testing.T) {
+	r, tempDir := setupTestServer(t)
+
+	// Attempting to delete with empty videoRelativePath
+	delBody, _ := json.Marshal(models.DeleteVideoRequest{
+		RootPath:          tempDir,
+		VideoRelativePath: "",
+	})
+	delReq := httptest.NewRequest("POST", "/api/videos/delete", bytes.NewBuffer(delBody))
+	delReq.Header.Set("Content-Type", "application/json")
+
+	delW := httptest.NewRecorder()
+	r.ServeHTTP(delW, delReq)
+
+	if delW.Code != http.StatusBadRequest {
+		t.Fatalf("Expected status 400 for empty videoRelativePath delete attempt, got %d", delW.Code)
+	}
+
+	// Verify tempDir still exists
+	if _, err := os.Stat(tempDir); err != nil {
+		t.Fatalf("Library root directory was deleted by delete request!")
+	}
+}
+
+func TestPutClipMetadataNonExistentClip(t *testing.T) {
+	r, tempDir := setupTestServer(t)
+
+	putBody, _ := json.Marshal(models.PutClipMetadataRequest{
+		RootPath:          tempDir,
+		VideoRelativePath: "sample-video",
+		ClipMediaPath:     "sample-video/clips/scene_01.mp4",
+		Metadata:          map[string]interface{}{"tags": []string{"action"}},
+	})
+	putReq := httptest.NewRequest("PUT", "/api/clips/metadata", bytes.NewBuffer(putBody))
+	putReq.Header.Set("Content-Type", "application/json")
+
+	putW := httptest.NewRecorder()
+	r.ServeHTTP(putW, putReq)
+
+	if putW.Code != http.StatusNotFound {
+		t.Fatalf("Expected status 404 for non-existent clip metadata update, got %d", putW.Code)
+	}
+}
+

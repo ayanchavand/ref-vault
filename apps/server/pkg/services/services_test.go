@@ -80,7 +80,7 @@ func TestSyncAndGetCachedVideos(t *testing.T) {
 	tempDir := t.TempDir()
 
 	videoDir := filepath.Join(tempDir, "test-vid")
-	_ = os.MkdirAll(videoDir, 0755)
+	_ = os.MkdirAll(filepath.Join(videoDir, "clips"), 0755)
 	_ = os.WriteFile(filepath.Join(videoDir, "main.mp4"), []byte("fake mp4 data"), 0644)
 	_ = os.WriteFile(filepath.Join(videoDir, "metadata.json"), []byte(`{"title":"Test"}`), 0644)
 

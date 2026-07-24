@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os/exec"
 )
 
@@ -115,8 +116,10 @@ func CaptureFrame(videoPath string, timestamp float64, outputPath string) error 
 	var args []string
 	args = append(args, "-y")
 	if timestamp > 10 {
-		fastSeek := fmt.Sprintf("%.0f", timestamp-10)
-		slowSeek := fmt.Sprintf("%.3f", 10.0+(timestamp-float64(int(timestamp))))
+		fastSeekInt := int(math.Floor(timestamp - 10))
+		slowSeekVal := timestamp - float64(fastSeekInt)
+		fastSeek := fmt.Sprintf("%d", fastSeekInt)
+		slowSeek := fmt.Sprintf("%.3f", slowSeekVal)
 		args = append(args, "-ss", fastSeek, "-i", videoPath, "-ss", slowSeek)
 	} else {
 		args = append(args, "-i", videoPath, "-ss", fmt.Sprintf("%.3f", timestamp))

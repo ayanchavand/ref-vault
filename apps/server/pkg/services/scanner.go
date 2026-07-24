@@ -74,23 +74,35 @@ func findVideoDirs(rootPath, currentPath string) ([]discoveredVideo, error) {
 
 	var results []discoveredVideo
 	hasMainMP4 := false
-	var dirMtime int64
+	hasClipsDir := false
+	var maxMtime int64
 
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.ToLower(entry.Name()) == "main.mp4" {
+		name := strings.ToLower(entry.Name())
+		if !entry.IsDir() && name == "main.mp4" {
 			hasMainMP4 = true
 			if info, err := entry.Info(); err == nil {
-				dirMtime = info.ModTime().UnixMilli()
+				if info.ModTime().UnixMilli() > maxMtime {
+					maxMtime = info.ModTime().UnixMilli()
+				}
+			}
+		} else if entry.IsDir() && name == "clips" {
+			hasClipsDir = true
+		} else if !entry.IsDir() && (name == "metadata.json" || name == "clips.json") {
+			if info, err := entry.Info(); err == nil {
+				if info.ModTime().UnixMilli() > maxMtime {
+					maxMtime = info.ModTime().UnixMilli()
+				}
 			}
 		}
 	}
 
-	if hasMainMP4 {
+	if hasMainMP4 && hasClipsDir {
 		relPath, _ := filepath.Rel(rootPath, currentPath)
 		results = append(results, discoveredVideo{
 			dirPath:      currentPath,
 			videoRelPath: toForwardSlash(relPath),
-			mtimeMs:      dirMtime,
+			mtimeMs:      maxMtime,
 			entries:      entries,
 		})
 	}
@@ -344,16 +356,14 @@ func ResequenceSceneClips(libraryRoot, videoDirPath, videoRelPath, clipPath stri
 
 	// Sync split_plan.json if exists
 	splitPlanPath := filepath.Join(videoDirPath, "split_plan.json")
-	var splitPlan struct {
-		VideoRelativePath string                `json:"videoRelativePath"`
-		MainVideoPath     string                `json:"mainVideoPath"`
-		Segments          []models.SplitSegment `json:"segments"`
-	}
-	if err := ReadJSONFile(splitPlanPath, &splitPlan); err == nil && len(splitPlan.Segments) > 0 {
-		segmentIndex := deletedIndex - 1
-		if segmentIndex >= 0 && segmentIndex < len(splitPlan.Segments) {
-			splitPlan.Segments = append(splitPlan.Segments[:segmentIndex], splitPlan.Segments[segmentIndex+1:]...)
-			_ = WriteJSONFile(splitPlanPath, splitPlan)
+	var splitPlan map[string]interface{}
+	if err := ReadJSONFile(splitPlanPath, &splitPlan); err == nil && splitPlan != nil {
+		if segsRaw, ok := splitPlan["segments"].([]interface{}); ok && len(segsRaw) > 0 {
+			segmentIndex := deletedIndex - 1
+			if segmentIndex >= 0 && segmentIndex < len(segsRaw) {
+				splitPlan["segments"] = append(segsRaw[:segmentIndex], segsRaw[segmentIndex+1:]...)
+				_ = WriteJSONFile(splitPlanPath, splitPlan)
+			}
 		}
 	}
 

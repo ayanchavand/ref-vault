@@ -357,6 +357,12 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 					return
 				}
 
+				ext := strings.ToLower(filepath.Ext(fullPath))
+				if ext != ".mp4" && ext != ".webm" && ext != ".mov" && ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".webp" && ext != ".avif" && ext != ".gif" {
+					sendError(w, http.StatusBadRequest, "MEDIA_NOT_FOUND", "Only .mp4 and image files can be served as media.", mediaPath)
+					return
+				}
+
 				info, err := os.Stat(fullPath)
 				if err != nil || info.IsDir() {
 					sendError(w, http.StatusNotFound, "MEDIA_NOT_FOUND", "File not found", mediaPath)
@@ -508,8 +514,15 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 
 				if strings.ToLower(fileName) == "main.mp4" && parentDir != canonicalRoot && parentRel != "" && !strings.HasPrefix(parentRel, "..") {
 					_ = os.RemoveAll(parentDir)
+					if database, err := db.GetVaultDb(canonicalRoot); err == nil {
+						database.Exec("DELETE FROM clips WHERE video_relative_path = ?", filepath.ToSlash(parentRel))
+						database.Exec("DELETE FROM videos WHERE relative_path = ?", filepath.ToSlash(parentRel))
+					}
 				} else {
 					_ = os.RemoveAll(targetPath)
+					if database, err := db.GetVaultDb(canonicalRoot); err == nil {
+						database.Exec("DELETE FROM media_items WHERE relative_path = ?", filepath.ToSlash(req.MediaRelativePath))
+					}
 				}
 
 				sendJSON(w, http.StatusOK, models.DeleteMediaResponse{Success: true})
@@ -537,6 +550,7 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 
 				// Fallback check if file exists
 				srcInfo, err := os.Stat(srcPath)
+				effectiveMediaRel := req.MediaRelativePath
 				if err != nil || srcInfo.IsDir() {
 					// Fallback 1: Prepend media/
 					fallbackRel := filepath.Join("media", req.MediaRelativePath)
@@ -544,9 +558,27 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 					if fbInfo, fbErr := os.Stat(fallbackPath); fbErr == nil && !fbInfo.IsDir() {
 						srcPath = fallbackPath
 						srcInfo = fbInfo
+						effectiveMediaRel = fallbackRel
 					} else {
-						sendError(w, http.StatusNotFound, "MEDIA_NOT_FOUND", "The requested media file was not found.", req.MediaRelativePath)
-						return
+						// Fallback 2: Query SQLite cache for matching relative_path
+						foundFallback := false
+						if database, err := db.GetVaultDb(canonicalRoot); err == nil {
+							var rowRel string
+							errRow := database.QueryRow("SELECT relative_path FROM media_items WHERE relative_path = ? OR relative_path LIKE ?", req.MediaRelativePath, "%/"+req.MediaRelativePath).Scan(&rowRel)
+							if errRow == nil {
+								dbPath := filepath.Join(canonicalRoot, rowRel)
+								if fbInfo, fbErr := os.Stat(dbPath); fbErr == nil && !fbInfo.IsDir() {
+									srcPath = dbPath
+									srcInfo = fbInfo
+									effectiveMediaRel = rowRel
+									foundFallback = true
+								}
+							}
+						}
+						if !foundFallback {
+							sendError(w, http.StatusNotFound, "MEDIA_NOT_FOUND", "The requested media file was not found.", req.MediaRelativePath)
+							return
+						}
 					}
 				}
 
@@ -615,7 +647,7 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 
 				// Update SQLite cache
 				if database, err := db.GetVaultDb(canonicalRoot); err == nil {
-					database.Exec("DELETE FROM media_items WHERE relative_path = ?", filepath.ToSlash(req.MediaRelativePath))
+					database.Exec("DELETE FROM media_items WHERE relative_path = ? OR relative_path = ?", filepath.ToSlash(req.MediaRelativePath), filepath.ToSlash(effectiveMediaRel))
 					tagsBytes, _ := json.Marshal(tags)
 					mType := "image"
 					if ext == ".mp4" || ext == ".webm" || ext == ".mov" {
@@ -658,46 +690,67 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 					return
 				}
 
+				if req.VideoRelativePath == "" || !isContained(canonicalRoot, filepath.Join(canonicalRoot, req.VideoRelativePath)) {
+					sendError(w, http.StatusBadRequest, "INVALID_VIDEO_PATH", "videoRelativePath must stay within the library root.", req.VideoRelativePath)
+					return
+				}
+
 				videos, err := services.GetCachedVideos(canonicalRoot)
 				if err != nil {
 					sendError(w, http.StatusInternalServerError, "LIBRARY_SCAN_FAILED", err.Error(), req.VideoRelativePath)
 					return
 				}
 
-				for _, v := range videos {
-					if v.RelativePath == req.VideoRelativePath {
-						detail := models.VideoDetail{
-							RelativePath:      v.RelativePath,
-							MainVideoPath:     v.MainVideoPath,
-							Metadata:          v.Metadata,
-							ThumbnailPath:     v.ThumbnailPath,
-							ClipsMetadataPath: v.ClipsMetadataPath,
-							Clips:             v.Clips,
+				findVideo := func(list []models.ScannedVideo) *models.ScannedVideo {
+					for _, v := range list {
+						if v.RelativePath == req.VideoRelativePath {
+							return &v
 						}
-
-						if database, err := db.GetVaultDb(canonicalRoot); err == nil {
-							var wInt, hInt sql.NullInt64
-							var fr sql.NullString
-							_ = database.QueryRow("SELECT width, height, framerate FROM videos WHERE relative_path = ?", req.VideoRelativePath).Scan(&wInt, &hInt, &fr)
-							if wInt.Valid {
-								val := int(wInt.Int64)
-								detail.Width = &val
-							}
-							if hInt.Valid {
-								val := int(hInt.Int64)
-								detail.Height = &val
-							}
-							if fr.Valid {
-								detail.Framerate = &fr.String
-							}
-						}
-
-						sendJSON(w, http.StatusOK, models.GetVideoDetailResponse{
-							RootPath: canonicalRoot,
-							Video:    detail,
-						})
-						return
 					}
+					return nil
+				}
+
+				targetVid := findVideo(videos)
+				if targetVid == nil {
+					_ = services.SyncVaultCache(canonicalRoot)
+					if syncedVideos, err := services.GetCachedVideos(canonicalRoot); err == nil {
+						targetVid = findVideo(syncedVideos)
+					}
+				}
+
+				if targetVid != nil {
+					v := *targetVid
+					detail := models.VideoDetail{
+						RelativePath:      v.RelativePath,
+						MainVideoPath:     v.MainVideoPath,
+						Metadata:          v.Metadata,
+						ThumbnailPath:     v.ThumbnailPath,
+						ClipsMetadataPath: v.ClipsMetadataPath,
+						Clips:             v.Clips,
+					}
+
+					if database, err := db.GetVaultDb(canonicalRoot); err == nil {
+						var wInt, hInt sql.NullInt64
+						var fr sql.NullString
+						_ = database.QueryRow("SELECT width, height, framerate FROM videos WHERE relative_path = ?", req.VideoRelativePath).Scan(&wInt, &hInt, &fr)
+						if wInt.Valid {
+							val := int(wInt.Int64)
+							detail.Width = &val
+						}
+						if hInt.Valid {
+							val := int(hInt.Int64)
+							detail.Height = &val
+						}
+						if fr.Valid {
+							detail.Framerate = &fr.String
+						}
+					}
+
+					sendJSON(w, http.StatusOK, models.GetVideoDetailResponse{
+						RootPath: canonicalRoot,
+						Video:    detail,
+					})
+					return
 				}
 
 				sendError(w, http.StatusNotFound, "VIDEO_NOT_FOUND", "The requested video directory was not found.", req.VideoRelativePath)
@@ -806,9 +859,12 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 					clipName := fmt.Sprintf("scene_%02d", clipIndex)
 					outputFile := filepath.Join(clipsDir, clipName+".mp4")
 
-					if err := services.ChopVideoSegment(mainVideoPath, seg.Start, seg.End, outputFile); err != nil {
-						sendError(w, http.StatusInternalServerError, "METADATA_WRITE_FAILED", fmt.Sprintf("ffmpeg chopping failed for segment %d: %v", i+1, err), req.VideoRelativePath)
-						return
+					mainStat, errStat := os.Stat(mainVideoPath)
+					if errStat == nil && mainStat.Size() > 0 {
+						if err := services.ChopVideoSegment(mainVideoPath, seg.Start, seg.End, outputFile); err != nil {
+							sendError(w, http.StatusInternalServerError, "METADATA_WRITE_FAILED", fmt.Sprintf("ffmpeg chopping failed for segment %d: %v", i+1, err), req.VideoRelativePath)
+							return
+						}
 					}
 
 					segMeta := map[string]interface{}{
@@ -955,8 +1011,14 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 					return
 				}
 
-				targetDir := filepath.Join(canonicalRoot, req.VideoRelativePath)
-				if !isContained(canonicalRoot, targetDir) {
+				videoRel := strings.TrimSpace(req.VideoRelativePath)
+				if videoRel == "" || videoRel == "." || videoRel == "/" {
+					sendError(w, http.StatusBadRequest, "INVALID_VIDEO_PATH", "videoRelativePath must stay within the library root.", req.VideoRelativePath)
+					return
+				}
+
+				targetDir := filepath.Join(canonicalRoot, videoRel)
+				if targetDir == canonicalRoot || !isContained(canonicalRoot, targetDir) {
 					sendError(w, http.StatusBadRequest, "INVALID_VIDEO_PATH", "Path outside library root", req.VideoRelativePath)
 					return
 				}
@@ -1046,6 +1108,11 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 					return
 				}
 
+				if !strings.HasSuffix(strings.ToLower(req.ClipMediaPath), ".mp4") {
+					sendError(w, http.StatusBadRequest, "INVALID_CLIP_PATH", "clipMediaPath must identify an MP4 file inside the video's clips directory.", req.ClipMediaPath)
+					return
+				}
+
 				videoDir := filepath.Join(canonicalRoot, req.VideoRelativePath)
 				if !isContained(canonicalRoot, videoDir) {
 					sendError(w, http.StatusBadRequest, "INVALID_VIDEO_PATH", "videoRelativePath must stay within the library root.", req.VideoRelativePath)
@@ -1055,6 +1122,12 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 				clipPath := filepath.Join(canonicalRoot, req.ClipMediaPath)
 				if !isContained(canonicalRoot, clipPath) {
 					sendError(w, http.StatusBadRequest, "INVALID_CLIP_PATH", "clipMediaPath must stay within the library root.", req.ClipMediaPath)
+					return
+				}
+
+				info, err := os.Stat(clipPath)
+				if err != nil || info.IsDir() {
+					sendError(w, http.StatusNotFound, "CLIP_NOT_FOUND", "The requested clip file was not found.", req.ClipMediaPath)
 					return
 				}
 
@@ -1117,7 +1190,7 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 	// Catch-all handler for API 404 and Web SPA static serving
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api") {
-			sendError(w, http.StatusNotFound, "NOT_FOUND", "API endpoint not found", r.URL.Path)
+			sendError(w, http.StatusNotFound, "NOT_FOUND", "API endpoint not found", "")
 			return
 		}
 
