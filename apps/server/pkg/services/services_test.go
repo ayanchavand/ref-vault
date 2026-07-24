@@ -98,9 +98,12 @@ func TestSyncAndGetCachedVideos(t *testing.T) {
 	tempDir := t.TempDir()
 
 	videoDir := filepath.Join(tempDir, "test-vid")
-	_ = os.MkdirAll(filepath.Join(videoDir, "clips"), 0755)
+	clipsDir := filepath.Join(videoDir, "clips")
+	_ = os.MkdirAll(clipsDir, 0755)
 	_ = os.WriteFile(filepath.Join(videoDir, "main.mp4"), []byte("fake mp4 data"), 0644)
 	_ = os.WriteFile(filepath.Join(videoDir, "metadata.json"), []byte(`{"title":"Test"}`), 0644)
+	_ = os.WriteFile(filepath.Join(clipsDir, "scene_01.mp4"), []byte("clip mp4"), 0644)
+	_ = os.WriteFile(filepath.Join(clipsDir, "scene_01.jpg"), []byte("clip thumbnail jpg"), 0644)
 
 	if err := SyncVaultCache(tempDir); err != nil {
 		t.Fatalf("SyncVaultCache failed: %v", err)
@@ -116,6 +119,12 @@ func TestSyncAndGetCachedVideos(t *testing.T) {
 	}
 	if videos[0].RelativePath != "test-vid" {
 		t.Errorf("Expected relative path test-vid, got %s", videos[0].RelativePath)
+	}
+	if len(videos[0].Clips) != 1 {
+		t.Fatalf("Expected exactly 1 clip (scene_01.mp4), got %d", len(videos[0].Clips))
+	}
+	if videos[0].Clips[0].MediaPath != "test-vid/clips/scene_01.mp4" {
+		t.Errorf("Expected clip path test-vid/clips/scene_01.mp4, got %s", videos[0].Clips[0].MediaPath)
 	}
 }
 

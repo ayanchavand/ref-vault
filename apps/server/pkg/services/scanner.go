@@ -175,72 +175,79 @@ func SyncVaultCache(libraryRoot string) error {
 		var existingMtime int64
 		err := database.QueryRow("SELECT mtime_ms FROM videos WHERE relative_path = ?", v.videoRelPath).Scan(&existingMtime)
 
-		if err == nil && existingMtime >= v.mtimeMs {
-			continue
-		}
+		if err != nil || existingMtime < v.mtimeMs {
+			mainVideoPath := toForwardSlash(filepath.Join(v.videoRelPath, "main.mp4"))
 
-		mainVideoPath := toForwardSlash(filepath.Join(v.videoRelPath, "main.mp4"))
+			var thumbnailPath *string
+			var metadataPath *string
+			var metadataJSON *string
+			var clipsMetadataPath *string
+			var clipsMetadataJSON *string
 
-		var thumbnailPath *string
-		var metadataPath *string
-		var metadataJSON *string
-		var clipsMetadataPath *string
-		var clipsMetadataJSON *string
-
-		for _, entry := range v.entries {
-			name := entry.Name()
-			if !entry.IsDir() {
-				if name == "thumbnail.jpg" {
-					str := toForwardSlash(filepath.Join(v.videoRelPath, "thumbnail.jpg"))
-					thumbnailPath = &str
-				} else if name == "metadata.json" {
-					str := toForwardSlash(filepath.Join(v.videoRelPath, "metadata.json"))
-					metadataPath = &str
-					if data, err := os.ReadFile(filepath.Join(v.dirPath, "metadata.json")); err == nil {
-						s := string(data)
-						metadataJSON = &s
-					}
-				} else if name == "clips.json" {
-					str := toForwardSlash(filepath.Join(v.videoRelPath, "clips.json"))
-					clipsMetadataPath = &str
-					if data, err := os.ReadFile(filepath.Join(v.dirPath, "clips.json")); err == nil {
-						s := string(data)
-						clipsMetadataJSON = &s
+			for _, entry := range v.entries {
+				name := entry.Name()
+				if !entry.IsDir() {
+					if name == "thumbnail.jpg" {
+						str := toForwardSlash(filepath.Join(v.videoRelPath, "thumbnail.jpg"))
+						thumbnailPath = &str
+					} else if name == "metadata.json" {
+						str := toForwardSlash(filepath.Join(v.videoRelPath, "metadata.json"))
+						metadataPath = &str
+						if data, err := os.ReadFile(filepath.Join(v.dirPath, "metadata.json")); err == nil {
+							s := string(data)
+							metadataJSON = &s
+						}
+					} else if name == "clips.json" {
+						str := toForwardSlash(filepath.Join(v.videoRelPath, "clips.json"))
+						clipsMetadataPath = &str
+						if data, err := os.ReadFile(filepath.Join(v.dirPath, "clips.json")); err == nil {
+							s := string(data)
+							clipsMetadataJSON = &s
+						}
 					}
 				}
 			}
+
+			probe, _ := ProbeVideo(filepath.Join(v.dirPath, "main.mp4"))
+			now := time.Now().UnixMilli()
+
+			_, err = database.Exec(`
+				INSERT INTO videos (
+					relative_path, main_video_path, thumbnail_path, metadata_path, metadata_json,
+					clips_metadata_path, clips_metadata_json, width, height, framerate, mtime_ms, updated_at
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				ON CONFLICT(relative_path) DO UPDATE SET
+					main_video_path = excluded.main_video_path,
+					thumbnail_path = excluded.thumbnail_path,
+					metadata_path = excluded.metadata_path,
+					metadata_json = excluded.metadata_json,
+					clips_metadata_path = excluded.clips_metadata_path,
+					clips_metadata_json = excluded.clips_metadata_json,
+					width = excluded.width,
+					height = excluded.height,
+					framerate = excluded.framerate,
+					mtime_ms = excluded.mtime_ms,
+					updated_at = excluded.updated_at
+			`, v.videoRelPath, mainVideoPath, thumbnailPath, metadataPath, metadataJSON,
+				clipsMetadataPath, clipsMetadataJSON, probe.Width, probe.Height, probe.Framerate, v.mtimeMs, now)
+
+			if err != nil {
+				fmt.Printf("Error inserting video into sqlite: %v\n", err)
+			}
 		}
 
-		probe, _ := ProbeVideo(filepath.Join(v.dirPath, "main.mp4"))
-		now := time.Now().UnixMilli()
-
-		_, err = database.Exec(`
-			INSERT INTO videos (
-				relative_path, main_video_path, thumbnail_path, metadata_path, metadata_json,
-				clips_metadata_path, clips_metadata_json, width, height, framerate, mtime_ms, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT(relative_path) DO UPDATE SET
-				main_video_path = excluded.main_video_path,
-				thumbnail_path = excluded.thumbnail_path,
-				metadata_path = excluded.metadata_path,
-				metadata_json = excluded.metadata_json,
-				clips_metadata_path = excluded.clips_metadata_path,
-				clips_metadata_json = excluded.clips_metadata_json,
-				width = excluded.width,
-				height = excluded.height,
-				framerate = excluded.framerate,
-				mtime_ms = excluded.mtime_ms,
-				updated_at = excluded.updated_at
-		`, v.videoRelPath, mainVideoPath, thumbnailPath, metadataPath, metadataJSON,
-			clipsMetadataPath, clipsMetadataJSON, probe.Width, probe.Height, probe.Framerate, v.mtimeMs, now)
-
-		if err != nil {
-			fmt.Printf("Error inserting video into sqlite: %v\n", err)
-		}
-
-		// Scan clips inside video directory
+		// Always scan clips inside video directory so SQLite cache stays updated
 		scanClipsForVideo(database, libraryRoot, v.dirPath, v.videoRelPath)
 	}
+
+	// Clean up stale or non-video/non-gif clips in DB
+	database.Exec(`
+		DELETE FROM clips 
+		WHERE LOWER(media_path) NOT LIKE '%.mp4' 
+		  AND LOWER(media_path) NOT LIKE '%.webm' 
+		  AND LOWER(media_path) NOT LIKE '%.mov' 
+		  AND LOWER(media_path) NOT LIKE '%.gif'
+	`)
 
 	// Clean up stale video records in DB
 	rows, err := database.Query("SELECT relative_path FROM videos")
@@ -451,14 +458,29 @@ func GetCachedVideos(libraryRoot string) ([]models.ScannedVideo, error) {
 			v.ClipsMetadataPath = clipsP.String
 		}
 
-		// Query clips for video
-		clipRows, err := database.Query("SELECT media_path, metadata_json FROM clips WHERE video_relative_path = ?", v.RelativePath)
+		// Query clips for video (filtering strictly for video/gif extensions)
+		clipRows, err := database.Query(`
+			SELECT media_path, metadata_json 
+			FROM clips 
+			WHERE video_relative_path = ? 
+			  AND (
+				LOWER(media_path) LIKE '%.mp4' OR 
+				LOWER(media_path) LIKE '%.webm' OR 
+				LOWER(media_path) LIKE '%.mov' OR 
+				LOWER(media_path) LIKE '%.gif'
+			  )
+			ORDER BY media_path ASC
+		`, v.RelativePath)
 		if err == nil {
 			var clips []models.ScannedClip
 			for clipRows.Next() {
 				var c models.ScannedClip
 				var cMetaJ sql.NullString
 				if err := clipRows.Scan(&c.MediaPath, &cMetaJ); err == nil {
+					mType := inferMediaType(c.MediaPath)
+					if mType != "video" && mType != "gif" {
+						continue
+					}
 					if cMetaJ.Valid {
 						var cm map[string]interface{}
 						if err := json.Unmarshal([]byte(cMetaJ.String), &cm); err == nil {

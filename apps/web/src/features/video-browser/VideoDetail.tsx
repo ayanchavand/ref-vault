@@ -435,13 +435,20 @@ function ClipMetadataEditor({
     return libraryConfig?.fields.filter((f: LibraryConfigField) => f.type === "clip") ?? [];
   }, [libraryConfig]);
 
+  const filteredClips = useMemo(() => {
+    return video.clips.filter((c) => {
+      const ext = c.mediaPath.split(".").pop()?.toLowerCase();
+      return ext === "mp4" || ext === "webm" || ext === "mov" || ext === "gif";
+    });
+  }, [video.clips]);
+
   const allLibraryTags = useMemo(() => {
     const set = new Set<string>();
-    video.clips.forEach((c) => {
+    filteredClips.forEach((c) => {
       extractTags(c.metadata).forEach((tag) => set.add(tag));
     });
     return Array.from(set).sort();
-  }, [video.clips]);
+  }, [filteredClips]);
 
   const activeTags = useMemo(() => {
     return tagsInput
@@ -1834,6 +1841,13 @@ export function VideoDetail({
   libraryConfig,
 }: VideoDetailProps) {
 
+  const filteredClips = useMemo(() => {
+    return video.clips.filter((c) => {
+      const ext = c.mediaPath.split(".").pop()?.toLowerCase();
+      return ext === "mp4" || ext === "webm" || ext === "mov" || ext === "gif";
+    });
+  }, [video.clips]);
+
   const [selectedMediaPath, setSelectedMediaPath] = useState(video.mainVideoPath);
   const [isEditingSegments, setIsEditingSegments] = useState(false);
   const [isEditorExpanded, setIsEditorExpanded] = useState(false);
@@ -2022,8 +2036,8 @@ export function VideoDetail({
   const isMainPlaying = selectedMediaPath === video.mainVideoPath;
 
   const activeClip = useMemo(() => {
-    return video.clips.find((clip) => clip.mediaPath === selectedMediaPath);
-  }, [video.clips, selectedMediaPath]);
+    return filteredClips.find((clip) => clip.mediaPath === selectedMediaPath);
+  }, [filteredClips, selectedMediaPath]);
 
   return (
     <div className="flex min-h-[calc(100vh-7rem)] flex-col gap-4 sm:gap-5 bg-[#0A0B0D] text-white">
@@ -2113,7 +2127,7 @@ export function VideoDetail({
               <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-white sm:text-xl">
                 {isMainPlaying
                   ? video.relativePath
-                  : `Clip ${pad(video.clips.findIndex((c) => c.mediaPath === selectedMediaPath))}`}
+                  : `Clip ${pad(filteredClips.findIndex((c) => c.mediaPath === selectedMediaPath))}`}
               </h2>
               {isMainPlaying && video.metadata ? (
                 <VideoDetailsDisplay metadata={video.metadata} libraryConfig={libraryConfig} />
@@ -2334,7 +2348,7 @@ export function VideoDetail({
               }}
               onCancel={() => setIsEditingSegments(false)}
             />
-          ) : video.clips.length === 0 ? (
+          ) : filteredClips.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 px-4 py-10 text-center">
               <Film className="h-8 w-8 text-white/20 mb-1" />
               <span className="font-mono text-[0.65rem] uppercase tracking-widest text-white/30">
@@ -2346,7 +2360,7 @@ export function VideoDetail({
             </div>
           ) : (
             <ul className="flex-1 space-y-2 overflow-y-visible pr-0.5">
-              {video.clips.map((clip, index) => (
+              {filteredClips.map((clip, index) => (
                 <li key={clip.mediaPath}>
                   <ClipCard
                     rootPath={rootPath}
