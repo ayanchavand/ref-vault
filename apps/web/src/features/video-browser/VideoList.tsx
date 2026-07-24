@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, memo } from "react";
-import { List, LayoutGrid, Video, User, FileText, Film, Tag, AlertTriangle } from "lucide-react";
+import { List, LayoutGrid, Video, User, FileText, Film, Tag, AlertTriangle, RefreshCw } from "lucide-react";
 import type { ScannedVideo, JsonObject, LibraryConfig, LibraryConfigField } from "@reference-vault/shared";
 import { useLazyThumbnail, usePrefetchOnHover, useDynamicThumbnail } from "./Uselazythumbnail";
 import { showTitleInListKey, showTitleInBoardKey } from "../settings/Settings";
@@ -49,6 +49,7 @@ interface VideoListProps {
   openingVideoPath: string | null;
   error: string | null;
   libraryConfig?: LibraryConfig;
+  onRescan?(): void;
 }
 
 function ShimmerFill() {
@@ -393,6 +394,7 @@ export function VideoList({
   openingVideoPath,
   error,
   libraryConfig,
+  onRescan,
 }: VideoListProps) {
   const [viewMode, setViewMode] = useState<"details" | "moodboard">("details");
   const isInitialScan = isLoading && videos.length === 0;
@@ -437,6 +439,19 @@ export function VideoList({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+          {onRescan && (
+            <button
+              type="button"
+              onClick={onRescan}
+              disabled={isLoading}
+              className="flex items-center gap-1.5 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-widest text-amber-300 hover:bg-amber-400/20 active:scale-[0.97] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_2px_8px_rgba(251,191,36,0.1)]"
+              title="Rescan video library and refresh clips cache"
+            >
+              <RefreshCw className={`h-3 w-3 ${isLoading ? "animate-spin text-amber-400" : "text-amber-400"}`} />
+              <span>{isLoading ? "Scanning…" : "Scan Library"}</span>
+            </button>
+          )}
+
           <div className="flex rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5 mr-1 backdrop-blur-sm">
             <button
               onClick={() => setViewMode("details")}

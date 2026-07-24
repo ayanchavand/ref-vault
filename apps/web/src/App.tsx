@@ -9,7 +9,7 @@ import type {
   ProjectInfo,
 } from "@reference-vault/shared";
 
-import { Library, Tag, Upload, Image, Settings as SettingsIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Library, Tag, Upload, Image, Settings as SettingsIcon, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 
 // Lazy-loaded components mapped from named exports to defaults
 const Settings = lazy(() =>
@@ -323,6 +323,23 @@ export function App() {
     }
   }, [activeRoute, activeRootPath, videoDetail]);
 
+  const handleRescanLibrary = useCallback(async (): Promise<void> => {
+    if (!activeRootPath) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await scanLibrary(activeRootPath);
+      setScanResult({
+        ...result,
+        videos: shuffleVideos(result.videos),
+      });
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : "Failed to scan library.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeRootPath]);
+
   const handleSelectVideo = useCallback((video: ScannedVideo): void => {
     setSelectedVideo(video);
     navigate({ view: "VIEW_VIDEO", path: video.relativePath });
@@ -504,6 +521,7 @@ export function App() {
                   openingVideoPath={openingVideoPath}
                   error={error}
                   libraryConfig={libraryConfig}
+                  onRescan={handleRescanLibrary}
                 />
                 <VideoListPagination
                   currentPage={clampedVideoPage}
