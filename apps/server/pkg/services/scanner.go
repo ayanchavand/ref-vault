@@ -283,7 +283,8 @@ func scanClipsForVideo(database *sql.DB, libraryRoot, videoDirPath, videoRelPath
 			continue
 		}
 		name := entry.Name()
-		if inferMediaType(name) != "" {
+		mType := inferMediaType(name)
+		if mType == "video" || mType == "gif" {
 			fullPath := filepath.Join(clipsDir, name)
 			info, err := entry.Info()
 			if err != nil {
