@@ -2035,6 +2035,11 @@ export function VideoDetail({
 
   const isMainPlaying = selectedMediaPath === video.mainVideoPath;
 
+  const videoDisplayTitle =
+    typeof video.metadata?.title === "string" && video.metadata.title.trim()
+      ? video.metadata.title.trim()
+      : video.relativePath.split("/").pop() || video.relativePath;
+
   const activeClip = useMemo(() => {
     return filteredClips.find((clip) => clip.mediaPath === selectedMediaPath);
   }, [filteredClips, selectedMediaPath]);
@@ -2049,7 +2054,7 @@ export function VideoDetail({
             <p className="font-mono text-[0.65rem] uppercase tracking-[0.3em] text-amber-300/80">
               Vault / Watch
             </p>
-            <p className="mt-1 truncate font-mono text-sm text-white/50">{video.relativePath}</p>
+            <p className="mt-1 truncate font-mono text-sm text-white/50">{videoDisplayTitle}</p>
           </div>
         </div>
       </div>
@@ -2126,7 +2131,7 @@ export function VideoDetail({
               </p>
               <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-white sm:text-xl">
                 {isMainPlaying
-                  ? video.relativePath
+                  ? videoDisplayTitle
                   : `Clip ${pad(filteredClips.findIndex((c) => c.mediaPath === selectedMediaPath))}`}
               </h2>
               {isMainPlaying && video.metadata ? (

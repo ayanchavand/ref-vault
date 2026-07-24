@@ -1530,11 +1530,15 @@ export function MediaBrowser({ rootPath: propRootPath, onGoToSettings }: MediaBr
     }
   }, []);
 
-  // Auto-load on mount if saved root exists
+  // Auto-load when propRootPath or saved root changes
   useEffect(() => {
-    const saved = localStorage.getItem(MEDIA_ROOT_KEY);
-    if (saved) loadMedia(saved);
-  }, [loadMedia]);
+    const rootToLoad = propRootPath || localStorage.getItem(MEDIA_ROOT_KEY);
+    if (rootToLoad && rootToLoad !== mediaRoot) {
+      loadMedia(rootToLoad);
+    } else if (!items.length && rootToLoad) {
+      loadMedia(rootToLoad);
+    }
+  }, [propRootPath, mediaRoot, items.length, loadMedia]);
 
   const handleCategorizeMedia = useCallback(async (category: string | null) => {
     const activeItem = filteredItems[index];

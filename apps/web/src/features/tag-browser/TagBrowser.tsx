@@ -129,7 +129,7 @@ const TagBrowserClipCard = memo(function TagBrowserClipCard({
       <div className="flex flex-col gap-2 p-3 w-full">
         <div className="min-w-0">
           <p className="truncate font-semibold text-white text-sm">{entry.clip.mediaPath.split("/").pop()}</p>
-          <p className="truncate text-xs text-white/50">{entry.video.relativePath}</p>
+          <p className="truncate text-xs text-white/50">{typeof entry.video.metadata?.title === "string" && entry.video.metadata.title.trim() ? entry.video.metadata.title.trim() : (entry.video.relativePath.split("/").pop() || entry.video.relativePath)}</p>
         </div>
         <div className="flex flex-wrap gap-1">
           <span className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[0.6rem] text-white/60">

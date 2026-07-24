@@ -4,6 +4,14 @@ import type { ScannedVideo, JsonObject, LibraryConfig, LibraryConfigField } from
 import { useLazyThumbnail, usePrefetchOnHover, useDynamicThumbnail } from "./Uselazythumbnail";
 import { showTitleInListKey, showTitleInBoardKey } from "../settings/Settings";
 
+export function getVideoDisplayTitle(video: { relativePath: string; metadata?: Record<string, any> | null }): string {
+  if (typeof video.metadata?.title === "string" && video.metadata.title.trim().length > 0) {
+    return video.metadata.title.trim();
+  }
+  const parts = video.relativePath.split("/");
+  return parts[parts.length - 1] || video.relativePath;
+}
+
 function getTagColorClass(tag: string): string {
   const clean = tag.toLowerCase().trim();
   
@@ -212,7 +220,7 @@ const VideoThumbnailCard = memo(function VideoThumbnailCard({
             <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/95 via-black/85 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 flex flex-col gap-1.5">
               {showTitleInBoard && (
                 <div>
-                  <p className="truncate font-semibold text-white text-xs">{video.relativePath}</p>
+                  <p className="truncate font-semibold text-white text-xs">{getVideoDisplayTitle(video)}</p>
                 </div>
               )}
 
@@ -284,7 +292,7 @@ const VideoThumbnailCard = memo(function VideoThumbnailCard({
         {!isMoodboard && (
           <div className="w-full p-4 border-t border-white/[0.02] flex flex-col gap-1">
             {showTitleInList && (
-              <p className="truncate font-semibold text-white/95">{video.relativePath}</p>
+              <p className="truncate font-semibold text-white/95">{getVideoDisplayTitle(video)}</p>
             )}
 
             {/* Tags section */}

@@ -278,8 +278,10 @@ export function App() {
   const handleSelectProject = useCallback((proj: ProjectInfo) => {
     setActiveProject(proj);
     window.localStorage.setItem(activeProjectStorageKey, proj.path);
+    setScanResult(null);
     setSelectedVideo(null);
     setVideoDetail(null);
+    setError(null);
     loadProjectData(proj.path);
     navigate({ view: "BROWSE_LIBRARY" });
   }, [loadProjectData]);
@@ -296,6 +298,18 @@ export function App() {
   useEffect(() => {
     if (activeRoute.view === "VIEW_VIDEO" && activeRootPath) {
       const path = activeRoute.path;
+
+      // If scanResult is not yet loaded for activeRootPath or project is switching, wait for scanResult
+      if (!scanResult || scanResult.rootPath !== activeRootPath) {
+        return;
+      }
+
+      // If the video path doesn't exist in the scanned videos for this project, navigate back to browse
+      if (!scanResult.videos.some((v) => v.relativePath === path)) {
+        navigate({ view: "BROWSE_LIBRARY" });
+        return;
+      }
+
       if (!videoDetail || videoDetail.relativePath !== path) {
         setVideoDetail(null);
         setError(null);
@@ -321,7 +335,7 @@ export function App() {
           });
       }
     }
-  }, [activeRoute, activeRootPath, videoDetail]);
+  }, [activeRoute, activeRootPath, scanResult, videoDetail]);
 
   const handleRescanLibrary = useCallback(async (): Promise<void> => {
     if (!activeRootPath) return;
