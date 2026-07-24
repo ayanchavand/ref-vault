@@ -57,47 +57,73 @@ func ProbeVideo(filePath string) (ProbeResult, error) {
 		Height: &st.Height,
 	}
 	if st.RFrameRate != "" {
-		res.Framerate = &st.RFrameRate
+		var num, den float64
+		if _, err := fmt.Sscanf(st.RFrameRate, "%f/%f", &num, &den); err == nil && den != 0 {
+			fps := num / den
+			formatted := fmt.Sprintf("%g fps", float64(int(fps*100+0.5))/100.0)
+			res.Framerate = &formatted
+		} else {
+			res.Framerate = &st.RFrameRate
+		}
 	}
 
 	return res, nil
 }
 
-// GenerateThumbnail extracts a thumbnail from a video file at 1s timestamp using ffmpeg.
+// GenerateThumbnail extracts a thumbnail from a video file at 2s timestamp (or 0s fallback), scaled to 480px width.
 func GenerateThumbnail(videoPath, outputPath string) error {
+	// Try seeking to 2 seconds first
 	cmd := exec.Command(
 		"ffmpeg",
-		"-ss", "00:00:01",
-		"-i", videoPath,
-		"-vframes", "1",
-		"-q:v", "2",
 		"-y",
+		"-ss", "00:00:02",
+		"-i", videoPath,
+		"-vf", "scale=480:-1",
+		"-vframes", "1",
 		outputPath,
 	)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("ffmpeg thumbnail generation failed: %w (stderr: %s)", err, stderr.String())
+	if err := cmd.Run(); err == nil {
+		return nil
+	}
+
+	// Fallback: Seek to 0 seconds if video is short or 2s seek fails
+	cmdFallback := exec.Command(
+		"ffmpeg",
+		"-y",
+		"-ss", "00:00:00",
+		"-i", videoPath,
+		"-vf", "scale=480:-1",
+		"-vframes", "1",
+		outputPath,
+	)
+	var stderrFallback bytes.Buffer
+	cmdFallback.Stderr = &stderrFallback
+
+	if err := cmdFallback.Run(); err != nil {
+		return fmt.Errorf("ffmpeg thumbnail generation failed: %w (stderr: %s)", err, stderrFallback.String())
 	}
 
 	return nil
 }
 
-// CaptureFrame extracts a frame from a video/media file at a specific timestamp in seconds.
+// CaptureFrame extracts a frame from a video/media file at a specific timestamp using optimized two-stage seeking.
 func CaptureFrame(videoPath string, timestamp float64, outputPath string) error {
-	timestampStr := fmt.Sprintf("%.3f", timestamp)
-	cmd := exec.Command(
-		"ffmpeg",
-		"-ss", timestampStr,
-		"-i", videoPath,
-		"-vframes", "1",
-		"-q:v", "2",
-		"-y",
-		outputPath,
-	)
+	var args []string
+	args = append(args, "-y")
+	if timestamp > 10 {
+		fastSeek := fmt.Sprintf("%.0f", timestamp-10)
+		slowSeek := fmt.Sprintf("%.3f", 10.0+(timestamp-float64(int(timestamp))))
+		args = append(args, "-ss", fastSeek, "-i", videoPath, "-ss", slowSeek)
+	} else {
+		args = append(args, "-i", videoPath, "-ss", fmt.Sprintf("%.3f", timestamp))
+	}
+	args = append(args, "-vframes", "1", "-q:v", "2", outputPath)
 
+	cmd := exec.Command("ffmpeg", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
@@ -107,3 +133,33 @@ func CaptureFrame(videoPath string, timestamp float64, outputPath string) error 
 
 	return nil
 }
+
+// ChopVideoSegment slices a segment from a main video file into a clip file using x264/aac.
+func ChopVideoSegment(mainVideoPath string, start, end float64, outputPath string) error {
+	duration := end - start
+	if duration < 0 {
+		duration = 0
+	}
+	args := []string{
+		"-y",
+		"-ss", fmt.Sprintf("%.3f", start),
+		"-i", mainVideoPath,
+		"-t", fmt.Sprintf("%.3f", duration),
+		"-c:v", "libx264",
+		"-preset", "ultrafast",
+		"-crf", "18",
+		"-c:a", "aac",
+		outputPath,
+	}
+
+	cmd := exec.Command("ffmpeg", args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("ffmpeg clip chopping failed: %w (stderr: %s)", err, stderr.String())
+	}
+
+	return nil
+}
+

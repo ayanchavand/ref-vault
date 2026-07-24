@@ -18,7 +18,7 @@ func ReadJSONFile(filePath string, target interface{}) error {
 	return json.Unmarshal(data, target)
 }
 
-// WriteJSONFile marshals and writes target struct/map as formatted JSON.
+// WriteJSONFile marshals and writes target struct/map as formatted JSON atomically.
 func WriteJSONFile(filePath string, target interface{}) error {
 	dir := filepath.Dir(filePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -29,17 +29,24 @@ func WriteJSONFile(filePath string, target interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal json: %w", err)
 	}
+	data = append(data, '\n')
 
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write json file %s: %w", filePath, err)
+	tmpFile := filepath.Join(dir, fmt.Sprintf(".%s.%d.tmp", filepath.Base(filePath), os.Getpid()))
+	if err := os.WriteFile(tmpFile, data, 0644); err != nil {
+		return fmt.Errorf("failed to write temp json file %s: %w", tmpFile, err)
+	}
+
+	if err := os.Rename(tmpFile, filePath); err != nil {
+		_ = os.Remove(tmpFile)
+		return fmt.Errorf("failed to rename temp json file to %s: %w", filePath, err)
 	}
 
 	return nil
 }
 
-// GetLibraryConfig reads .vault/config.json or returns default empty fields config.
+// GetLibraryConfig reads library.json or returns default empty fields config.
 func GetLibraryConfig(libraryRoot string) (models.LibraryConfig, error) {
-	configPath := filepath.Join(libraryRoot, ".vault", "config.json")
+	configPath := filepath.Join(libraryRoot, "library.json")
 	var cfg models.LibraryConfig
 
 	err := ReadJSONFile(configPath, &cfg)
@@ -55,8 +62,9 @@ func GetLibraryConfig(libraryRoot string) (models.LibraryConfig, error) {
 	return cfg, nil
 }
 
-// SaveLibraryConfig saves config to .vault/config.json.
+// SaveLibraryConfig saves config to library.json.
 func SaveLibraryConfig(libraryRoot string, cfg models.LibraryConfig) error {
-	configPath := filepath.Join(libraryRoot, ".vault", "config.json")
+	configPath := filepath.Join(libraryRoot, "library.json")
 	return WriteJSONFile(configPath, cfg)
 }
+

@@ -7,6 +7,8 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -221,6 +223,12 @@ func scanClipsForVideo(database *sql.DB, libraryRoot, videoDirPath, videoRelPath
 		return
 	}
 
+	clipsMetadataPath := filepath.Join(videoDirPath, "clips.json")
+	var clipsMetadata map[string]interface{}
+	if data, err := os.ReadFile(clipsMetadataPath); err == nil {
+		_ = json.Unmarshal(data, &clipsMetadata)
+	}
+
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -237,13 +245,15 @@ func scanClipsForVideo(database *sql.DB, libraryRoot, videoDirPath, videoRelPath
 			relMedia, _ := filepath.Rel(libraryRoot, fullPath)
 			mediaPathStr := toForwardSlash(relMedia)
 
-			// Look for matching json
-			metaName := strings.TrimSuffix(name, filepath.Ext(name)) + ".json"
-			metaFullPath := filepath.Join(clipsDir, metaName)
+			clipKey := strings.TrimSuffix(name, filepath.Ext(name))
 			var metaJSON *string
-			if data, err := os.ReadFile(metaFullPath); err == nil {
-				s := string(data)
-				metaJSON = &s
+			if clipsMetadata != nil {
+				if metaObj, ok := clipsMetadata[clipKey]; ok {
+					if bytes, err := json.Marshal(metaObj); err == nil {
+						s := string(bytes)
+						metaJSON = &s
+					}
+				}
 			}
 
 			database.Exec(`
@@ -256,6 +266,98 @@ func scanClipsForVideo(database *sql.DB, libraryRoot, videoDirPath, videoRelPath
 			`, mediaPathStr, videoRelPath, metaJSON, mtime)
 		}
 	}
+}
+
+// ResequenceSceneClips handles deleting scene_XX.mp4, resequencing remaining scene clips, updating clips.json & split_plan.json, and re-syncing cache.
+func ResequenceSceneClips(libraryRoot, videoDirPath, videoRelPath, clipPath string) error {
+	clipFileName := filepath.Base(clipPath)
+	re := regexp.MustCompile(`(?i)^scene_(\d+)\.mp4$`)
+	match := re.FindStringSubmatch(clipFileName)
+
+	// Remove target clip file
+	_ = os.Remove(clipPath)
+
+	clipsMetadataPath := filepath.Join(videoDirPath, "clips.json")
+	var clipsMetadata map[string]interface{}
+	_ = ReadJSONFile(clipsMetadataPath, &clipsMetadata)
+	if clipsMetadata == nil {
+		clipsMetadata = make(map[string]interface{})
+	}
+
+	clipKey := strings.TrimSuffix(clipFileName, filepath.Ext(clipFileName))
+
+	if match == nil {
+		// Non-scene clip: just delete key from clips.json if present
+		delete(clipsMetadata, clipKey)
+		_ = WriteJSONFile(clipsMetadataPath, clipsMetadata)
+		return SyncVaultCache(libraryRoot)
+	}
+
+	// Resequence scene clips
+	var deletedIndex int
+	fmt.Sscanf(match[1], "%d", &deletedIndex)
+	clipsDir := filepath.Dir(clipPath)
+
+	entries, _ := os.ReadDir(clipsDir)
+	var remainingIndices []int
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if m := re.FindStringSubmatch(entry.Name()); m != nil {
+			var idx int
+			fmt.Sscanf(m[1], "%d", &idx)
+			if idx > deletedIndex {
+				remainingIndices = append(remainingIndices, idx)
+			}
+		}
+	}
+
+	sort.Ints(remainingIndices)
+
+	for _, idx := range remainingIndices {
+		oldName := fmt.Sprintf("scene_%02d.mp4", idx)
+		newName := fmt.Sprintf("scene_%02d.mp4", idx-1)
+		_ = os.Rename(filepath.Join(clipsDir, oldName), filepath.Join(clipsDir, newName))
+	}
+
+	// Update clips.json keys
+	updatedMetadata := make(map[string]interface{})
+	keyRe := regexp.MustCompile(`(?i)^scene_(\d+)$`)
+	for k, v := range clipsMetadata {
+		if m := keyRe.FindStringSubmatch(k); m != nil {
+			var idx int
+			fmt.Sscanf(m[1], "%d", &idx)
+			if idx == deletedIndex {
+				continue
+			} else if idx > deletedIndex {
+				newKey := fmt.Sprintf("scene_%02d", idx-1)
+				updatedMetadata[newKey] = v
+			} else {
+				updatedMetadata[k] = v
+			}
+		} else {
+			updatedMetadata[k] = v
+		}
+	}
+	_ = WriteJSONFile(clipsMetadataPath, updatedMetadata)
+
+	// Sync split_plan.json if exists
+	splitPlanPath := filepath.Join(videoDirPath, "split_plan.json")
+	var splitPlan struct {
+		VideoRelativePath string                `json:"videoRelativePath"`
+		MainVideoPath     string                `json:"mainVideoPath"`
+		Segments          []models.SplitSegment `json:"segments"`
+	}
+	if err := ReadJSONFile(splitPlanPath, &splitPlan); err == nil && len(splitPlan.Segments) > 0 {
+		segmentIndex := deletedIndex - 1
+		if segmentIndex >= 0 && segmentIndex < len(splitPlan.Segments) {
+			splitPlan.Segments = append(splitPlan.Segments[:segmentIndex], splitPlan.Segments[segmentIndex+1:]...)
+			_ = WriteJSONFile(splitPlanPath, splitPlan)
+		}
+	}
+
+	return SyncVaultCache(libraryRoot)
 }
 
 // GetCachedVideos fetches all scanned videos and clips from SQLite cache.

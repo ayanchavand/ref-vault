@@ -50,9 +50,9 @@ func TestInitLibraryEndpoint(t *testing.T) {
 		t.Fatalf("Expected status 200, got %d", w.Code)
 	}
 
-	videoDir := filepath.Join(tempDir, "video")
+	videoDir := filepath.Join(tempDir, "refVault_Videos")
 	if _, err := os.Stat(videoDir); err != nil {
-		t.Errorf("Expected video directory to exist")
+		t.Errorf("Expected video directory refVault_Videos to exist")
 	}
 }
 
@@ -139,7 +139,7 @@ func TestScanLibraryAndVideosDetailEndpoints(t *testing.T) {
 func TestMediaScanAndCategorizeEndpoints(t *testing.T) {
 	r, tempDir := setupTestServer(t)
 
-	imgDir := filepath.Join(tempDir, "media")
+	imgDir := filepath.Join(tempDir, "images")
 	_ = os.MkdirAll(imgDir, 0755)
 	_ = os.WriteFile(filepath.Join(imgDir, "photo.jpg"), []byte("jpeg image data"), 0644)
 
@@ -156,10 +156,10 @@ func TestMediaScanAndCategorizeEndpoints(t *testing.T) {
 	}
 
 	// POST /api/media/categorize
-	cat := "favorites"
+	cat := "images/favorites"
 	catBody, _ := json.Marshal(models.CategorizeMediaRequest{
 		RootPath:          tempDir,
-		MediaRelativePath: "media/photo.jpg",
+		MediaRelativePath: "images/photo.jpg",
 		Category:          &cat,
 	})
 	catReq := httptest.NewRequest("POST", "/api/media/categorize", bytes.NewBuffer(catBody))
@@ -169,7 +169,7 @@ func TestMediaScanAndCategorizeEndpoints(t *testing.T) {
 	r.ServeHTTP(catW, catReq)
 
 	if catW.Code != http.StatusOK {
-		t.Fatalf("Expected status 200 for POST /api/media/categorize, got %d", catW.Code)
+		t.Fatalf("Expected status 200 for POST /api/media/categorize, got %d. Body: %s", catW.Code, catW.Body.String())
 	}
 }
 
@@ -234,7 +234,7 @@ func TestMediaFileStreamingAndSecurity(t *testing.T) {
 	badW := httptest.NewRecorder()
 	r.ServeHTTP(badW, badReq)
 
-	if badW.Code != http.StatusForbidden {
-		t.Errorf("Expected status 403 Forbidden for path traversal attempt, got %d", badW.Code)
+	if badW.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 Bad Request for path traversal attempt, got %d", badW.Code)
 	}
 }
