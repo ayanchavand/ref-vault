@@ -100,3 +100,25 @@ func TestSyncAndGetCachedVideos(t *testing.T) {
 		t.Errorf("Expected relative path test-vid, got %s", videos[0].RelativePath)
 	}
 }
+
+func TestSyncAndGetCachedMediaItems(t *testing.T) {
+	tempDir := t.TempDir()
+
+	mediaDir := filepath.Join(tempDir, "nature", "animals")
+	_ = os.MkdirAll(mediaDir, 0755)
+	_ = os.WriteFile(filepath.Join(mediaDir, "lion.jpg"), []byte("jpg content"), 0644)
+	_ = os.WriteFile(filepath.Join(mediaDir, "clip.webm"), []byte("webm content"), 0644)
+
+	if err := SyncMediaCache(tempDir); err != nil {
+		t.Fatalf("SyncMediaCache failed: %v", err)
+	}
+
+	items, err := GetCachedMediaItems(tempDir)
+	if err != nil {
+		t.Fatalf("GetCachedMediaItems failed: %v", err)
+	}
+
+	if len(items) != 2 {
+		t.Fatalf("Expected 2 media items, got %d", len(items))
+	}
+}
