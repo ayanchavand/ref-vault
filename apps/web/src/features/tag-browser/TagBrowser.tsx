@@ -217,7 +217,13 @@ export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: T
   useEffect(() => {
     setIsLoading(true);
     setError(null);
-    setVideoDetails(videos as unknown as VideoDetailType[]);
+    const uniqueMap = new Map<string, VideoDetailType>();
+    for (const v of (videos as unknown as VideoDetailType[])) {
+      if (v && v.relativePath && !uniqueMap.has(v.relativePath.toLowerCase())) {
+        uniqueMap.set(v.relativePath.toLowerCase(), v);
+      }
+    }
+    setVideoDetails(Array.from(uniqueMap.values()));
     setSelectedVideoTags([]);
     setSelectedClipTags([]);
     setSelectedCategories({});
@@ -258,7 +264,12 @@ export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: T
   const clipTagCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const detail of videoDetails) {
+      const seenClips = new Set<string>();
       for (const clip of detail.clips) {
+        const key = clip.mediaPath.toLowerCase();
+        if (seenClips.has(key)) continue;
+        seenClips.add(key);
+
         const cTags = extractTags(clip.metadata);
         for (const tag of cTags) {
           counts[tag] = (counts[tag] || 0) + 1;
@@ -300,7 +311,12 @@ export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: T
       });
 
       const clipFields = libraryConfig?.fields.filter((f) => f.type === "clip") ?? [];
+      const seenClips = new Set<string>();
       detail.clips.forEach((clip) => {
+        const key = clip.mediaPath.toLowerCase();
+        if (seenClips.has(key)) return;
+        seenClips.add(key);
+
         clipFields.forEach((field) => {
           const val = clip.metadata?.[field.name];
           if (val) {
@@ -322,6 +338,7 @@ export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: T
 
   const matchedClips = useMemo(() => {
     const list: TaggedClip[] = [];
+    const seenMediaPaths = new Set<string>();
 
     const configuredVideoFields = libraryConfig?.fields.filter((f) => f.type === "video") ?? [];
     const configuredClipFields = libraryConfig?.fields.filter((f) => f.type === "clip") ?? [];
@@ -363,14 +380,18 @@ export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: T
           configuredClipFields.some((field) => (selectedCategories[field.name] || []).length > 0);
 
         if (!hasClipFilters) {
-          list.push({
-            clip: {
-              mediaPath: detail.mainVideoPath,
-              metadata: detail.metadata,
-            },
-            video: detail,
-            source: "video",
-          });
+          const pathKey = detail.mainVideoPath.toLowerCase();
+          if (!seenMediaPaths.has(pathKey)) {
+            seenMediaPaths.add(pathKey);
+            list.push({
+              clip: {
+                mediaPath: detail.mainVideoPath,
+                metadata: detail.metadata,
+              },
+              video: detail,
+              source: "video",
+            });
+          }
         }
       } else {
         for (const clip of detail.clips) {
@@ -403,8 +424,12 @@ export function TagBrowser({ rootPath, videos, onSelectVideo, libraryConfig }: T
           }
           if (!matchesClipCategories) continue;
 
-          const source = clip.metadata ? ("clip" as const) : ("video" as const);
-          list.push({ clip, video: detail, source });
+          const pathKey = clip.mediaPath.toLowerCase();
+          if (!seenMediaPaths.has(pathKey)) {
+            seenMediaPaths.add(pathKey);
+            const source = clip.metadata ? ("clip" as const) : ("video" as const);
+            list.push({ clip, video: detail, source });
+          }
         }
       }
     }

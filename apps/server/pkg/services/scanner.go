@@ -265,6 +265,7 @@ func SyncVaultCache(libraryRoot string) error {
 }
 
 func scanClipsForVideo(database *sql.DB, libraryRoot, videoDirPath, videoRelPath string) {
+	database.Exec("DELETE FROM clips WHERE video_relative_path = ?", videoRelPath)
 	clipsDir := filepath.Join(videoDirPath, "clips")
 	entries, err := os.ReadDir(clipsDir)
 	if err != nil {
