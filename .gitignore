@@ -12,3 +12,8 @@ ReferenceLibrary/
 .eslintcache
 *.tar
 *.tar.gz
+
+# Go binary and cache output
+apps/server/server
+apps/server/bin/
+.vault/

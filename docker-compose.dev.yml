@@ -5,9 +5,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: builder
+      target: go-builder
     container_name: reference-vault-dev-server
-    command: npm run dev --workspace=@reference-vault/server
+    command: go run ./cmd/server
     ports:
       - "4310:4310"
     environment:
@@ -15,15 +15,14 @@ services:
       - HOST=0.0.0.0
       - DEFAULT_LIBRARY_PATH=/library
     volumes:
-      - .:/app
-      - /app/node_modules
+      - ./apps/server:/app/apps/server
       - ${LIBRARY_PATH:-./Reference Library}:/library
 
   web:
     build:
       context: .
       dockerfile: Dockerfile
-      target: builder
+      target: web-builder
     container_name: reference-vault-dev-web
     command: npm run dev --workspace=@reference-vault/web -- --host 0.0.0.0
     ports:
