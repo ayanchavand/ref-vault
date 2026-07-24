@@ -67,12 +67,30 @@ func TestGetAndSaveLibraryConfig(t *testing.T) {
 		t.Fatalf("Failed saving library config: %v", err)
 	}
 
+	// Verify library.json is written into refvault_videos directory
+	expectedPath := filepath.Join(tempDir, "refvault_videos", "library.json")
+	if _, err := os.Stat(expectedPath); err != nil {
+		t.Errorf("Expected library.json at %s, but stat failed: %v", expectedPath, err)
+	}
+
 	loaded, err := GetLibraryConfig(tempDir)
 	if err != nil {
 		t.Fatalf("Failed reloading config: %v", err)
 	}
 	if len(loaded.Fields) != 1 || loaded.Fields[0].Name != "genre" {
 		t.Errorf("Unexpected loaded config: %v", loaded)
+	}
+
+	// Test fallback reading from root library.json
+	fallbackDir := t.TempDir()
+	rootJson := filepath.Join(fallbackDir, "library.json")
+	_ = WriteJSONFile(rootJson, newCfg)
+	fallbackLoaded, err := GetLibraryConfig(fallbackDir)
+	if err != nil {
+		t.Fatalf("Failed loading fallback root config: %v", err)
+	}
+	if len(fallbackLoaded.Fields) != 1 || fallbackLoaded.Fields[0].Name != "genre" {
+		t.Errorf("Unexpected fallback loaded config: %v", fallbackLoaded)
 	}
 }
 

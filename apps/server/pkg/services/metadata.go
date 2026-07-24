@@ -55,9 +55,60 @@ func WriteJSONFile(filePath string, target interface{}) error {
 	return nil
 }
 
+// resolveLibraryConfigReadPath determines the path to read library.json from.
+// It checks for refvault_videos/library.json (or refVault_Videos/library.json),
+// directly inside libraryRoot if it is a video folder,
+// and falls back to libraryRoot/library.json if present.
+func resolveLibraryConfigReadPath(libraryRoot string) string {
+	v1 := filepath.Join(libraryRoot, "refvault_videos", "library.json")
+	if _, err := os.Stat(v1); err == nil {
+		return v1
+	}
+
+	v2 := filepath.Join(libraryRoot, "refVault_Videos", "library.json")
+	if _, err := os.Stat(v2); err == nil {
+		return v2
+	}
+
+	base := filepath.Base(libraryRoot)
+	if base == "refvault_videos" || base == "refVault_Videos" {
+		vSelf := filepath.Join(libraryRoot, "library.json")
+		if _, err := os.Stat(vSelf); err == nil {
+			return vSelf
+		}
+	}
+
+	rootConfig := filepath.Join(libraryRoot, "library.json")
+	if _, err := os.Stat(rootConfig); err == nil {
+		return rootConfig
+	}
+
+	if base == "refvault_videos" || base == "refVault_Videos" {
+		return filepath.Join(libraryRoot, "library.json")
+	}
+	return v1
+}
+
+// resolveLibraryConfigWritePath determines where to save library.json.
+// It targets the video folder (refvault_videos or refVault_Videos) inside libraryRoot.
+func resolveLibraryConfigWritePath(libraryRoot string) string {
+	base := filepath.Base(libraryRoot)
+	if base == "refvault_videos" || base == "refVault_Videos" {
+		return filepath.Join(libraryRoot, "library.json")
+	}
+
+	v2 := filepath.Join(libraryRoot, "refVault_Videos")
+	if info, err := os.Stat(v2); err == nil && info.IsDir() {
+		return filepath.Join(v2, "library.json")
+	}
+
+	v1 := filepath.Join(libraryRoot, "refvault_videos")
+	return filepath.Join(v1, "library.json")
+}
+
 // GetLibraryConfig reads library.json or returns default empty fields config.
 func GetLibraryConfig(libraryRoot string) (models.LibraryConfig, error) {
-	configPath := filepath.Join(libraryRoot, "library.json")
+	configPath := resolveLibraryConfigReadPath(libraryRoot)
 	var cfg models.LibraryConfig
 
 	err := ReadJSONFile(configPath, &cfg)
@@ -73,9 +124,9 @@ func GetLibraryConfig(libraryRoot string) (models.LibraryConfig, error) {
 	return cfg, nil
 }
 
-// SaveLibraryConfig saves config to library.json.
+// SaveLibraryConfig saves config to library.json in the video folder.
 func SaveLibraryConfig(libraryRoot string, cfg models.LibraryConfig) error {
-	configPath := filepath.Join(libraryRoot, "library.json")
+	configPath := resolveLibraryConfigWritePath(libraryRoot)
 	return WriteJSONFile(configPath, cfg)
 }
 
