@@ -31,13 +31,24 @@ func WriteJSONFile(filePath string, target interface{}) error {
 	}
 	data = append(data, '\n')
 
-	tmpFile := filepath.Join(dir, fmt.Sprintf(".%s.%d.tmp", filepath.Base(filePath), os.Getpid()))
-	if err := os.WriteFile(tmpFile, data, 0644); err != nil {
-		return fmt.Errorf("failed to write temp json file %s: %w", tmpFile, err)
+	tmpFile, err := os.CreateTemp(dir, fmt.Sprintf(".%s.*.tmp", filepath.Base(filePath)))
+	if err != nil {
+		return fmt.Errorf("failed to create temp json file in %s: %w", dir, err)
+	}
+	tmpName := tmpFile.Name()
+
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("failed to write temp json file %s: %w", tmpName, err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("failed to close temp json file %s: %w", tmpName, err)
 	}
 
-	if err := os.Rename(tmpFile, filePath); err != nil {
-		_ = os.Remove(tmpFile)
+	if err := os.Rename(tmpName, filePath); err != nil {
+		_ = os.Remove(tmpName)
 		return fmt.Errorf("failed to rename temp json file to %s: %w", filePath, err)
 	}
 

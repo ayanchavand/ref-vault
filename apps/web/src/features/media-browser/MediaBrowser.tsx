@@ -1351,6 +1351,7 @@ function CatTreeExplorer({
 
 
 interface MediaBrowserProps {
+  rootPath?: string;
   onGoToSettings: () => void;
 }
 
@@ -1358,8 +1359,8 @@ interface MediaItemWithId extends ScannedMediaItem {
   id: string;
 }
 
-export function MediaBrowser({ onGoToSettings }: MediaBrowserProps) {
-  const [mediaRoot, setMediaRoot] = useState(() => localStorage.getItem(MEDIA_ROOT_KEY) ?? "");
+export function MediaBrowser({ rootPath: propRootPath, onGoToSettings }: MediaBrowserProps) {
+  const [mediaRoot, setMediaRoot] = useState(() => propRootPath || localStorage.getItem(MEDIA_ROOT_KEY) || "");
   const [savedLocations, setSavedLocations] = useState<string[]>(loadSavedLocations);
   const [items, setItems] = useState<MediaItemWithId[]>([]);
   const [index, setIndex] = useState(0);

@@ -1856,16 +1856,11 @@ export function VideoDetail({
     setCaptureError(null);
     setCaptureResult(null);
 
-    const savedMediaRoot = typeof window !== "undefined"
-      ? localStorage.getItem("reference-vault.media-root")
-      : null;
-
     try {
       const response = await captureFrame({
         rootPath,
         mediaPath: selectedMediaPath,
         timestamp: videoRef.current.currentTime,
-        mediaRootPath: savedMediaRoot || undefined,
       });
       setCaptureResult(response.savedPath);
       // Auto-clear success message after 4 seconds

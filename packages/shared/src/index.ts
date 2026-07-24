@@ -264,4 +264,24 @@ export interface CategorizeMediaResponse {
   tags: string[];
 }
 
+// ─── Projects Types ──────────────────────────────────────────────────────────
+
+export interface ProjectInfo {
+  name: string;
+  path: string;
+}
+
+export interface GetProjectsResponse {
+  libraryRoot: string;
+  projects: ProjectInfo[];
+}
+
+export interface CreateProjectRequest {
+  name: string;
+}
+
+export interface CreateProjectResponse {
+  success: boolean;
+  project: ProjectInfo;
+}
 

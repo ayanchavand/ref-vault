@@ -36,19 +36,22 @@ func sendError(w http.ResponseWriter, status int, code, msg, path string) {
 }
 
 func isContained(root, target string) bool {
-	realRoot, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		realRoot, err = filepath.Abs(root)
-		if err != nil {
-			return false
+	evalPath := func(p string) (string, error) {
+		realP, err := filepath.EvalSymlinks(p)
+		if err == nil {
+			return realP, nil
 		}
+		parent := filepath.Dir(p)
+		if realParent, pErr := filepath.EvalSymlinks(parent); pErr == nil {
+			return filepath.Join(realParent, filepath.Base(p)), nil
+		}
+		return filepath.Abs(p)
 	}
-	realTarget, err := filepath.EvalSymlinks(target)
-	if err != nil {
-		realTarget, err = filepath.Abs(target)
-		if err != nil {
-			return false
-		}
+
+	realRoot, err1 := evalPath(root)
+	realTarget, err2 := evalPath(target)
+	if err1 != nil || err2 != nil {
+		return false
 	}
 	rel, err := filepath.Rel(realRoot, realTarget)
 	if err != nil {
@@ -94,7 +97,15 @@ func resolveAndValidateLibraryRoot(rootPath string) (string, *models.ApiErrorRes
 		return "", &models.ApiErrorResponse{Error: "INVALID_LIBRARY_ROOT", Message: "rootPath must identify a directory."}, http.StatusBadRequest
 	}
 
-	return filepath.ToSlash(realPath), nil, http.StatusOK
+	cleanReal := filepath.Clean(realPath)
+	if cleanReal == filepath.Clean(getProjectsBaseDir()) {
+		_, projects, err := scanProjects()
+		if err == nil && len(projects) > 0 {
+			cleanReal = filepath.Clean(projects[0].Path)
+		}
+	}
+
+	return filepath.ToSlash(cleanReal), nil, http.StatusOK
 }
 
 func getContentType(filePath string) string {
@@ -146,11 +157,147 @@ func randomShortUUID() string {
 	return hex.EncodeToString(b)
 }
 
+func getProjectsBaseDir() string {
+	if val := os.Getenv("LIBRARY_PATH"); val != "" {
+		return val
+	}
+	// Try /library
+	if err := os.MkdirAll("/library", 0755); err == nil {
+		return "/library"
+	}
+	// Fallback to ./library if /library isn't writable
+	cwd, err := os.Getwd()
+	if err == nil {
+		fallback := filepath.Join(cwd, "library")
+		_ = os.MkdirAll(fallback, 0755)
+		return fallback
+	}
+	return "/library"
+}
+
+func scanProjects() (string, []models.ProjectInfo, error) {
+	baseDir := getProjectsBaseDir()
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		return baseDir, nil, err
+	}
+
+	entries, err := os.ReadDir(baseDir)
+	if err != nil {
+		return baseDir, nil, err
+	}
+
+	var projects []models.ProjectInfo
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") || name == "node_modules" {
+			continue
+		}
+
+		projPath := filepath.Join(baseDir, name)
+
+		vPath := filepath.Join(projPath, "refvault_videos")
+		mPath := filepath.Join(projPath, "refvault_media")
+
+		if _, err := os.Stat(vPath); err != nil {
+			altV := filepath.Join(projPath, "refVault_Videos")
+			if _, err2 := os.Stat(altV); err2 != nil {
+				_ = os.MkdirAll(vPath, 0755)
+			}
+		}
+		if _, err := os.Stat(mPath); err != nil {
+			altM := filepath.Join(projPath, "refVault_Media")
+			if _, err2 := os.Stat(altM); err2 != nil {
+				_ = os.MkdirAll(mPath, 0755)
+			}
+		}
+
+		projects = append(projects, models.ProjectInfo{
+			Name: name,
+			Path: filepath.ToSlash(projPath),
+		})
+	}
+
+	return filepath.ToSlash(baseDir), projects, nil
+}
+
+func createProjectByName(name string) (models.ProjectInfo, error) {
+	cleanName := strings.TrimSpace(name)
+	if cleanName == "" {
+		cleanName = "Project-" + randomShortUUID()
+	}
+
+	baseDir := getProjectsBaseDir()
+	dirName := sanitizeDirectoryName(cleanName)
+	if dirName == "" {
+		dirName = "project-" + randomShortUUID()
+	}
+	projPath := filepath.Join(baseDir, dirName)
+
+	if err := os.MkdirAll(projPath, 0755); err != nil {
+		return models.ProjectInfo{}, err
+	}
+
+	vPath := filepath.Join(projPath, "refvault_videos")
+	mPath := filepath.Join(projPath, "refvault_media")
+
+	_ = os.MkdirAll(vPath, 0755)
+	_ = os.MkdirAll(mPath, 0755)
+	_ = os.MkdirAll(filepath.Join(mPath, "images"), 0755)
+	_ = os.MkdirAll(filepath.Join(mPath, "images", "generated"), 0755)
+	_ = os.MkdirAll(filepath.Join(mPath, "gifs"), 0755)
+	_ = os.MkdirAll(filepath.Join(mPath, "videos"), 0755)
+
+	return models.ProjectInfo{
+		Name: cleanName,
+		Path: filepath.ToSlash(projPath),
+	}, nil
+}
+
 func RegisterRoutes(r chi.Router, webDistPath string) {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
 	r.Route("/api", func(r chi.Router) {
+
+		// ─── /api/projects ─────────────────────────────────────────────────
+		r.Route("/projects", func(r chi.Router) {
+			// GET /api/projects
+			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+				baseDir, projects, err := scanProjects()
+				if err != nil {
+					sendError(w, http.StatusInternalServerError, "LIBRARY_SCAN_FAILED", err.Error(), baseDir)
+					return
+				}
+				if projects == nil {
+					projects = []models.ProjectInfo{}
+				}
+				sendJSON(w, http.StatusOK, models.GetProjectsResponse{
+					LibraryRoot: baseDir,
+					Projects:    projects,
+				})
+			})
+
+			// POST /api/projects/create
+			r.Post("/create", func(w http.ResponseWriter, r *http.Request) {
+				var req models.CreateProjectRequest
+				if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Name) == "" {
+					sendError(w, http.StatusBadRequest, "INVALID_LIBRARY_ROOT", "Project name must not be empty.", "")
+					return
+				}
+				proj, err := createProjectByName(req.Name)
+				if err != nil {
+					sendError(w, http.StatusInternalServerError, "METADATA_WRITE_FAILED", err.Error(), "")
+					return
+				}
+				sendJSON(w, http.StatusOK, models.CreateProjectResponse{
+					Success: true,
+					Project: proj,
+				})
+			})
+		})
 
 		// ─── /api/library ──────────────────────────────────────────────────
 		r.Route("/library", func(r chi.Router) {
@@ -201,8 +348,8 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 					containerPath = filepath.Join(targetAbs, "refvault")
 				}
 
-				videoPath := filepath.Join(containerPath, "refVault_Videos")
-				mediaPath := filepath.Join(containerPath, "refVault_Media")
+				videoPath := filepath.Join(containerPath, "refvault_videos")
+				mediaPath := filepath.Join(containerPath, "refvault_media")
 
 				if err := os.MkdirAll(videoPath, 0755); err != nil {
 					sendError(w, http.StatusInternalServerError, "METADATA_WRITE_FAILED", err.Error(), req.TargetPath)
@@ -469,7 +616,18 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 					return
 				}
 
-				targetDir := filepath.Join(canonicalRoot, subFolder)
+				// Ensure refvault_media folder inside canonicalRoot
+				mBase := filepath.Join(canonicalRoot, "refvault_media")
+				if _, err := os.Stat(mBase); os.IsNotExist(err) {
+					altMBase := filepath.Join(canonicalRoot, "refVault_Media")
+					if info, err := os.Stat(altMBase); err == nil && info.IsDir() {
+						mBase = altMBase
+					} else {
+						_ = os.MkdirAll(mBase, 0755)
+					}
+				}
+
+				targetDir := filepath.Join(mBase, subFolder)
 				_ = os.MkdirAll(targetDir, 0755)
 
 				targetFile := filepath.Join(targetDir, fileName)
@@ -542,6 +700,17 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 					return
 				}
 
+				// Ensure refvault_media folder inside canonicalRoot
+				mBase := filepath.Join(canonicalRoot, "refvault_media")
+				if _, err := os.Stat(mBase); os.IsNotExist(err) {
+					altMBase := filepath.Join(canonicalRoot, "refVault_Media")
+					if info, err := os.Stat(altMBase); err == nil && info.IsDir() {
+						mBase = altMBase
+					} else {
+						_ = os.MkdirAll(mBase, 0755)
+					}
+				}
+
 				srcPath := filepath.Join(canonicalRoot, req.MediaRelativePath)
 				if !isContained(canonicalRoot, srcPath) {
 					sendError(w, http.StatusBadRequest, "INVALID_VIDEO_PATH", "Media file path must stay within the library root.", req.MediaRelativePath)
@@ -552,13 +721,15 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 				srcInfo, err := os.Stat(srcPath)
 				effectiveMediaRel := req.MediaRelativePath
 				if err != nil || srcInfo.IsDir() {
-					// Fallback 1: Prepend media/
-					fallbackRel := filepath.Join("media", req.MediaRelativePath)
-					fallbackPath := filepath.Join(canonicalRoot, fallbackRel)
+					// Fallback 1: Try inside mBase
+					relNoPrefix := strings.TrimPrefix(strings.TrimPrefix(req.MediaRelativePath, "refvault_media/"), "refVault_Media/")
+					fallbackPath := filepath.Join(mBase, relNoPrefix)
 					if fbInfo, fbErr := os.Stat(fallbackPath); fbErr == nil && !fbInfo.IsDir() {
 						srcPath = fallbackPath
 						srcInfo = fbInfo
-						effectiveMediaRel = fallbackRel
+						if relFB, relErr := filepath.Rel(canonicalRoot, fallbackPath); relErr == nil {
+							effectiveMediaRel = filepath.ToSlash(relFB)
+						}
 					} else {
 						// Fallback 2: Query SQLite cache for matching relative_path
 						foundFallback := false
@@ -602,7 +773,9 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 				}
 
 				destCategoryNormalized := filepath.ToSlash(destCategory)
-				destSegments := strings.Split(destCategoryNormalized, "/")
+				destCategoryClean := strings.TrimPrefix(strings.TrimPrefix(destCategoryNormalized, "refvault_media/"), "refVault_Media/")
+
+				destSegments := strings.Split(destCategoryClean, "/")
 				hasExpectedSubfolder := false
 				for _, seg := range destSegments {
 					if seg == expectedSubfolder {
@@ -616,7 +789,7 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 					return
 				}
 
-				destDir := filepath.Join(canonicalRoot, destCategory)
+				destDir := filepath.Join(mBase, destCategoryClean)
 				if !isContained(canonicalRoot, destDir) {
 					sendError(w, http.StatusBadRequest, "INVALID_VIDEO_PATH", "Target category path must stay within the library root.", destCategory)
 					return
@@ -913,17 +1086,28 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 					folderName = "unnamed-video"
 				}
 
+				// Ensure refvault_videos folder inside canonicalRoot
+				vBase := filepath.Join(canonicalRoot, "refvault_videos")
+				if _, err := os.Stat(vBase); os.IsNotExist(err) {
+					altVBase := filepath.Join(canonicalRoot, "refVault_Videos")
+					if info, err := os.Stat(altVBase); err == nil && info.IsDir() {
+						vBase = altVBase
+					} else {
+						_ = os.MkdirAll(vBase, 0755)
+					}
+				}
+
 				finalName := folderName
 				counter := 1
 				for {
-					if _, err := os.Stat(filepath.Join(canonicalRoot, finalName)); os.IsNotExist(err) {
+					if _, err := os.Stat(filepath.Join(vBase, finalName)); os.IsNotExist(err) {
 						break
 					}
 					finalName = fmt.Sprintf("%s-%d", folderName, counter)
 					counter++
 				}
 
-				videoDir := filepath.Join(canonicalRoot, finalName)
+				videoDir := filepath.Join(vBase, finalName)
 				_ = os.MkdirAll(videoDir, 0755)
 				_ = os.MkdirAll(filepath.Join(videoDir, "clips"), 0755)
 
@@ -947,9 +1131,10 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 
 				_ = services.WriteJSONFile(filepath.Join(videoDir, "metadata.json"), metadata)
 
+				relVideoPath, _ := filepath.Rel(canonicalRoot, videoDir)
 				sendJSON(w, http.StatusOK, models.CreateVideoPlaceholderResponse{
 					Success:           true,
-					VideoRelativePath: finalName,
+					VideoRelativePath: filepath.ToSlash(relVideoPath),
 				})
 			})
 
@@ -1028,6 +1213,11 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 					return
 				}
 
+				if database, err := db.GetVaultDb(canonicalRoot); err == nil {
+					database.Exec("DELETE FROM clips WHERE video_relative_path = ?", filepath.ToSlash(videoRel))
+					database.Exec("DELETE FROM videos WHERE relative_path = ?", filepath.ToSlash(videoRel))
+				}
+
 				sendJSON(w, http.StatusOK, models.DeleteVideoResponse{Success: true})
 			})
 
@@ -1056,22 +1246,26 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 					return
 				}
 
-				// Resolve target media root
-				mediaRoot := canonicalRoot
+				// Determine target media directory inside project (refvault_media/images/generated)
+				mediaDir := filepath.Join(canonicalRoot, "refvault_media")
+				if _, err := os.Stat(mediaDir); os.IsNotExist(err) {
+					altMediaDir := filepath.Join(canonicalRoot, "refVault_Media")
+					if info, err := os.Stat(altMediaDir); err == nil && info.IsDir() {
+						mediaDir = altMediaDir
+					} else {
+						_ = os.MkdirAll(mediaDir, 0755)
+					}
+				}
+
 				if req.MediaRootPath != nil && strings.TrimSpace(*req.MediaRootPath) != "" {
 					if mr, mrErr, _ := resolveAndValidateLibraryRoot(*req.MediaRootPath); mrErr == nil {
-						mediaRoot = mr
-					}
-				} else {
-					peerMediaDir := filepath.Join(canonicalRoot, "..", "media")
-					if peerInfo, peerErr := os.Stat(peerMediaDir); peerErr == nil && peerInfo.IsDir() {
-						if canonicalPeer, pErr := filepath.EvalSymlinks(peerMediaDir); pErr == nil {
-							mediaRoot = filepath.ToSlash(canonicalPeer)
+						if isContained(canonicalRoot, mr) {
+							mediaDir = mr
 						}
 					}
 				}
 
-				generatedDir := filepath.Join(mediaRoot, "images", "generated")
+				generatedDir := filepath.Join(mediaDir, "images", "generated")
 				_ = os.MkdirAll(generatedDir, 0755)
 
 				timecode := formatTimecodeForFilename(req.Timestamp)
@@ -1084,7 +1278,7 @@ func RegisterRoutes(r chi.Router, webDistPath string) {
 					return
 				}
 
-				relSaved, _ := filepath.Rel(mediaRoot, outputPath)
+				relSaved, _ := filepath.Rel(canonicalRoot, outputPath)
 				sendJSON(w, http.StatusOK, models.CaptureFrameResponse{
 					Success:   true,
 					SavedPath: filepath.ToSlash(relSaved),

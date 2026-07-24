@@ -233,3 +233,22 @@ type GenerateThumbnailResponse struct {
 	Success       bool   `json:"success"`
 	ThumbnailPath string `json:"thumbnailPath"`
 }
+
+type ProjectInfo struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
+type GetProjectsResponse struct {
+	LibraryRoot string        `json:"libraryRoot"`
+	Projects    []ProjectInfo `json:"projects"`
+}
+
+type CreateProjectRequest struct {
+	Name string `json:"name"`
+}
+
+type CreateProjectResponse struct {
+	Success bool        `json:"success"`
+	Project ProjectInfo `json:"project"`
+}

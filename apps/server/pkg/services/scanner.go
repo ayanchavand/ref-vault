@@ -40,11 +40,36 @@ func ExtractTagsFromPath(relativePath string) []string {
 		return []string{}
 	}
 
-	intermediate := parts[1 : len(parts)-1]
+	dirParts := parts[:len(parts)-1]
+	strippedRoot := false
+
+	// 1. Strip project media root container (refvault_media / refVault_Media / media)
+	if len(dirParts) > 0 {
+		firstLower := strings.ToLower(dirParts[0])
+		if firstLower == "refvault_media" || firstLower == "refvault_videos" || firstLower == "media" {
+			dirParts = dirParts[1:]
+			strippedRoot = true
+		}
+	}
+
+	// 2. Strip media category subfolder (images / gifs / videos)
+	if len(dirParts) > 0 {
+		firstLower := strings.ToLower(dirParts[0])
+		if firstLower == "images" || firstLower == "gifs" || firstLower == "videos" {
+			dirParts = dirParts[1:]
+			strippedRoot = true
+		}
+	}
+
+	// 3. Fallback: if no recognized root container was stripped, strip top-level root directory
+	if !strippedRoot && len(dirParts) > 1 {
+		dirParts = dirParts[1:]
+	}
+
 	var tags []string
 	var current string
 
-	for _, segment := range intermediate {
+	for _, segment := range dirParts {
 		if segment == "" {
 			continue
 		}
@@ -108,7 +133,8 @@ func findVideoDirs(rootPath, currentPath string) ([]discoveredVideo, error) {
 	}
 
 	for _, entry := range entries {
-		if entry.IsDir() && entry.Name() != ".vault" && entry.Name() != "node_modules" {
+		name := entry.Name()
+		if entry.IsDir() && name != ".vault" && name != "node_modules" && name != "clips" && name != "refvault_media" && name != "refVault_Media" {
 			subResults, err := findVideoDirs(rootPath, filepath.Join(currentPath, entry.Name()))
 			if err == nil {
 				results = append(results, subResults...)
@@ -126,7 +152,17 @@ func SyncVaultCache(libraryRoot string) error {
 		return err
 	}
 
-	discovered, err := findVideoDirs(libraryRoot, libraryRoot)
+	videoRootDir := filepath.Join(libraryRoot, "refvault_videos")
+	if _, err := os.Stat(videoRootDir); os.IsNotExist(err) {
+		altVideoRootDir := filepath.Join(libraryRoot, "refVault_Videos")
+		if info, err := os.Stat(altVideoRootDir); err == nil && info.IsDir() {
+			videoRootDir = altVideoRootDir
+		} else {
+			videoRootDir = libraryRoot
+		}
+	}
+
+	discovered, err := findVideoDirs(libraryRoot, videoRootDir)
 	if err != nil {
 		return fmt.Errorf("failed scanning video directories: %w", err)
 	}
@@ -450,16 +486,26 @@ func SyncMediaCache(libraryRoot string) error {
 		return err
 	}
 
+	mediaRootDir := filepath.Join(libraryRoot, "refvault_media")
+	if _, err := os.Stat(mediaRootDir); os.IsNotExist(err) {
+		altMediaRootDir := filepath.Join(libraryRoot, "refVault_Media")
+		if info, err := os.Stat(altMediaRootDir); err == nil && info.IsDir() {
+			mediaRootDir = altMediaRootDir
+		} else {
+			mediaRootDir = libraryRoot
+		}
+	}
+
 	foundPaths := make(map[string]bool)
 
-	err = filepath.WalkDir(libraryRoot, func(path string, d os.DirEntry, err error) error {
+	err = filepath.WalkDir(mediaRootDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
 
 		if d.IsDir() {
 			name := d.Name()
-			if name == ".vault" || name == "node_modules" || name == ".git" {
+			if name == ".vault" || name == "node_modules" || name == ".git" || name == "refvault_videos" || name == "refVault_Videos" {
 				return filepath.SkipDir
 			}
 			return nil

@@ -192,11 +192,6 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
     }
 
     if (importType === "media") {
-      if (!mediaRoot) {
-        setErrorMessage("Media library root path is not configured. Go to Settings.");
-        return;
-      }
-
       setIsImporting(true);
       setErrorMessage(null);
       setUploadPercent(0);
@@ -209,7 +204,7 @@ export function VideoImport({ rootPath, onImportSuccess, onBack, libraryConfig }
           setUploadingFileIndex(i);
 
           await uploadMediaFile(
-            mediaRoot,
+            rootPath,
             currentFile.name,
             currentFile,
             (percent) => {

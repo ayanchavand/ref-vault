@@ -6,6 +6,7 @@ import type {
   VideoDetail as VideoDetailType,
   LibraryConfig,
   JsonObject,
+  ProjectInfo,
 } from "@reference-vault/shared";
 
 import { Library, Tag, Upload, Image, Settings as SettingsIcon, ChevronLeft, ChevronRight } from "lucide-react";
@@ -33,17 +34,14 @@ const Onboarding = lazy(() =>
   import("./features/onboarding/Onboarding").then((m) => ({ default: m.Onboarding }))
 );
 
-import { scanLibrary, getVideoDetail, ApiError, getLibraryConfig } from "./lib/api";
+import { ProjectSelector } from "./features/projects/ProjectSelector";
+import { scanLibrary, getVideoDetail, ApiError, getLibraryConfig, getProjects } from "./lib/api";
 import { useHashRouter, navigate } from "./lib/router";
 
-const libraryRootStorageKey = "reference-vault.library-root";
+const activeProjectStorageKey = "reference-vault.active-project-path";
 
 // How many videos to show per page in the browse view.
 const VIDEOS_PER_PAGE = 6;
-
-function loadSavedLibraryRoot(): string {
-  return window.localStorage.getItem(libraryRootStorageKey) ?? "";
-}
 
 function shuffleVideos(videos: ScannedVideo[]): ScannedVideo[] {
   const shuffled = [...videos];
@@ -53,8 +51,6 @@ function shuffleVideos(videos: ScannedVideo[]): ScannedVideo[] {
   }
   return shuffled;
 }
-
-
 
 // Global keyframes shared by shimmer thumbnails and the top loading bar
 // across every feature component. Defined once here since App is always
@@ -203,8 +199,10 @@ function extractTags(metadata?: JsonObject): string[] {
 }
 
 export function App() {
-  const [savedRootPath, setSavedRootPath] = useState(loadSavedLibraryRoot);
-  const [activeRootPath, setActiveRootPath] = useState<string | null>(null);
+  const [projects, setProjects] = useState<ProjectInfo[]>([]);
+  const [activeProject, setActiveProject] = useState<ProjectInfo | null>(null);
+  const activeRootPath = activeProject ? activeProject.path : null;
+
   const activeRoute = useHashRouter(activeRootPath !== null);
   const [scanResult, setScanResult] = useState<ScanLibraryResponse | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<ScannedVideo | null>(null);
@@ -212,9 +210,6 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [openingVideoPath, setOpeningVideoPath] = useState<string | null>(null);
-  // Which page of the video grid is currently showing. Reset to 1 whenever
-  // a fresh scan happens; preserved when navigating to/from a video detail
-  // or the tag browser so the user doesn't lose their place.
   const [videoPage, setVideoPage] = useState(1);
   const [libraryConfig, setLibraryConfig] = useState<LibraryConfig>({ fields: [] });
 
@@ -230,38 +225,72 @@ export function App() {
     return Array.from(set).sort();
   }, [scanResult?.videos]);
 
-  // Auto-load saved library on mount
-  useEffect(() => {
-    const saved = loadSavedLibraryRoot();
-    if (saved) {
-      setActiveRootPath(saved);
-      setError(null);
-      setIsLoading(true);
-
-      Promise.all([
-        scanLibrary(saved),
-        getLibraryConfig({ rootPath: saved }).catch(() => ({ config: { fields: [] } })),
-      ])
-        .then(([scanRes, configRes]) => {
-          setScanResult({
-            ...scanRes,
-            videos: shuffleVideos(scanRes.videos),
-          });
-          setLibraryConfig(configRes.config);
-          setVideoPage(1);
-        })
-        .catch((cause) => {
-          const message =
-            cause instanceof ApiError
-              ? cause.message
-              : "The library could not be scanned.";
-          setError(message);
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
+  const loadProjectData = useCallback(async (projPath: string) => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      const [scanRes, configRes] = await Promise.all([
+        scanLibrary(projPath),
+        getLibraryConfig({ rootPath: projPath }).catch(() => ({ config: { fields: [] } })),
+      ]);
+      setScanResult({
+        ...scanRes,
+        videos: shuffleVideos(scanRes.videos),
+      });
+      setLibraryConfig(configRes.config);
+      setVideoPage(1);
+    } catch (cause) {
+      const message =
+        cause instanceof ApiError
+          ? cause.message
+          : "The library could not be scanned.";
+      setError(message);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
+
+  // Fetch projects on mount
+  useEffect(() => {
+    setIsLoading(true);
+    getProjects()
+      .then((res) => {
+        setProjects(res.projects);
+        if (res.projects.length === 0) {
+          setActiveProject(null);
+          navigate({ view: "SELECT_LIBRARY" });
+        } else {
+          const savedPath = window.localStorage.getItem(activeProjectStorageKey);
+          const matched = res.projects.find((p) => p.path === savedPath) || res.projects[0]!;
+          setActiveProject(matched);
+          window.localStorage.setItem(activeProjectStorageKey, matched.path);
+          loadProjectData(matched.path);
+        }
+      })
+      .catch((err) => {
+        setError(err instanceof ApiError ? err.message : "Failed to load projects.");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [loadProjectData]);
+
+  const handleSelectProject = useCallback((proj: ProjectInfo) => {
+    setActiveProject(proj);
+    window.localStorage.setItem(activeProjectStorageKey, proj.path);
+    setSelectedVideo(null);
+    setVideoDetail(null);
+    loadProjectData(proj.path);
+    navigate({ view: "BROWSE_LIBRARY" });
+  }, [loadProjectData]);
+
+  const handleProjectCreated = useCallback((newProj: ProjectInfo) => {
+    setProjects((prev) => {
+      if (prev.some((p) => p.path === newProj.path)) return prev;
+      return [...prev, newProj];
+    });
+    handleSelectProject(newProj);
+  }, [handleSelectProject]);
 
   // Fetch video details when activeRoute is VIEW_VIDEO
   useEffect(() => {
@@ -285,7 +314,6 @@ export function App() {
                 ? cause.message
                 : "The video details could not be loaded.";
             setError(message);
-            // Fallback back to library browser on error
             navigate({ view: "BROWSE_LIBRARY" });
           })
           .finally(() => {
@@ -295,71 +323,10 @@ export function App() {
     }
   }, [activeRoute, activeRootPath, videoDetail]);
 
-  async function handleVideoRootChange(newPath: string): Promise<void> {
-    window.localStorage.setItem(libraryRootStorageKey, newPath);
-    setSavedRootPath(newPath);
-    setActiveRootPath(newPath);
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const [scanRes, configRes] = await Promise.all([
-        scanLibrary(newPath),
-        getLibraryConfig({ rootPath: newPath }).catch(() => ({ config: { fields: [] } })),
-      ]);
-      setScanResult({
-        ...scanRes,
-        videos: shuffleVideos(scanRes.videos),
-      });
-      setLibraryConfig(configRes.config);
-      setVideoPage(1);
-    } catch (cause) {
-      const message =
-        cause instanceof ApiError
-          ? cause.message
-          : "The library could not be scanned.";
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  function handleVideoRootForget(): void {
-    window.localStorage.removeItem(libraryRootStorageKey);
-    setSavedRootPath("");
-    setActiveRootPath(null);
-    setScanResult(null);
-    setSelectedVideo(null);
-    setVideoDetail(null);
-    setVideoPage(1);
-    setLibraryConfig({ fields: [] });
-  }
-
-  const [activeMediaRoot, setActiveMediaRoot] = useState(() => window.localStorage.getItem("reference-vault.media-root") ?? "");
-
-  function handleMediaRootChange(newPath: string): void {
-    setActiveMediaRoot(newPath);
-  }
-
-  function handleMediaRootForget(): void {
-    setActiveMediaRoot("");
-  }
-
   const handleSelectVideo = useCallback((video: ScannedVideo): void => {
     setSelectedVideo(video);
     navigate({ view: "VIEW_VIDEO", path: video.relativePath });
   }, []);
-
-  function handleBrowseTags(): void {
-    setSelectedVideo(null);
-    setVideoDetail(null);
-    navigate({ view: "BROWSE_TAGS" });
-  }
-
-  function handleBrowseMedia(): void {
-    navigate({ view: "BROWSE_MEDIA" });
-  }
-
 
   function handleUpdateVideoDetail(updatedVideo: VideoDetailType): void {
     setVideoDetail(updatedVideo);
@@ -386,7 +353,6 @@ export function App() {
     }
   }
 
-
   function handlePrevVideoPage(): void {
     setVideoPage((page) => Math.max(1, page - 1));
   }
@@ -402,8 +368,6 @@ export function App() {
   const totalVideoPages = scanResult
     ? Math.max(1, Math.ceil(scanResult.videos.length / VIDEOS_PER_PAGE))
     : 1;
-  // Clamp in case the underlying list ever shrinks (e.g. a re-scan) while
-  // sitting on a page that no longer exists.
   const clampedVideoPage = Math.min(videoPage, totalVideoPages);
   const paginatedVideos = scanResult
     ? scanResult.videos.slice(
@@ -412,8 +376,8 @@ export function App() {
       )
     : [];
 
-  // Render onboarding fullscreen — no header or nav
-  if (activeRoute.view === "SELECT_LIBRARY") {
+  // Render onboarding fullscreen if no project active or selecting library
+  if (activeRoute.view === "SELECT_LIBRARY" || (!activeProject && !isLoading)) {
     return (
       <main className="m-0 min-h-screen bg-[#0A0B0D] text-white">
         <GlobalMotionStyles />
@@ -422,16 +386,7 @@ export function App() {
             Loading…
           </div>
         }>
-          <Onboarding
-            onComplete={async (videoPath, mediaPath) => {
-              if (mediaPath) {
-                window.localStorage.setItem("reference-vault.media-root", mediaPath);
-                setActiveMediaRoot(mediaPath);
-              }
-              await handleVideoRootChange(videoPath);
-              navigate({ view: "BROWSE_LIBRARY" });
-            }}
-          />
+          <Onboarding onComplete={handleProjectCreated} />
         </Suspense>
       </main>
     );
@@ -441,7 +396,7 @@ export function App() {
     <main className="m-0 min-h-screen bg-[#0A0B0D] text-white">
       <GlobalMotionStyles />
 
-      {/* Global top loading bar — always visible when any async work is in flight */}
+      {/* Global top loading bar */}
       {isBusy && (
         <div className="fixed inset-x-0 top-0 z-50 h-0.5 overflow-hidden bg-white/[0.06]">
           <div className="h-full w-1/3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(232,163,61,0.7)] animate-[rv-progress_1.3s_ease-in-out_infinite]" />
@@ -459,9 +414,18 @@ export function App() {
             <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-white to-white/60 sm:text-2xl">
               Reference Vault
             </h1>
+
+            {projects.length > 0 && (
+              <ProjectSelector
+                projects={projects}
+                activeProject={activeProject}
+                onSelectProject={handleSelectProject}
+                onProjectCreated={handleProjectCreated}
+              />
+            )}
           </div>
 
-          {/* Desktop navbar (hidden on mobile) */}
+          {/* Desktop navbar */}
           <nav className="hidden sm:flex sm:items-center sm:gap-2">
             {[
               {
@@ -624,17 +588,13 @@ export function App() {
 
             {activeRoute.view === "BROWSE_MEDIA" && (
               <div className="animate-[rv-fade-up_0.35s_ease-out_both] px-2 sm:px-0 flex flex-col flex-1 min-h-0 h-full">
-                <MediaBrowser onGoToSettings={() => navigate({ view: "SETTINGS" })} />
+                <MediaBrowser rootPath={activeRootPath!} onGoToSettings={() => navigate({ view: "SETTINGS" })} />
               </div>
             )}
 
             {activeRoute.view === "SETTINGS" && (
               <div className="animate-[rv-fade-up_0.35s_ease-out_both] px-2 sm:px-0">
                 <Settings
-                  onVideoLibraryChange={handleVideoRootChange}
-                  onForgetVideoLibrary={handleVideoRootForget}
-                  onMediaLibraryChange={handleMediaRootChange}
-                  onForgetMediaLibrary={handleMediaRootForget}
                   videoLibraryPath={activeRootPath ?? ""}
                   libraryConfig={libraryConfig}
                   onUpdateLibraryConfig={setLibraryConfig}

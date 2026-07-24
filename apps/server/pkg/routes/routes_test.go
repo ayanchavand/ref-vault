@@ -50,9 +50,9 @@ func TestInitLibraryEndpoint(t *testing.T) {
 		t.Fatalf("Expected status 200, got %d", w.Code)
 	}
 
-	videoDir := filepath.Join(tempDir, "refVault_Videos")
+	videoDir := filepath.Join(tempDir, "refvault_videos")
 	if _, err := os.Stat(videoDir); err != nil {
-		t.Errorf("Expected video directory refVault_Videos to exist")
+		t.Errorf("Expected video directory refvault_videos to exist")
 	}
 }
 
@@ -103,7 +103,7 @@ func TestLibraryConfigEndpoints(t *testing.T) {
 func TestScanLibraryAndVideosDetailEndpoints(t *testing.T) {
 	r, tempDir := setupTestServer(t)
 
-	vidDir := filepath.Join(tempDir, "sample-video")
+	vidDir := filepath.Join(tempDir, "refvault_videos", "sample-video")
 	_ = os.MkdirAll(filepath.Join(vidDir, "clips"), 0755)
 	_ = os.WriteFile(filepath.Join(vidDir, "main.mp4"), []byte("mp4 dummy content"), 0644)
 	_ = os.WriteFile(filepath.Join(vidDir, "metadata.json"), []byte(`{"title":"Sample"}`), 0644)
@@ -123,7 +123,7 @@ func TestScanLibraryAndVideosDetailEndpoints(t *testing.T) {
 	// POST /api/videos/detail
 	detailBody, _ := json.Marshal(models.GetVideoDetailRequest{
 		RootPath:          tempDir,
-		VideoRelativePath: "sample-video",
+		VideoRelativePath: "refvault_videos/sample-video",
 	})
 	detailReq := httptest.NewRequest("POST", "/api/videos/detail", bytes.NewBuffer(detailBody))
 	detailReq.Header.Set("Content-Type", "application/json")
@@ -139,7 +139,7 @@ func TestScanLibraryAndVideosDetailEndpoints(t *testing.T) {
 func TestMediaScanAndCategorizeEndpoints(t *testing.T) {
 	r, tempDir := setupTestServer(t)
 
-	imgDir := filepath.Join(tempDir, "images")
+	imgDir := filepath.Join(tempDir, "refvault_media", "images")
 	_ = os.MkdirAll(imgDir, 0755)
 	_ = os.WriteFile(filepath.Join(imgDir, "photo.jpg"), []byte("jpeg image data"), 0644)
 
@@ -159,7 +159,7 @@ func TestMediaScanAndCategorizeEndpoints(t *testing.T) {
 	cat := "images/favorites"
 	catBody, _ := json.Marshal(models.CategorizeMediaRequest{
 		RootPath:          tempDir,
-		MediaRelativePath: "images/photo.jpg",
+		MediaRelativePath: "refvault_media/images/photo.jpg",
 		Category:          &cat,
 	})
 	catReq := httptest.NewRequest("POST", "/api/media/categorize", bytes.NewBuffer(catBody))
@@ -170,6 +170,11 @@ func TestMediaScanAndCategorizeEndpoints(t *testing.T) {
 
 	if catW.Code != http.StatusOK {
 		t.Fatalf("Expected status 200 for POST /api/media/categorize, got %d. Body: %s", catW.Code, catW.Body.String())
+	}
+
+	catPath := filepath.Join(tempDir, "refvault_media", "images", "favorites", "photo.jpg")
+	if _, err := os.Stat(catPath); err != nil {
+		t.Errorf("Expected categorized file to exist at %s", catPath)
 	}
 }
 
@@ -193,14 +198,14 @@ func TestVideosPlaceholderAndUploadDeleteEndpoints(t *testing.T) {
 
 	var createResp models.CreateVideoPlaceholderResponse
 	_ = json.Unmarshal(createW.Body.Bytes(), &createResp)
-	if createResp.VideoRelativePath != "my-new-video" {
-		t.Errorf("Expected folder my-new-video, got %s", createResp.VideoRelativePath)
+	if createResp.VideoRelativePath != "refvault_videos/my-new-video" {
+		t.Errorf("Expected folder refvault_videos/my-new-video, got %s", createResp.VideoRelativePath)
 	}
 
 	// POST /api/videos/delete
 	delBody, _ := json.Marshal(models.DeleteVideoRequest{
 		RootPath:          tempDir,
-		VideoRelativePath: "my-new-video",
+		VideoRelativePath: "refvault_videos/my-new-video",
 	})
 	delReq := httptest.NewRequest("POST", "/api/videos/delete", bytes.NewBuffer(delBody))
 	delReq.Header.Set("Content-Type", "application/json")

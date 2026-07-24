@@ -2,10 +2,12 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
 	"os/exec"
+	"time"
 )
 
 type ProbeResult struct {
@@ -26,7 +28,11 @@ type ffprobeOutput struct {
 
 // ProbeVideo runs ffprobe on the target video file to extract width, height, and framerate.
 func ProbeVideo(filePath string) (ProbeResult, error) {
-	cmd := exec.Command(
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(
+		ctx,
 		"ffprobe",
 		"-v", "error",
 		"-select_streams", "v:0",
@@ -40,6 +46,9 @@ func ProbeVideo(filePath string) (ProbeResult, error) {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return ProbeResult{}, fmt.Errorf("ffprobe timed out after 15s")
+		}
 		return ProbeResult{}, fmt.Errorf("ffprobe failed: %w (stderr: %s)", err, stderr.String())
 	}
 
@@ -73,8 +82,12 @@ func ProbeVideo(filePath string) (ProbeResult, error) {
 
 // GenerateThumbnail extracts a thumbnail from a video file at 2s timestamp (or 0s fallback), scaled to 480px width.
 func GenerateThumbnail(videoPath, outputPath string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	// Try seeking to 2 seconds first
-	cmd := exec.Command(
+	cmd := exec.CommandContext(
+		ctx,
 		"ffmpeg",
 		"-y",
 		"-ss", "00:00:02",
@@ -92,7 +105,8 @@ func GenerateThumbnail(videoPath, outputPath string) error {
 	}
 
 	// Fallback: Seek to 0 seconds if video is short or 2s seek fails
-	cmdFallback := exec.Command(
+	cmdFallback := exec.CommandContext(
+		ctx,
 		"ffmpeg",
 		"-y",
 		"-ss", "00:00:00",
@@ -105,6 +119,9 @@ func GenerateThumbnail(videoPath, outputPath string) error {
 	cmdFallback.Stderr = &stderrFallback
 
 	if err := cmdFallback.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("ffmpeg thumbnail generation timed out after 30s")
+		}
 		return fmt.Errorf("ffmpeg thumbnail generation failed: %w (stderr: %s)", err, stderrFallback.String())
 	}
 
@@ -113,6 +130,9 @@ func GenerateThumbnail(videoPath, outputPath string) error {
 
 // CaptureFrame extracts a frame from a video/media file at a specific timestamp using optimized two-stage seeking.
 func CaptureFrame(videoPath string, timestamp float64, outputPath string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	var args []string
 	args = append(args, "-y")
 	if timestamp > 10 {
@@ -126,11 +146,14 @@ func CaptureFrame(videoPath string, timestamp float64, outputPath string) error 
 	}
 	args = append(args, "-vframes", "1", "-q:v", "2", outputPath)
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("ffmpeg frame capture timed out after 30s")
+		}
 		return fmt.Errorf("ffmpeg frame capture failed: %w (stderr: %s)", err, stderr.String())
 	}
 
@@ -139,6 +162,9 @@ func CaptureFrame(videoPath string, timestamp float64, outputPath string) error 
 
 // ChopVideoSegment slices a segment from a main video file into a clip file using x264/aac.
 func ChopVideoSegment(mainVideoPath string, start, end float64, outputPath string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
 	duration := end - start
 	if duration < 0 {
 		duration = 0
@@ -155,11 +181,14 @@ func ChopVideoSegment(mainVideoPath string, start, end float64, outputPath strin
 		outputPath,
 	}
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("ffmpeg clip chopping timed out after 120s")
+		}
 		return fmt.Errorf("ffmpeg clip chopping failed: %w (stderr: %s)", err, stderr.String())
 	}
 

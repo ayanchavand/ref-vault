@@ -20,11 +20,12 @@ func GetVaultDb(libraryRootPath string) (*sql.DB, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	if db, ok := dbCache[libraryRootPath]; ok {
+	cleanRoot := filepath.ToSlash(filepath.Clean(libraryRootPath))
+	if db, ok := dbCache[cleanRoot]; ok {
 		return db, nil
 	}
 
-	vaultDir := filepath.Join(libraryRootPath, ".vault")
+	vaultDir := filepath.Join(cleanRoot, ".vault")
 	if err := os.MkdirAll(vaultDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create .vault directory: %w", err)
 	}
@@ -88,6 +89,6 @@ func GetVaultDb(libraryRootPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to create sqlite tables: %w", err)
 	}
 
-	dbCache[libraryRootPath] = db
+	dbCache[cleanRoot] = db
 	return db, nil
 }

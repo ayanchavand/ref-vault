@@ -29,6 +29,9 @@ import type {
   PutLibraryConfigResponse,
   CategorizeMediaRequest,
   CategorizeMediaResponse,
+  GetProjectsResponse,
+  CreateProjectResponse,
+  ProjectInfo,
 } from "@reference-vault/shared";
 
 export class ApiError extends Error {
@@ -425,6 +428,35 @@ export async function putLibraryConfig(
 
   return payload as PutLibraryConfigResponse;
 }
+
+export async function getProjects(): Promise<GetProjectsResponse> {
+  const response = await fetch("/api/projects");
+  const payload: unknown = await response.json();
+
+  if (!response.ok) {
+    const error = payload as ApiErrorResponse;
+    throw new ApiError(error.message || "Failed to scan projects directory.");
+  }
+
+  return payload as GetProjectsResponse;
+}
+
+export async function createProject(name: string): Promise<CreateProjectResponse> {
+  const response = await fetch("/api/projects/create", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  const payload: unknown = await response.json();
+
+  if (!response.ok) {
+    const error = payload as ApiErrorResponse;
+    throw new ApiError(error.message || "Failed to create new project.");
+  }
+
+  return payload as CreateProjectResponse;
+}
+
 
 
 
